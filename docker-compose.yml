@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000                                 # Your UID (run `id -u` to check)
+      - PGID=1000                                 # Your GID (run `id -g` to check)
+      - TZ=Europe/Moscow                          # Set your timezone
+      - WEBUI_PORT=8085                           # Web UI port (inside container)
+    volumes:
+      - ./config:/config                          # Stores settings
+      - /mnt/DATA:/DATA                           # Maps mounted share to DATA
+    ports:
+      - 8085:8085                                 # Web UI (host:container)
+      - 6881:6881                                 # BT port (TCP)
+      - 6881:6881/udp                             # BT port (UDP)
+    restart: unless-stopped
