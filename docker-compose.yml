@@ -11,21 +11,5 @@ services:
     volumes:
       - ./config:/config                          # Stores settings
       - /mnt/DATA:/DATA                           # Maps mounted share to DATA
-    networks:
-      - bypass-vpn                               # Use network that bypasses VPN
-      - default                                  # Use default bridge for port access
-    ports:
-      - 8085:8085                                 # Web UI (host:container)
-      - 6881:6881                                 # BT port (TCP)
-      - 6881:6881/udp                             # BT port (UDP)
+    network_mode: host                            # Use host network to bypass VPN completely
     restart: unless-stopped
-
-networks:
-  bypass-vpn:
-    driver: macvlan
-    driver_opts:
-      parent: enx00e04c68045d                     # Physical interface name
-    ipam:
-      config:
-        - subnet: "192.168.0.0/24"                # Local subnet
-          gateway: "192.168.0.1"                  # Gateway IP
