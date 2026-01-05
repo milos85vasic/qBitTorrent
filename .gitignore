@@ -1,0 +1,6 @@
+# qBittorrent configuration and data
+config/qBittorrent/
+!config/qBittorrent/.gitkeep
+
+# Keep directory structure but ignore all contents
+config/qBittorrent/*
