@@ -13,6 +13,7 @@ services:
       - /mnt/DATA:/DATA                           # Maps mounted share to DATA
     networks:
       - bypass-vpn                               # Use network that bypasses VPN
+      - default                                  # Use default bridge for port access
     ports:
       - 8085:8085                                 # Web UI (host:container)
       - 6881:6881                                 # BT port (TCP)
@@ -23,7 +24,7 @@ networks:
   bypass-vpn:
     driver: macvlan
     driver_opts:
-      parent: YOUR_INTERFACE_NAME                # Physical interface name
+      parent: enx00e04c68045d                     # Physical interface name
     ipam:
       config:
         - subnet: "192.168.0.0/24"                # Local subnet
