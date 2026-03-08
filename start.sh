@@ -222,20 +222,30 @@ pull_image() {
 copy_plugins() {
     print_info "Installing search plugins..."
     
-    if [[ -d "plugins" ]]; then
-        for plugin in plugins/*.py; do
-            if [[ -f "$plugin" ]]; then
-                cp "$plugin" config/qBittorrent/nova3/engines/
-                print_success "Installed: $(basename "$plugin")"
-            fi
-        done
-        
-        for icon in plugins/*.png; do
-            if [[ -f "$icon" ]]; then
-                cp "$icon" config/qBittorrent/nova3/engines/
-            fi
-        done
+    local engines_dir="config/qBittorrent/nova3/engines"
+    
+    if [[ ! -d "plugins" ]]; then
+        print_warning "No plugins directory found"
+        return 0
     fi
+    
+    local copy_cmd="cp"
+    if [[ "$CONTAINER_RUNTIME" == "podman" ]]; then
+        copy_cmd="podman unshare cp"
+    fi
+    
+    for plugin in plugins/*.py; do
+        if [[ -f "$plugin" ]]; then
+            $copy_cmd "$plugin" "$engines_dir/"
+            print_success "Installed: $(basename "$plugin")"
+        fi
+    done
+    
+    for icon in plugins/*.png; do
+        if [[ -f "$icon" ]]; then
+            $copy_cmd "$icon" "$engines_dir/"
+        fi
+    done
 }
 
 start_container() {
