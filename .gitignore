@@ -1,6 +1,8 @@
 # qBittorrent Configuration
 config/qBittorrent/
 !config/qBittorrent/.gitkeep
+!config/qBittorrent/config/
+!config/qBittorrent/config/qBittorrent.conf
 
 # Keep directory structure but ignore all contents
 config/qBittorrent/*
@@ -13,6 +15,7 @@ config/qBittorrent/*
 # Environment files (may contain secrets)
 .env
 .env.*
+!.env.example
 *.env
 .qbit.env
 
@@ -52,6 +55,13 @@ Thumbs.db
 .project
 .classpath
 .settings/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
 # Backup files
 *.bak

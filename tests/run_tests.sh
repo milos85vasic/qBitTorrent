@@ -696,7 +696,7 @@ test_documentation() {
     
     test_start ".env.example has all required variables"
     if assert_file_exists ".env.example"; then
-        local vars=("RUTRACKER_USERNAME" "RUTRACKER_PASSWORD" "PUID" "PGID" "TZ" "WEBUI_PORT")
+        local vars=("RUTRACKER_USERNAME" "RUTRACKER_PASSWORD" "PUID" "PGID" "TZ" "WEBUI_PORT" "QBITTORRENT_DATA_DIR")
         local missing=0
         for v in "${vars[@]}"; do
             if ! grep -q "$v" .env.example; then
@@ -711,6 +711,60 @@ test_documentation() {
         fi
     else
         test_fail ".env.example not found"
+    fi
+    
+    suite_end
+}
+
+test_data_directory() {
+    suite_start "Data Directory Configuration"
+    
+    test_start "docker-compose.yml uses QBITTORRENT_DATA_DIR variable"
+    if grep -q 'QBITTORRENT_DATA_DIR' docker-compose.yml 2>/dev/null; then
+        test_pass "docker-compose.yml references QBITTORRENT_DATA_DIR"
+    else
+        test_fail "docker-compose.yml missing QBITTORRENT_DATA_DIR variable"
+    fi
+    
+    test_start "QBITTORRENT_DATA_DIR has default value in docker-compose.yml"
+    if grep -q 'QBITTORRENT_DATA_DIR:-' docker-compose.yml 2>/dev/null; then
+        test_pass "QBITTORRENT_DATA_DIR has default fallback"
+    else
+        test_fail "QBITTORRENT_DATA_DIR missing default value"
+    fi
+    
+    test_start "start.sh creates data directories"
+    if grep -q 'create_data_directories' start.sh 2>/dev/null; then
+        test_pass "start.sh has create_data_directories function"
+    else
+        test_fail "start.sh missing create_data_directories function"
+    fi
+    
+    test_start "start.sh loads environment variables"
+    if grep -q 'load_environment' start.sh 2>/dev/null; then
+        test_pass "start.sh has load_environment function"
+    else
+        test_fail "start.sh missing load_environment function"
+    fi
+    
+    test_start "Incomplete directory is configured"
+    if grep -q 'Incomplete' config/qBittorrent/config/qBittorrent.conf 2>/dev/null; then
+        test_pass "qBittorrent config has Incomplete directory"
+    else
+        test_fail "qBittorrent config missing Incomplete directory"
+    fi
+    
+    test_start "Torrents directories are mentioned in .env.example"
+    if grep -q 'Torrents/All' .env.example 2>/dev/null; then
+        test_pass ".env.example documents Torrents/All directory"
+    else
+        test_fail ".env.example missing Torrents/All documentation"
+    fi
+    
+    if grep -q 'Torrents/Completed' .env.example 2>/dev/null; then
+        test_pass ".env.example documents Torrents/Completed directory"
+    else
+        test_fail ".env.example missing Torrents/Completed documentation"
     fi
     
     suite_end
@@ -820,6 +874,7 @@ AVAILABLE SUITES:
     container           Container operation tests
     docs                Documentation tests
     security            Security checks
+    datadir             Data directory configuration tests
     all                 Run all tests (default)
 
 EXAMPLES:
@@ -844,6 +899,7 @@ list_suites() {
     echo "  container   - Container operation tests"
     echo "  docs        - Documentation tests"
     echo "  security    - Security checks"
+    echo "  datadir     - Data directory configuration tests"
     echo "  all         - Run all tests (default)"
     exit 0
 }
@@ -933,6 +989,9 @@ main() {
             security)
                 test_security
                 ;;
+            datadir)
+                test_data_directory
+                ;;
             all)
                 test_project_structure
                 test_syntax_validation
@@ -944,6 +1003,7 @@ main() {
                 test_container_operations
                 test_documentation
                 test_security
+                test_data_directory
                 ;;
             *)
                 echo "Unknown suite: $suite"

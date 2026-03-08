@@ -35,9 +35,18 @@
    - Under **Authentication**, set new username and password
    - Click **Save**
 
-4. **Configure Download Location**:
-   - In **Tools** → **Options** → **Downloads**
-   - Set "Default Save Path" to `/DATA` (or your preferred location)
+4. **Configure Data Directory**:
+   - The data directory is set via `QBITTORRENT_DATA_DIR` environment variable
+   - Default: `/mnt/DATA`
+   - To customize, add to `.env`:
+     ```bash
+     QBITTORRENT_DATA_DIR=/your/custom/path
+     ```
+   - Restart the container for changes to take effect
+   - Required subdirectories are created automatically:
+     - `Incomplete/` - Partial downloads
+     - `Torrents/All/` - All .torrent files
+     - `Torrents/Completed/` - Completed .torrent files
 
 ---
 
@@ -193,10 +202,12 @@ Access via: **Tools** → **Options**
 
 | Setting | Recommended Value |
 |---------|-------------------|
-| Default Save Path | `/DATA` |
-| Keep incomplete torrents in | `/DATA/incomplete` |
+| Default Save Path | `/DATA` (mapped from `QBITTORRENT_DATA_DIR`) |
+| Keep incomplete torrents in | `/DATA/Incomplete` |
 | Torrent Management Mode | Automatic |
 | Pre-allocate disk space | Enabled (for less fragmentation) |
+
+> **Note:** The `/DATA` path inside the container is mapped to the host directory specified by `QBITTORRENT_DATA_DIR` (default: `/mnt/DATA`).
 
 #### Connection Tab
 
@@ -307,6 +318,14 @@ docker compose logs -f qbittorrent
 
 **Q: How do I change the Web UI port?**
 > Edit `.env` and change `WEBUI_PORT=8085` to your desired port, then restart.
+
+**Q: How do I change the data/download directory?**
+> Set `QBITTORRENT_DATA_DIR` in one of these locations:
+> 1. Project `.env` file: `QBITTORRENT_DATA_DIR=/your/path`
+> 2. `~/.qbit.env` file: `QBITTORRENT_DATA_DIR=/your/path`
+> 3. Shell environment (`~/.bashrc`): `export QBITTORRENT_DATA_DIR=/your/path`
+>
+> Then restart the container: `./stop.sh && ./start.sh`
 
 **Q: Can I access qBitTorrent remotely?**
 > Yes, but secure it first:

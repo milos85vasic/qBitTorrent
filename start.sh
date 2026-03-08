@@ -19,6 +19,153 @@ print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+load_env_file() {
+    local env_file="$1"
+    if [[ -f "$env_file" ]]; then
+        print_info "Loading environment from: $env_file"
+        set -a
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+            if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                local key="${BASH_REMATCH[1]}"
+                local value="${BASH_REMATCH[2]}"
+                key="${key//[[:space:]]/}"
+                value="${value#\"}"
+                value="${value%\"}"
+                value="${value#\'}"
+                value="${value%\'}"
+                if [[ -z "${!key:-}" ]]; then
+                    export "$key"="$value"
+                fi
+            fi
+        done < "$env_file"
+        set +a
+    fi
+}
+
+load_environment() {
+    local env_priority=(
+        "$SCRIPT_DIR/.env"
+        "$HOME/.qbit.env"
+    )
+    
+    for env_file in "${env_priority[@]}"; do
+        load_env_file "$env_file"
+    done
+    
+    QBITTORRENT_DATA_DIR="${QBITTORRENT_DATA_DIR:-/mnt/DATA}"
+    export QBITTORRENT_DATA_DIR
+    
+    print_info "Data directory: $QBITTORRENT_DATA_DIR"
+}
+
+create_data_directories() {
+    print_info "Creating data directories..."
+    
+    local data_dir="$QBITTORRENT_DATA_DIR"
+    
+    if [[ ! -d "$data_dir" ]]; then
+        print_warning "Data directory does not exist: $data_dir"
+        print_info "Attempting to create: $data_dir"
+        mkdir -p "$data_dir" 2>/dev/null || {
+            print_warning "Could not create data directory. This is expected if it's a mounted volume."
+        }
+    fi
+    
+    local subdirs=(
+        "Incomplete"
+        "Torrents/All"
+        "Torrents/Completed"
+    )
+    
+    for subdir in "${subdirs[@]}"; do
+        local full_path="$data_dir/$subdir"
+        if [[ ! -d "$full_path" ]]; then
+            print_info "Creating: $full_path"
+            mkdir -p "$full_path" 2>/dev/null || {
+                print_warning "Could not create subdirectory: $full_path"
+            }
+        fi
+    done
+    
+    print_success "Data directories verified"
+}
+
+update_qbittorrent_config() {
+    local config_file="$SCRIPT_DIR/config/qBittorrent/config/qBittorrent.conf"
+    local config_dir
+    config_dir=$(dirname "$config_file")
+    
+    if [[ ! -d "$config_dir" ]]; then
+        mkdir -p "$config_dir"
+    fi
+    
+    if [[ ! -f "$config_file" ]]; then
+        print_info "Creating default qBittorrent configuration..."
+        cat > "$config_file" << 'EOF'
+[LegalNotice]
+Accepted=true
+
+[BitTorrent]
+Session\DefaultSavePath=/DATA
+Session\TempPath=/DATA/Incomplete
+Session\TempPathEnabled=true
+Session\IncompleteFilesExtension=.!qB
+
+[Preferences]
+Downloads\SavePath=/DATA
+Downloads\TempPath=/DATA/Incomplete
+Downloads\TempPathEnabled=true
+Downloads\IncompleteFilesExt=!qB
+Downloads\PreAllocation=false
+Downloads\UseIncompleteExtension=true
+
+Advanced\AnnounceToAllTrackers=true
+Advanced\AnnounceToAllTiers=true
+Advanced\AnonymousMode=false
+Advanced\AsyncIOThreadsCount=10
+Advanced\FilePoolSize=5000
+Advanced\CheckingMemoryUse=512
+Advanced\OutgoingPortsMin=0
+Advanced\OutgoingPortsMax=0
+
+Connection\GlobalDLLimit=0
+Connection\GlobalDLLimitAlt=0
+Connection\GlobalUPLimit=0
+Connection\GlobalUPLimitAlt=0
+Connection\MaxConnections=500
+Connection\MaxConnectionsPerTorrent=100
+Connection\MaxUploads=20
+Connection\MaxUploadsPerTorrent=4
+
+General\Locale=en
+General\UseRandomPort=true
+General\ExitCheckDownloads=true
+
+WebUI\Enabled=true
+WebUI\Port=8085
+WebUI\Address=*
+WebUI\LocalHostAuth=false
+WebUI\AuthSubnetWhitelist=0.0.0.0/0
+WebUI\AuthSubnetWhitelistEnabled=true
+WebUI\ServerDomains=*
+WebUI\UseUPNP=true
+WebUI\UseHTTPS=false
+
+MailNotification\Enabled=false
+
+RSS\AutoDownloader\Enabled=false
+
+Search\PluginManager\UseProxy=false
+Search\PluginManager\Enabled=true
+EOF
+        print_success "Default configuration created"
+    fi
+    
+    print_success "qBittorrent configuration ready"
+}
+
 detect_container_runtime() {
     if command -v podman &> /dev/null; then
         CONTAINER_RUNTIME="podman"
@@ -130,6 +277,11 @@ show_status() {
     print_info "Default credentials: admin / adminadmin"
     print_warning "Remember to change the default password!"
     echo ""
+    print_info "Data Directory: $QBITTORRENT_DATA_DIR"
+    print_info "  Downloads:     $QBITTORRENT_DATA_DIR"
+    print_info "  Incomplete:    $QBITTORRENT_DATA_DIR/Incomplete"
+    print_info "  Torrents:      $QBITTORRENT_DATA_DIR/Torrents"
+    echo ""
     
     if [[ -f "config/qBittorrent/nova3/engines/rutracker.py" ]]; then
         print_info "RuTracker plugin installed"
@@ -201,6 +353,7 @@ main() {
         set -x
     fi
 
+    load_environment
     detect_container_runtime
     check_prerequisites
 
@@ -210,6 +363,8 @@ main() {
     fi
 
     create_directories
+    update_qbittorrent_config
+    create_data_directories
 
     if [[ "$install_plugins" == true ]]; then
         copy_plugins

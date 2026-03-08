@@ -202,11 +202,34 @@ services:
 
 ### Environment Variables
 
-- Use uppercase with underscores: `PUID`, `WEBUI_PORT`, `RUTRACKER_USERNAME`
+- Use uppercase with underscores: `PUID`, `WEBUI_PORT`, `RUTRACKER_USERNAME`, `QBITTORRENT_DATA_DIR`
 - Document each variable with inline comments
 - Keep sensitive values in `.env` files (add to .gitignore)
 - Provide sensible defaults where possible
 - Support multiple credential sources (project .env, ~/.qbit.env, environment)
+
+### Data Directory Configuration
+
+The `QBITTORRENT_DATA_DIR` environment variable controls where downloads are stored:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `QBITTORRENT_DATA_DIR` | Base directory for all downloads | `/mnt/DATA` |
+
+**Directory Structure Created Automatically:**
+
+| Path | Purpose |
+|------|---------|
+| `$QBITTORRENT_DATA_DIR/` | Main download directory |
+| `$QBITTORRENT_DATA_DIR/Incomplete/` | Incomplete/partial downloads |
+| `$QBITTORRENT_DATA_DIR/Torrents/All/` | All .torrent files |
+| `$QBITTORRENT_DATA_DIR/Torrents/Completed/` | Completed .torrent files |
+
+**Configuration Sources (in priority order):**
+1. Project `.env` file (`./.env`)
+2. Home directory config (`~/.qbit.env`)
+3. Shell environment (from `~/.bashrc` exports)
+4. Default value (`/mnt/DATA`)
 
 ### Naming Conventions
 

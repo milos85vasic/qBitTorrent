@@ -98,6 +98,9 @@ RUTRACKER_PASSWORD=your_password
 # Optional: Custom RuTracker Mirrors
 # RUTRACKER_MIRRORS=https://rutracker.org,https://rutracker.net
 
+# Data Directory (default: /mnt/DATA)
+QBITTORRENT_DATA_DIR=/path/to/your/data
+
 # qBitTorrent Configuration
 PUID=1000
 PGID=1000
@@ -111,15 +114,34 @@ id -u    # Shows your UID
 id -g    # Shows your GID
 ```
 
-### Step 3: Configure Volumes
+### Step 3: Configure Data Directory
 
-Edit the volume mappings in `docker-compose.yml`:
+The data directory is configured via the `QBITTORRENT_DATA_DIR` environment variable.
 
-```yaml
-volumes:
-  - ./config:/config             # Configuration storage
-  - /mnt/DATA:/DATA              # Your download location
+**Option 1: Using .env file (recommended)**
+```bash
+# Edit .env file
+echo "QBITTORRENT_DATA_DIR=/your/custom/path" >> .env
 ```
+
+**Option 2: Using ~/.bashrc**
+```bash
+# Add to ~/.bashrc
+export QBITTORRENT_DATA_DIR="/your/custom/path"
+```
+
+**Option 3: Using ~/.qbit.env**
+```bash
+# Create or edit ~/.qbit.env
+echo "QBITTORRENT_DATA_DIR=/your/custom/path" >> ~/.qbit.env
+```
+
+If not set, defaults to `/mnt/DATA`.
+
+The `start.sh` script will automatically create the required subdirectories:
+- `Incomplete/` - For partial downloads
+- `Torrents/All/` - For all .torrent files
+- `Torrents/Completed/` - For completed .torrent files
 
 ### Step 4: Start the Service
 
@@ -137,10 +159,22 @@ chmod +x *.sh
 | `RUTRACKER_USERNAME` | RuTracker username | - | For plugin |
 | `RUTRACKER_PASSWORD` | RuTracker password | - | For plugin |
 | `RUTRACKER_MIRRORS` | Custom mirrors (comma-separated) | - | No |
+| `QBITTORRENT_DATA_DIR` | Data directory for downloads | `/mnt/DATA` | No |
 | `PUID` | User ID for file permissions | `1000` | Yes |
 | `PGID` | Group ID for file permissions | `1000` | Yes |
 | `TZ` | Timezone (TZ format) | `Europe/Moscow` | Yes |
 | `WEBUI_PORT` | Port for Web UI | `8085` | Yes |
+
+### Data Directory Structure
+
+When `QBITTORRENT_DATA_DIR` is set, the following directory structure is automatically created:
+
+| Path | Purpose |
+|------|---------|
+| `$QBITTORRENT_DATA_DIR` | Main download directory |
+| `$QBITTORRENT_DATA_DIR/Incomplete` | Incomplete/partial downloads |
+| `$QBITTORRENT_DATA_DIR/Torrents/All` | All .torrent files |
+| `$QBITTORRENT_DATA_DIR/Torrents/Completed` | .torrent files of completed downloads |
 
 ### Credential Storage Options
 
@@ -191,7 +225,12 @@ The setup uses `network_mode: host` which:
 |-----------|----------------|---------|
 | `./config` | `/config` | Stores qBitTorrent configuration |
 | `./config/qBittorrent/nova3/engines` | `/config/qBittorrent/nova3/engines` | Search plugins |
-| `/mnt/DATA` | `/DATA` | Download destination |
+| `$QBITTORRENT_DATA_DIR` | `/DATA` | Download destination (configurable) |
+
+The data directory is configurable via the `QBITTORRENT_DATA_DIR` environment variable. You can set it in:
+1. Project `.env` file
+2. `~/.qbit.env` file
+3. Shell environment (`~/.bashrc`)
 
 ## Usage
 

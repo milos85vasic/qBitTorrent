@@ -10,6 +10,6 @@ services:
       - WEBUI_PORT=8085                           # Web UI port (inside container)
     volumes:
       - ./config:/config                          # Stores settings
-      - /mnt/DATA:/DATA                           # Maps mounted share to DATA
+      - ${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/DATA  # Data directory (configurable via QBITTORRENT_DATA_DIR)
     network_mode: host                            # Use host network to bypass VPN completely
     restart: unless-stopped

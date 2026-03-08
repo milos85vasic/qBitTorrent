@@ -90,6 +90,53 @@ test_env_file() {
     fi
 }
 
+test_qbittorrent_data_dir() {
+    local data_dir="${QBITTORRENT_DATA_DIR:-/mnt/DATA}"
+    
+    print_info "QBITTORRENT_DATA_DIR: $data_dir"
+    
+    if [[ -n "$data_dir" ]]; then
+        print_pass "QBITTORRENT_DATA_DIR is set: $data_dir"
+    else
+        print_fail "QBITTORRENT_DATA_DIR is not set"
+        return 1
+    fi
+    
+    if [[ -d "$data_dir" ]]; then
+        print_pass "Data directory exists: $data_dir"
+    else
+        print_info "Data directory will be created on first run: $data_dir"
+    fi
+    
+    return 0
+}
+
+test_qbittorrent_config() {
+    local config_file="$SCRIPT_DIR/config/qBittorrent/config/qBittorrent.conf"
+    
+    if [[ -f "$config_file" ]]; then
+        print_pass "qBittorrent config file exists"
+        
+        if grep -q "DefaultSavePath=/DATA" "$config_file" 2>/dev/null; then
+            print_pass "Config has correct download path"
+        else
+            print_fail "Config has incorrect download path"
+            return 1
+        fi
+        
+        if grep -q "TempPath=/DATA/Incomplete" "$config_file" 2>/dev/null; then
+            print_pass "Config has correct incomplete path"
+        else
+            print_fail "Config has incorrect incomplete path"
+            return 1
+        fi
+    else
+        print_info "qBittorrent config will be created on first run"
+    fi
+    
+    return 0
+}
+
 test_docker_compose_syntax() {
     local compose_file="$1"
     if command -v docker &> /dev/null; then
@@ -338,6 +385,10 @@ run_all_tests() {
         print_info ".env file not found (optional, credentials can be in ~/.qbit.env or exported)"
     fi
 
+    print_test_header "Data Directory"
+    test_qbittorrent_data_dir || true
+    test_qbittorrent_config || true
+
     print_test_header "Dependencies"
     test_container_runtime || true
     test_compose_command || true
@@ -364,6 +415,7 @@ run_quick_test() {
     test_file_executable "start.sh" || ((failed++)) || true
     test_file_executable "stop.sh" || ((failed++)) || true
     test_container_runtime || ((failed++)) || true
+    test_qbittorrent_data_dir || ((failed++)) || true
 
     if [[ $failed -eq 0 ]]; then
         echo -e "\n${GREEN}All quick tests passed!${NC}"
