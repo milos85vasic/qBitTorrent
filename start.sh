@@ -92,6 +92,28 @@ create_data_directories() {
     print_success "Data directories verified"
 }
 
+cleanup_stale_config() {
+    local stale_config="$SCRIPT_DIR/config/qBittorrent/qBittorrent.conf"
+    local correct_config="$SCRIPT_DIR/config/qBittorrent/config/qBittorrent.conf"
+    
+    if [[ -f "$stale_config" ]] && [[ ! -L "$stale_config" ]]; then
+        if grep -q "SavePath=/downloads/" "$stale_config" 2>/dev/null || \
+           grep -q "DefaultSavePath=/downloads/" "$stale_config" 2>/dev/null; then
+            print_warning "Found stale config with incorrect paths: $stale_config"
+            print_info "Backing up and removing stale config..."
+            
+            if mv "$stale_config" "${stale_config}.backup.$(date +%s)" 2>/dev/null; then
+                print_success "Stale config backed up and removed"
+            elif rm -f "$stale_config" 2>/dev/null; then
+                print_success "Stale config removed"
+            else
+                print_warning "Could not remove stale config (permission denied)"
+                print_info "The correct config is being used at: config/qBittorrent/config/qBittorrent.conf"
+            fi
+        fi
+    fi
+}
+
 update_qbittorrent_config() {
     local config_file="$SCRIPT_DIR/config/qBittorrent/config/qBittorrent.conf"
     local config_dir
@@ -373,6 +395,7 @@ main() {
     fi
 
     create_directories
+    cleanup_stale_config
     update_qbittorrent_config
     create_data_directories
 

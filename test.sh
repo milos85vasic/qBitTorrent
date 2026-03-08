@@ -120,14 +120,14 @@ test_qbittorrent_config() {
         if grep -q "DefaultSavePath=/DATA" "$config_file" 2>/dev/null; then
             print_pass "Config has correct download path"
         else
-            print_fail "Config has incorrect download path"
+            print_fail "Config has incorrect download path (should be /DATA)"
             return 1
         fi
         
         if grep -q "TempPath=/DATA/Incomplete" "$config_file" 2>/dev/null; then
             print_pass "Config has correct incomplete path"
         else
-            print_fail "Config has incorrect incomplete path"
+            print_fail "Config has incorrect incomplete path (should be /DATA/Incomplete)"
             return 1
         fi
     else
@@ -135,6 +135,72 @@ test_qbittorrent_config() {
     fi
     
     return 0
+}
+
+test_no_stale_config() {
+    local stale_config="$SCRIPT_DIR/config/qBittorrent/qBittorrent.conf"
+    
+    if [[ -f "$stale_config" ]] && [[ ! -L "$stale_config" ]]; then
+        if grep -q "SavePath=/downloads/" "$stale_config" 2>/dev/null || \
+           grep -q "DefaultSavePath=/downloads/" "$stale_config" 2>/dev/null; then
+            print_fail "Stale config file with wrong paths detected: config/qBittorrent/qBittorrent.conf"
+            print_info "Run ./start.sh to clean up stale config"
+            return 1
+        fi
+    fi
+    
+    print_pass "No stale config files detected"
+    return 0
+}
+
+test_volume_mapping() {
+    local compose_file="$SCRIPT_DIR/docker-compose.yml"
+    
+    if [[ -f "$compose_file" ]]; then
+        if grep -q '\${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/DATA' "$compose_file" 2>/dev/null; then
+            print_pass "Volume mapping is correct (DATA directory)"
+        else
+            print_fail "Volume mapping might be incorrect"
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
+test_container_write_permissions() {
+    local container_name="${1:-qbittorrent}"
+    
+    if command -v podman &> /dev/null; then
+        if podman ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
+            if podman exec "$container_name" sh -c 'touch /DATA/.write_test && rm /DATA/.write_test' 2>/dev/null; then
+                print_pass "Container can write to /DATA directory"
+                return 0
+            else
+                print_fail "Container cannot write to /DATA directory (check permissions)"
+                return 1
+            fi
+        else
+            print_skip "Container write test (container not running)"
+            return 0
+        fi
+    elif command -v docker &> /dev/null; then
+        if docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
+            if docker exec "$container_name" sh -c 'touch /DATA/.write_test && rm /DATA/.write_test' 2>/dev/null; then
+                print_pass "Container can write to /DATA directory"
+                return 0
+            else
+                print_fail "Container cannot write to /DATA directory (check permissions)"
+                return 1
+            fi
+        else
+            print_skip "Container write test (container not running)"
+            return 0
+        fi
+    else
+        print_skip "Container write test (no container runtime)"
+        return 0
+    fi
 }
 
 test_docker_compose_syntax() {
@@ -388,6 +454,8 @@ run_all_tests() {
     print_test_header "Data Directory"
     test_qbittorrent_data_dir || true
     test_qbittorrent_config || true
+    test_no_stale_config || true
+    test_volume_mapping || true
 
     print_test_header "Dependencies"
     test_container_runtime || true
@@ -395,12 +463,14 @@ run_all_tests() {
 
     print_test_header "Runtime Status"
     test_container_running "qbittorrent" || true
-
+    
     if podman ps --format '{{.Names}}' 2>/dev/null | grep -q "^qbittorrent$" || \
        docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^qbittorrent$"; then
         test_webui_accessible "8085" || true
+        test_container_write_permissions "qbittorrent" || true
     else
         print_skip "Web UI accessibility (container not running)"
+        print_skip "Container write permissions (container not running)"
     fi
 }
 

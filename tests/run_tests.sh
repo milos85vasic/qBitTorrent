@@ -649,6 +649,28 @@ test_container_operations() {
         test_skip "Container not running"
     fi
     
+    test_start "Container can write to /DATA directory"
+    if assert_container_running "qbittorrent"; then
+        local can_write=false
+        if command -v podman &> /dev/null; then
+            if podman exec qbittorrent sh -c 'touch /DATA/.write_test && rm /DATA/.write_test' 2>/dev/null; then
+                can_write=true
+            fi
+        elif command -v docker &> /dev/null; then
+            if docker exec qbittorrent sh -c 'touch /DATA/.write_test && rm /DATA/.write_test' 2>/dev/null; then
+                can_write=true
+            fi
+        fi
+        
+        if [[ "$can_write" == true ]]; then
+            test_pass "Container has write permissions to /DATA"
+        else
+            test_fail "Container cannot write to /DATA (check permissions on host)"
+        fi
+    else
+        test_skip "Container not running"
+    fi
+    
     suite_end
 }
 
@@ -765,6 +787,47 @@ test_data_directory() {
         test_pass ".env.example documents Torrents/Completed directory"
     else
         test_fail ".env.example missing Torrents/Completed documentation"
+    fi
+    
+    test_start "No stale qBittorrent config with wrong paths"
+    local stale_config="config/qBittorrent/qBittorrent.conf"
+    if [[ -f "$stale_config" ]] && [[ ! -L "$stale_config" ]]; then
+        if grep -q "SavePath=/downloads/" "$stale_config" 2>/dev/null || \
+           grep -q "DefaultSavePath=/downloads/" "$stale_config" 2>/dev/null; then
+            test_fail "Stale config file detected with /downloads/ paths: $stale_config"
+            echo -e "    ${YELLOW}Run ./start.sh to clean up stale config${NC}"
+        else
+            test_pass "No stale config with incorrect paths"
+        fi
+    else
+        test_pass "No stale config file present"
+    fi
+    
+    test_start "Volume mapping uses correct paths"
+    if grep -q '\${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/DATA' docker-compose.yml 2>/dev/null; then
+        test_pass "Volume mapping is correct (host:/DATA)"
+    else
+        test_fail "Volume mapping may be incorrect"
+    fi
+    
+    test_start "qBittorrent config uses /DATA paths"
+    local config_file="config/qBittorrent/config/qBittorrent.conf"
+    if [[ -f "$config_file" ]]; then
+        if grep -q "SavePath=/DATA" "$config_file" 2>/dev/null && \
+           grep -q "DefaultSavePath=/DATA" "$config_file" 2>/dev/null; then
+            test_pass "Config uses correct /DATA paths"
+        else
+            test_fail "Config has incorrect paths (should use /DATA)"
+        fi
+    else
+        test_skip "Config file not yet created"
+    fi
+    
+    test_start "start.sh has stale config cleanup"
+    if grep -q 'cleanup_stale_config' start.sh 2>/dev/null; then
+        test_pass "start.sh includes stale config cleanup"
+    else
+        test_fail "start.sh missing stale config cleanup function"
     fi
     
     suite_end
