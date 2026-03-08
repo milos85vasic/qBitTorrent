@@ -69,7 +69,7 @@ docker --version    # Check Docker
 
 6. Login with default credentials:
    - Username: `admin`
-   - Password: `adminadmin`
+   - Password: `admin`
 
 7. **Important**: Change the default password immediately after first login!
 

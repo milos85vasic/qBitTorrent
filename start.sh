@@ -284,7 +284,7 @@ show_status() {
     $COMPOSE_CMD ps
     echo ""
     print_success "qBitTorrent Web UI: http://localhost:8085"
-    print_info "Default credentials: admin / adminadmin"
+    print_info "Default credentials: admin / admin"
     print_warning "Remember to change the default password!"
     echo ""
     print_info "Data Directory: $QBITTORRENT_DATA_DIR"
