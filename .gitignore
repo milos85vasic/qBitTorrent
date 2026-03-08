@@ -5,10 +5,25 @@ config/qBittorrent/
 # Keep directory structure but ignore all contents
 config/qBittorrent/*
 
+# But keep plugin directory structure in git
+!config/qBittorrent/nova3/
+!config/qBittorrent/nova3/engines/
+!config/qBittorrent/nova3/engines/.gitkeep
+
 # Environment files (may contain secrets)
 .env
 .env.*
 *.env
+.qbit.env
+
+# NEVER commit credentials - multiple patterns for safety
+*credentials*
+*secrets*
+*_password*
+*_passwd*
+*_username*
+*_user*
+RUTRACKER_*
 
 # Log files
 *.log

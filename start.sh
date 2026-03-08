@@ -62,6 +62,7 @@ check_prerequisites() {
 create_directories() {
     print_info "Creating necessary directories..."
     mkdir -p config/qBittorrent
+    mkdir -p config/qBittorrent/nova3/engines
     print_success "Directories created"
 }
 
@@ -69,6 +70,25 @@ pull_image() {
     print_info "Pulling latest image..."
     $COMPOSE_CMD pull
     print_success "Image pulled successfully"
+}
+
+copy_plugins() {
+    print_info "Installing search plugins..."
+    
+    if [[ -d "plugins" ]]; then
+        for plugin in plugins/*.py; do
+            if [[ -f "$plugin" ]]; then
+                cp "$plugin" config/qBittorrent/nova3/engines/
+                print_success "Installed: $(basename "$plugin")"
+            fi
+        done
+        
+        for icon in plugins/*.png; do
+            if [[ -f "$icon" ]]; then
+                cp "$icon" config/qBittorrent/nova3/engines/
+            fi
+        done
+    fi
 }
 
 start_container() {
@@ -82,6 +102,25 @@ start_container() {
     fi
 }
 
+wait_for_container() {
+    print_info "Waiting for container to be ready..."
+    local max_attempts=30
+    local attempt=0
+    
+    while [[ $attempt -lt $max_attempts ]]; do
+        if $CONTAINER_RUNTIME ps --format '{{.Names}}' | grep -q "^qbittorrent$"; then
+            sleep 2
+            print_success "Container is ready"
+            return 0
+        fi
+        ((attempt++))
+        sleep 1
+    done
+    
+    print_warning "Container may not be fully ready yet"
+    return 0
+}
+
 show_status() {
     echo ""
     print_info "Container Status:"
@@ -90,6 +129,16 @@ show_status() {
     print_success "qBitTorrent Web UI: http://localhost:8085"
     print_info "Default credentials: admin / adminadmin"
     print_warning "Remember to change the default password!"
+    echo ""
+    
+    if [[ -f "config/qBittorrent/nova3/engines/rutracker.py" ]]; then
+        print_info "RuTracker plugin installed"
+        if [[ -f ".env" ]] && grep -q "^RUTRACKER_USERNAME=.\+" ".env" 2>/dev/null; then
+            print_success "RuTracker credentials configured"
+        else
+            print_warning "Configure RuTracker credentials in .env file"
+        fi
+    fi
 }
 
 show_help() {
@@ -103,6 +152,7 @@ OPTIONS:
     -p, --pull      Pull latest image before starting
     -v, --verbose   Enable verbose output
     -s, --status    Show container status only
+    --no-plugins    Skip plugin installation
 
 EXAMPLES:
     $(basename "$0")              Start container
@@ -117,6 +167,7 @@ main() {
     local pull_image_flag=false
     local verbose=false
     local status_only=false
+    local install_plugins=true
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -133,6 +184,10 @@ main() {
                 ;;
             -s|--status)
                 status_only=true
+                shift
+                ;;
+            --no-plugins)
+                install_plugins=false
                 shift
                 ;;
             *)
@@ -156,11 +211,16 @@ main() {
 
     create_directories
 
+    if [[ "$install_plugins" == true ]]; then
+        copy_plugins
+    fi
+
     if [[ "$pull_image_flag" == true ]]; then
         pull_image
     fi
 
     start_container
+    wait_for_container
     show_status
 }
 

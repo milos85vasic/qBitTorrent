@@ -1,6 +1,6 @@
 # qBitTorrent Docker/Podman Setup
 
-A containerized qBitTorrent setup using Docker Compose or Podman Compose for easy deployment and management.
+A containerized qBitTorrent setup with RuTracker search plugin, using Docker Compose or Podman Compose for easy deployment and management.
 
 ## Table of Contents
 
@@ -10,6 +10,8 @@ A containerized qBitTorrent setup using Docker Compose or Podman Compose for eas
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Scripts Reference](#scripts-reference)
+- [RuTracker Plugin](#rutracker-plugin)
+- [Testing & Validation](#testing--validation)
 - [Troubleshooting](#troubleshooting)
 - [Security](#security)
 - [Uninstallation](#uninstallation)
@@ -22,7 +24,7 @@ This setup supports both **Podman** and **Docker**. The scripts automatically de
 
 | Runtime | Minimum Version | Notes |
 |---------|----------------|-------|
-| Podman  | 3.0+           | Preferred on Linux systems |
+| Podman  | 3.0+           | Preferred on Linux systems (rootless) |
 | Docker  | 20.10+         | With Docker Compose v2 |
 
 Check if you have either installed:
@@ -47,23 +49,29 @@ docker --version    # Check Docker
    cd qBitTorrent
    ```
 
-2. Create the config directory:
+2. Create configuration files:
    ```bash
-   mkdir -p config/qBittorrent
+   cp .env.example .env
+   # Edit .env and add your RuTracker credentials
    ```
 
-3. Start the service:
+3. Make scripts executable:
+   ```bash
+   chmod +x *.sh
+   ```
+
+4. Start the service:
    ```bash
    ./start.sh
    ```
 
-4. Access the Web UI at: **http://localhost:8085**
+5. Access the Web UI at: **http://localhost:8085**
 
-5. Login with default credentials:
+6. Login with default credentials:
    - Username: `admin`
    - Password: `adminadmin`
 
-6. **Important**: Change the default password immediately after first login!
+7. **Important**: Change the default password immediately after first login!
 
 ## Installation
 
@@ -76,17 +84,28 @@ cd qBitTorrent
 
 ### Step 2: Configure Environment
 
-Edit `docker-compose.yml` to match your system:
-
-```yaml
-environment:
-  - PUID=1000                    # Your user ID (run `id -u`)
-  - PGID=1000                    # Your group ID (run `id -g`)
-  - TZ=Europe/Moscow             # Your timezone
-  - WEBUI_PORT=8085              # Web UI port
+Copy the example environment file:
+```bash
+cp .env.example .env
 ```
 
-Find your IDs:
+Edit `.env` with your settings:
+```bash
+# Required: RuTracker Login Credentials
+RUTRACKER_USERNAME=your_username
+RUTRACKER_PASSWORD=your_password
+
+# Optional: Custom RuTracker Mirrors
+# RUTRACKER_MIRRORS=https://rutracker.org,https://rutracker.net
+
+# qBitTorrent Configuration
+PUID=1000
+PGID=1000
+TZ=Europe/Moscow
+WEBUI_PORT=8085
+```
+
+Find your UID/GID:
 ```bash
 id -u    # Shows your UID
 id -g    # Shows your GID
@@ -102,15 +121,10 @@ volumes:
   - /mnt/DATA:/DATA              # Your download location
 ```
 
-### Step 4: Create Directories
+### Step 4: Start the Service
 
 ```bash
-mkdir -p config/qBittorrent
-```
-
-### Step 5: Start the Service
-
-```bash
+chmod +x *.sh
 ./start.sh
 ```
 
@@ -120,10 +134,38 @@ mkdir -p config/qBittorrent
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
+| `RUTRACKER_USERNAME` | RuTracker username | - | For plugin |
+| `RUTRACKER_PASSWORD` | RuTracker password | - | For plugin |
+| `RUTRACKER_MIRRORS` | Custom mirrors (comma-separated) | - | No |
 | `PUID` | User ID for file permissions | `1000` | Yes |
 | `PGID` | Group ID for file permissions | `1000` | Yes |
 | `TZ` | Timezone (TZ format) | `Europe/Moscow` | Yes |
 | `WEBUI_PORT` | Port for Web UI | `8085` | Yes |
+
+### Credential Storage Options
+
+You can store RuTracker credentials in multiple locations:
+
+1. **Project `.env` file** (recommended for containers):
+   ```bash
+   # ./qBitTorrent/.env
+   RUTRACKER_USERNAME=your_username
+   RUTRACKER_PASSWORD=your_password
+   ```
+
+2. **Home directory `.qbit.env`** (recommended for local):
+   ```bash
+   # ~/.qbit.env
+   RUTRACKER_USERNAME=your_username
+   RUTRACKER_PASSWORD=your_password
+   ```
+
+3. **Bash configuration**:
+   ```bash
+   # Add to ~/.bashrc
+   export RUTRACKER_USERNAME="your_username"
+   export RUTRACKER_PASSWORD="your_password"
+   ```
 
 ### Timezone Examples
 
@@ -131,9 +173,9 @@ Common timezone values:
 - `UTC`
 - `Europe/London`
 - `Europe/Berlin`
+- `Europe/Moscow`
 - `America/New_York`
 - `Asia/Tokyo`
-- `Australia/Sydney`
 
 ### Network Configuration
 
@@ -148,6 +190,7 @@ The setup uses `network_mode: host` which:
 | Host Path | Container Path | Purpose |
 |-----------|----------------|---------|
 | `./config` | `/config` | Stores qBitTorrent configuration |
+| `./config/qBittorrent/nova3/engines` | `/config/qBittorrent/nova3/engines` | Search plugins |
 | `/mnt/DATA` | `/DATA` | Download destination |
 
 ## Usage
@@ -159,9 +202,10 @@ The setup uses `network_mode: host` which:
 ```
 
 Options:
-- Detects and uses Podman or Docker automatically
-- Pulls the latest image if not present
-- Starts the container in detached mode
+- `-p, --pull` - Pull latest image before starting
+- `-v, --verbose` - Enable verbose output
+- `-s, --status` - Show container status only
+- `--no-plugins` - Skip plugin installation
 
 ### Stopping the Service
 
@@ -170,8 +214,8 @@ Options:
 ```
 
 Options:
-- Gracefully stops the container
-- Preserves all configuration and data
+- `-r, --remove` - Remove container after stopping
+- `-p, --purge` - Remove container and local images
 
 ### Viewing Logs
 
@@ -194,7 +238,7 @@ docker compose logs -f qbittorrent
 
 ```bash
 # Check container status
-./start.sh status
+./start.sh -s
 
 # Restart container
 ./stop.sh && ./start.sh
@@ -208,39 +252,178 @@ docker stats qbittorrent    # Docker
 
 ### start.sh
 
-Automated start script with Podman/Docker detection.
+Starts qBitTorrent container with automatic Podman/Docker detection and plugin installation.
 
 ```bash
 Usage: ./start.sh [OPTIONS]
 
 Options:
-  -h, --help      Show this help message
+  -h, --help      Show help message
   -p, --pull      Pull latest image before starting
   -v, --verbose   Enable verbose output
-
-Features:
-  - Auto-detects Podman or Docker
-  - Creates necessary directories
-  - Validates configuration
-  - Starts container in detached mode
+  -s, --status    Show container status only
+  --no-plugins    Skip plugin installation
 ```
 
 ### stop.sh
 
-Graceful stop script.
+Stops qBitTorrent container gracefully.
 
 ```bash
 Usage: ./stop.sh [OPTIONS]
 
 Options:
-  -h, --help      Show this help message
+  -h, --help      Show help message
   -v, --verbose   Enable verbose output
   -r, --remove    Remove container after stopping
-
-Features:
-  - Graceful shutdown (30s timeout)
-  - Preserves data and configuration
+  -p, --purge     Remove container and local images
 ```
+
+### install-plugin.sh
+
+Installs RuTracker search plugin.
+
+```bash
+Usage: ./install-plugin.sh [OPTIONS]
+
+Options:
+  -h, --help      Show help message
+  -l, --local     Install for local qBittorrent
+  -c, --container Install for containerized qBittorrent (default)
+  -t, --test      Test plugin configuration
+  -v, --verify    Verify credentials only
+  -a, --all       Install for both local and container
+```
+
+### test.sh
+
+Validates and tests the qBitTorrent setup.
+
+```bash
+Usage: ./test.sh [OPTIONS]
+
+Options:
+  -h, --help      Show help message
+  -a, --all       Run all validation tests
+  -q, --quick     Run quick validation (default)
+  -p, --plugin    Test RuTracker plugin only
+  -f, --full      Run full test suite
+  -c, --container Test container status only
+```
+
+## RuTracker Plugin
+
+### Features
+
+- Search RuTracker directly from qBitTorrent Web UI
+- Automatic mirror detection and failover
+- Environment variable support for credentials
+- Compatible with both local and containerized setups
+
+### Installation
+
+**For Container (automatic):**
+```bash
+./start.sh  # Plugins are installed automatically
+```
+
+**For Local qBittorrent:**
+```bash
+./install-plugin.sh --local
+```
+
+**For Both:**
+```bash
+./install-plugin.sh --all
+```
+
+### Configuration
+
+1. Create `.env` file with your credentials:
+   ```bash
+   cp .env.example .env
+   nano .env
+   ```
+
+2. Add your RuTracker credentials:
+   ```
+   RUTRACKER_USERNAME=your_username
+   RUTRACKER_PASSWORD=your_password
+   ```
+
+3. Restart qBitTorrent to load the plugin
+
+### Testing Plugin
+
+```bash
+./install-plugin.sh --test
+```
+
+### Using the Plugin
+
+1. Open qBitTorrent Web UI
+2. Go to **Search** tab
+3. Select **RuTracker** from the search engines dropdown
+4. Enter your search query
+5. Click **Search**
+
+### Troubleshooting Plugin
+
+If the plugin doesn't work:
+
+1. **Check credentials**:
+   ```bash
+   ./install-plugin.sh --verify
+   ```
+
+2. **Test plugin loading**:
+   ```bash
+   ./install-plugin.sh --test
+   ```
+
+3. **Check captcha**: Visit RuTracker website manually and login once to clear any captcha
+
+4. **Check mirrors**: Ensure at least one RuTracker mirror is accessible from your network
+
+## Testing & Validation
+
+### Quick Test
+
+Run basic validation:
+```bash
+./test.sh
+```
+
+### Full Test Suite
+
+Run all tests including plugin validation:
+```bash
+./test.sh --full
+```
+
+### Test Specific Components
+
+```bash
+# Test plugin only
+./test.sh --plugin
+
+# Test container status
+./test.sh --container
+
+# Run all validation tests
+./test.sh --all
+```
+
+### Test Results
+
+The test script checks:
+- Project structure (all required files)
+- Script executability and syntax
+- Configuration file validity
+- Container runtime availability
+- Container status
+- Web UI accessibility
+- Plugin configuration
 
 ## Troubleshooting
 
@@ -256,54 +439,66 @@ id -u    # Get your UID
 id -g    # Get your GID
 ```
 
-Update `docker-compose.yml`:
-```yaml
-- PUID=<your-uid>
-- PGID=<your-gid>
+Update `.env`:
+```
+PUID=<your-uid>
+PGID=<your-gid>
 ```
 
 #### Port Already in Use
 
 **Symptom**: Error about port 8085 being in use
 
-**Solution**: Change the port in `docker-compose.yml`:
-```yaml
-- WEBUI_PORT=8090    # Use different port
+**Solution**: Change the port in `.env`:
+```
+WEBUI_PORT=8090
 ```
 
 #### Container Won't Start
 
 **Symptom**: Container exits immediately
 
-**Solution**: Check logs for errors:
+**Solution**: Check logs:
 ```bash
 podman logs qbittorrent
-# or
 docker compose logs qbittorrent
 ```
 
 #### Cannot Access Web UI
 
-**Symptom**: Browser can't connect to Web UI
+**Symptom**: Browser can't connect
 
 **Solutions**:
-1. Check if container is running: `podman ps` or `docker ps`
-2. Verify the port: `netstat -tlnp | grep 8085`
+1. Check container is running: `./start.sh -s`
+2. Verify port: `netstat -tlnp | grep 8085`
 3. Check firewall: `sudo ufw status`
 4. Try localhost: `http://127.0.0.1:8085`
 
-#### Volume Mount Issues
+#### Plugin Not Working
 
-**Symptom**: Downloads not appearing in expected location
+**Symptom**: RuTracker not appearing in search engines
 
-**Solution**: Verify volume paths in `docker-compose.yml`:
-```bash
-ls -la /mnt/DATA    # Check host path exists
-```
+**Solutions**:
+1. Verify plugin is installed: `ls -la config/qBittorrent/nova3/engines/`
+2. Check credentials: `./install-plugin.sh --verify`
+3. Restart container: `./stop.sh && ./start.sh`
+4. Check qBitTorrent logs for errors
+
+#### RuTracker Login Failed
+
+**Symptom**: Plugin shows "Unable to connect using given credentials"
+
+**Solutions**:
+1. Verify username/password in `.env`
+2. Login to RuTracker website manually to clear captcha
+3. Check if RuTracker is accessible from your network
+4. Try alternative mirrors in `.env`:
+   ```
+   RUTRACKER_MIRRORS=https://rutracker.org,https://rutracker.net,https://rutracker.nl
+   ```
 
 ### Log Analysis
 
-View detailed logs:
 ```bash
 # Real-time logs
 podman logs -f qbittorrent
@@ -317,10 +512,8 @@ podman logs -t qbittorrent
 
 ### Reset Configuration
 
-To reset qBitTorrent to defaults:
-
 ```bash
-./stop.sh
+./stop.sh -r
 rm -rf config/qBittorrent/*
 ./start.sh
 ```
@@ -346,6 +539,11 @@ rm -rf config/qBittorrent/*
 
 5. **VPN Consideration**: For privacy, use a VPN
 
+6. **Secure Credentials**: 
+   - Never commit `.env` files
+   - Use environment variables or secure credential storage
+   - Consider using secrets management for production
+
 ### Firewall Configuration
 
 If using UFW:
@@ -355,8 +553,6 @@ sudo ufw reload
 ```
 
 ### Reverse Proxy Setup (Optional)
-
-For HTTPS access, use a reverse proxy like Nginx or Traefik.
 
 Example Nginx configuration:
 ```nginx
@@ -371,6 +567,8 @@ server {
         proxy_pass http://localhost:8085;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
@@ -380,14 +578,16 @@ server {
 ### Remove Container
 
 ```bash
-./stop.sh -r    # Stop and remove container
+./stop.sh -r
 ```
 
-### Remove All Data (Including Configuration)
+### Remove All Data
 
 ```bash
 ./stop.sh -r
 rm -rf config/
+rm -rf plugins/
+rm -f .env
 ```
 
 ### Remove Image
@@ -398,8 +598,12 @@ podman rmi lscr.io/linuxserver/qbittorrent:latest
 
 ## Additional Resources
 
+- [User Manual](docs/USER_MANUAL.md) - Detailed user guide
+- [Contributing Guide](CONTRIBUTING.md) - How to contribute
+- [Changelog](CHANGELOG.md) - Version history
 - [qBitTorrent Documentation](https://www.qbittorrent.org/)
 - [LinuxServer.io Documentation](https://docs.linuxserver.io/images/docker-qbittorrent)
+- [RuTracker Plugin Repository](https://github.com/nbusseneau/qBittorrent-RuTracker-plugin)
 - [Podman Documentation](https://docs.podman.io/)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
 
@@ -409,4 +613,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions are welcome! Please read the [Contributing Guide](CONTRIBUTING.md) for details on submitting issues and pull requests.
