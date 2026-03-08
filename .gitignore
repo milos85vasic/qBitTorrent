@@ -1,6 +1,51 @@
-# qBittorrent configuration and data
+# qBittorrent Configuration
 config/qBittorrent/
 !config/qBittorrent/.gitkeep
 
 # Keep directory structure but ignore all contents
 config/qBittorrent/*
+
+# Environment files (may contain secrets)
+.env
+.env.*
+*.env
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE/Editor files
+.idea/
+.vscode/
+*.sublime-*
+.project
+.classpath
+.settings/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Downloaded data (if any test downloads)
+downloads/
+incomplete/
+
+# Podman/Docker volumes (if using local volumes)
+volumes/
