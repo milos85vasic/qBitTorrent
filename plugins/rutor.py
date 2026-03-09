@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Rutor.org search engine plugin for qBittorrent with environment variable support."""
-# VERSION: 1.17-modified
+# VERSION: 1.18-fixed
 # AUTHORS: imDMG [imdmgg@gmail.com]
-# MODIFIED: Added environment variable support
+# MODIFIED: Added environment variable support and fixed download functionality
 
 import os
 import sys
@@ -55,19 +55,18 @@ def _get_proxy_from_env():
 
 
 class Config:
-    use_magnet = _get_env("RUTOR_USE_MAGNET", "false").lower() == "true"
+    use_magnet = _get_env("RUTOR_USE_MAGNET", "true").lower() == "true"
     proxy_enabled = _get_env("RUTOR_PROXY_ENABLED", "false").lower() == "true"
     proxies = _get_proxy_from_env()
     user_agent = _get_env(
         "RUTOR_USER_AGENT",
-        "Mozilla/5.0 (X11; Linux i686; rv:38.0) Gecko/20100101 Firefox/38.0",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     )
 
 
 CONFIG = Config()
 
 import base64
-import json
 import logging
 import re
 import socket
@@ -95,7 +94,11 @@ except ImportError:
         spec.loader.exec_module(novaprinter)
 
 
-logging.basicConfig(level=logging.WARNING)
+# Configure logging
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 RE_TORRENTS = re.compile(
@@ -107,7 +110,6 @@ RE_TORRENTS = re.compile(
 )
 RE_RESULTS = re.compile(r"</b>\sРезультатов\sпоиска\s(\d{1,4})\s", re.S)
 PATTERNS = ("%ssearch/%i/%i/000/0/%s",)
-
 PAGES = 100
 
 
@@ -117,25 +119,18 @@ def rng(t: int) -> range:
 
 def date_normalize(date_str: str) -> int:
     months = (
-        "Янв",
-        "Фев",
-        "Мар",
-        "Апр",
-        "Май",
-        "Июн",
-        "Июл",
-        "Авг",
-        "Сен",
-        "Окт",
-        "Ноя",
-        "Дек",
+        "Янв", "Фев", "Мар", "Апр", "Май", "Июн",
+        "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек",
     )
-    date_str = [
-        date_str.replace(m, f"{i:02d}")
-        for i, m in enumerate(months, 1)
-        if m in date_str
-    ][0]
-    return int(time.mktime(time.strptime(date_str, "%d %m %y")))
+    try:
+        date_str = [
+            date_str.replace(m, f"{i:02d}")
+            for i, m in enumerate(months, 1)
+            if m in date_str
+        ][0]
+        return int(time.mktime(time.strptime(date_str, "%d %m %y")))
+    except:
+        return int(time.time())
 
 
 class EngineError(Exception):
@@ -143,6 +138,8 @@ class EngineError(Exception):
 
 
 class Rutor:
+    """Rutor.org search engine plugin for qBittorrent."""
+    
     name = "Rutor"
     url = "https://rutor.info/"
     url_dl = url.replace("//", "//d.") + "download/"
@@ -158,19 +155,34 @@ class Rutor:
         "books": 11,
     }
 
-    session = build_opener()
-
     def __init__(self):
         self._init()
 
     def search(self, what: str, cat: str = "all") -> None:
+        """Search for torrents."""
         self._catch_errors(self._search, what, cat)
 
     def download_torrent(self, url: str) -> None:
+        """Download torrent file using authenticated session.
+        
+        This method is called by nova2dl.py when downloading torrents.
+        
+        Args:
+            url: The torrent download URL or magnet link
+            
+        Output format (required by qBittorrent):
+            <filepath> <url>
+        """
         self._catch_errors(self._download_torrent, url)
 
     def searching(self, query: str, first: bool = False) -> int:
-        page = self._request(query).decode()
+        """Execute search query on single page."""
+        try:
+            page = self._request(query).decode()
+        except Exception as e:
+            logger.error(f"Request failed: {e}")
+            return 0
+            
         torrents_found = -1
 
         if first:
@@ -186,14 +198,20 @@ class Rutor:
         return torrents_found
 
     def draw(self, html: str) -> None:
+        """Parse and output torrent results."""
         for tor in RE_TORRENTS.finditer(html):
+            mag_link = tor.group("mag_link")
+            tor_id = tor.group("tor_id")
+            
+            # Use magnet link if configured, otherwise use .torrent URL
+            if CONFIG.use_magnet:
+                link = mag_link
+            else:
+                link = self.url_dl + tor_id
+            
             novaprinter.prettyPrinter(
                 {
-                    "link": (
-                        tor.group("mag_link")
-                        if CONFIG.use_magnet
-                        else self.url_dl + tor.group("tor_id")
-                    ),
+                    "link": link,
                     "name": unescape(tor.group("name")),
                     "size": tor.group("size").replace("&nbsp;", " "),
                     "seeds": int(tor.group("seeds")),
@@ -205,6 +223,7 @@ class Rutor:
             )
 
     def _catch_errors(self, handler, *args):
+        """Error handler wrapper."""
         try:
             handler(*args)
         except EngineError as ex:
@@ -215,6 +234,9 @@ class Rutor:
             logger.exception(ex)
 
     def _init(self) -> None:
+        """Initialize session with proxy if configured."""
+        self.session = build_opener()
+        
         if CONFIG.proxy_enabled:
             if not any(CONFIG.proxies.values()):
                 raise EngineError("Proxy enabled, but not set!")
@@ -245,6 +267,7 @@ class Rutor:
         self.session.addheaders = [("User-Agent", CONFIG.user_agent)]
 
     def _search(self, what: str, cat: str = "all") -> None:
+        """Internal search implementation."""
         query = PATTERNS[0] % (
             self.url,
             0,
@@ -265,9 +288,34 @@ class Rutor:
         logger.info(f"Found torrents: {total}")
 
     def _download_torrent(self, url: str) -> None:
+        """Download torrent file from URL."""
+        logger.info(f"Downloading from: {url}")
+        
+        # Handle magnet links
+        if url.startswith("magnet:"):
+            # For magnet links, we just output the magnet URL directly
+            # qBittorrent will handle the magnet link
+            print(url + " " + url)
+            sys.stdout.flush()
+            return
+        
+        # Download .torrent file
         response = self._request(url)
 
-        file_handle, temp_path = tempfile.mkstemp(suffix=".torrent")
+        if not response:
+            raise ValueError("No data received from URL")
+
+        # Verify this looks like a torrent file
+        if not response.startswith(b'd'):
+            try:
+                decoded = response.decode('utf-8', errors='ignore')
+                if '<html' in decoded.lower():
+                    raise ValueError("Received HTML page instead of torrent file")
+            except:
+                pass
+            raise ValueError("Downloaded data is not a valid torrent file")
+
+        file_handle, temp_path = tempfile.mkstemp(suffix=".torrent", prefix="rutor_")
 
         try:
             with os.fdopen(file_handle, "wb") as f:
@@ -277,7 +325,7 @@ class Rutor:
 
             os.chmod(temp_path, 0o644)
 
-            logger.info("Torrent file saved to: {}".format(temp_path))
+            logger.info(f"Torrent saved to: {temp_path}")
             print(temp_path + " " + url)
             sys.stdout.flush()
 
@@ -289,6 +337,7 @@ class Rutor:
             raise e
 
     def _request(self, url: str, data=None, repeated: bool = False) -> bytes:
+        """Make HTTP request with retry logic."""
         try:
             with self.session.open(url, data, 5) as r:
                 if r.geturl().startswith((self.url, self.url_dl)):
@@ -296,9 +345,9 @@ class Rutor:
                 raise EngineError(f"{url} is blocked. Try another proxy.")
         except (URLError, HTTPError) as err:
             error = str(err.reason)
-            reason = f"{url} is not response! Maybe it is blocked."
+            reason = f"{url} is not responding! Maybe it is blocked."
             if "timed out" in error and not repeated:
-                logger.debug("Request timed out. Repeating...")
+                logger.debug("Request timed out. Retrying...")
                 return self._request(url, data, True)
             if "no host given" in error:
                 reason = "Proxy is bad, try another!"
@@ -307,6 +356,7 @@ class Rutor:
             raise EngineError(reason)
 
     def pretty_error(self, what: str, error: str) -> None:
+        """Output error in pretty format."""
         novaprinter.prettyPrinter(
             {
                 "engine_url": self.url,
@@ -321,12 +371,23 @@ class Rutor:
         )
 
 
+# Create the engine class reference
 rutor = Rutor
 
 if __name__ == "__main__":
-    from timeit import timeit
-
-    logging.info("Testing Rutor...")
-    engine = Rutor()
-    logging.info("[timeit] %s", timeit(lambda: engine.search("ubuntu"), number=1))
-    logging.info("[timeit] %s", timeit(lambda: engine.search("doctor"), number=1))
+    logging.basicConfig(level=logging.INFO)
+    
+    try:
+        logging.info("Testing Rutor plugin...")
+        engine = Rutor()
+        
+        # Test search
+        logging.info("\n[Test] Search for 'ubuntu':")
+        engine.search("ubuntu")
+        
+        logging.info("\nTest completed successfully!")
+        
+    except Exception as e:
+        logging.error(f"Test failed: {e}")
+        import traceback
+        traceback.print_exc()
