@@ -77,3 +77,41 @@ class torrentscsv:
     def download_link(self, result: Mapping[str, str]) -> str:
         dn = urlencode({'dn': result['name']})
         return f"magnet:?xt=urn:btih:{result['infohash']}&{dn}&{self.trackers}"
+
+    def download_torrent(self, url):
+        """Download torrent file from URL."""
+        import os
+        import sys
+        import tempfile
+        import urllib.request
+        
+        try:
+            # Handle magnet links
+            if url.startswith('magnet:'):
+                print(url + " " + url)
+                sys.stdout.flush()
+                return
+            
+            # Download the file
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = response.read()
+            
+            # Verify it's a torrent file (starts with 'd')
+            if not data.startswith(b'd'):
+                print(f"Error: Not a valid torrent file", file=sys.stderr)
+                sys.exit(1)
+            
+            # Save to temp file
+            fd, path = tempfile.mkstemp(suffix=".torrent")
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+            
+            os.chmod(path, 0o644)
+            print(path + " " + url)
+            sys.stdout.flush()
+            
+        except Exception as e:
+            print(f"Error downloading torrent: {e}", file=sys.stderr)
+            sys.exit(1)
+

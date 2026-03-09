@@ -150,3 +150,32 @@ class piratebay:
         dataStr = html.unescape(dataStr)
 
         return dataStr
+
+    def download_torrent(self, url):
+        """Handle magnet links - just pass through."""
+        import sys
+        if url.startswith('magnet:'):
+            # For magnet links, output as-is (qBittorrent handles them)
+            print(url + " " + url)
+            sys.stdout.flush()
+        else:
+            # Fallback to direct download
+            import tempfile
+            import urllib.request
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    data = response.read()
+                
+                fd, path = tempfile.mkstemp(suffix=".torrent")
+                with os.fdopen(fd, "wb") as f:
+                    f.write(data)
+                
+                import os
+                os.chmod(path, 0o644)
+                print(path + " " + url)
+                sys.stdout.flush()
+            except Exception as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+
