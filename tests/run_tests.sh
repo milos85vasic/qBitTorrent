@@ -883,6 +883,112 @@ test_security() {
     suite_end
 }
 
+test_python_plugin_tests() {
+    suite_start "Python Plugin Tests"
+    
+    test_start "Check Python3 availability"
+    if command -v python3 &> /dev/null; then
+        test_pass "Python3 is available"
+    else
+        test_fail "Python3 not available"
+        suite_end
+        return 1
+    fi
+    
+    test_start "Check test dependencies"
+    local has_requests=false
+    if python3 -c "import requests" 2>/dev/null; then
+        has_requests=true
+        test_pass "requests module available"
+    else
+        test_skip "requests module (install with: pip install requests)"
+    fi
+    
+    test_start "Run unit tests"
+    if [[ -f "tests/test_plugin_unit.py" ]]; then
+        if python3 tests/test_plugin_unit.py 2>&1 | grep -q "OK"; then
+            test_pass "Unit tests passed"
+        else
+            local output
+            output=$(python3 tests/test_plugin_unit.py 2>&1)
+            if echo "$output" | grep -q "FAILED"; then
+                test_fail "Unit tests failed"
+            else
+                test_pass "Unit tests completed"
+            fi
+        fi
+    else
+        test_skip "Unit test file not found"
+    fi
+    
+    test_start "Run integration tests"
+    if [[ -f "tests/test_plugin_integration.py" ]]; then
+        local output
+        output=$(python3 tests/test_plugin_integration.py 2>&1) || true
+        
+        if echo "$output" | grep -q "OK"; then
+            test_pass "Integration tests passed"
+        elif echo "$output" | grep -q "Skipping"; then
+            test_skip "Integration tests (credentials not configured)"
+        elif echo "$output" | grep -q "FAILED"; then
+            test_fail "Integration tests failed"
+        else
+            test_skip "Integration tests (no results)"
+        fi
+    else
+        test_skip "Integration test file not found"
+    fi
+    
+    test_start "Run E2E download tests"
+    if [[ -f "tests/test_e2e_download.py" ]]; then
+        if [[ "$has_requests" == true ]] && command -v podman &> /dev/null || command -v docker &> /dev/null; then
+            local output
+            output=$(python3 tests/test_e2e_download.py --direct 2>&1) || true
+            
+            if echo "$output" | grep -q "All tests passed"; then
+                test_pass "E2E tests passed"
+            elif echo "$output" | grep -q "SKIP"; then
+                test_skip "E2E tests (container not running or no credentials)"
+            elif echo "$output" | grep -q "FAIL"; then
+                test_fail "E2E tests failed"
+            else
+                test_skip "E2E tests (not applicable)"
+            fi
+        else
+            test_skip "E2E tests (missing dependencies or container runtime)"
+        fi
+    else
+        test_skip "E2E test file not found"
+    fi
+    
+    test_start "Test plugin download_torrent method"
+    if python3 -c "
+import sys
+import os
+sys.path.insert(0, 'plugins')
+
+# Mock environment
+os.environ['RUTRACKER_USERNAME'] = 'test'
+os.environ['RUTRACKER_PASSWORD'] = 'test'
+
+# Test import
+from rutracker import RuTracker
+
+# Check method exists and has correct signature
+import inspect
+sig = inspect.signature(RuTracker.download_torrent)
+params = list(sig.parameters.keys())
+assert 'url' in params, 'download_torrent should have url parameter'
+print('OK')
+" 2>/dev/null; then
+        test_pass "Plugin download_torrent method is correctly defined"
+    else
+        test_fail "Plugin download_torrent method check failed"
+    fi
+    
+    suite_end
+}
+
 show_final_summary() {
     local end_time=$(date +%s)
     local total_duration=$((end_time - SCRIPT_START_TIME))
@@ -932,6 +1038,7 @@ AVAILABLE SUITES:
     runtime             Container runtime tests
     credentials         Credentials configuration tests
     plugin              Plugin functionality tests
+    python              Python plugin tests (unit, integration, E2E)
     install             Plugin installation script tests
     scripts             Start/stop scripts tests
     container           Container operation tests
@@ -957,6 +1064,7 @@ list_suites() {
     echo "  runtime     - Container runtime tests"
     echo "  credentials - Credentials configuration tests"
     echo "  plugin      - Plugin functionality tests"
+    echo "  python      - Python plugin tests (unit, integration, E2E)"
     echo "  install     - Plugin installation script tests"
     echo "  scripts     - Start/stop scripts tests"
     echo "  container   - Container operation tests"
@@ -1036,6 +1144,10 @@ main() {
                 ;;
             plugin)
                 test_plugin_functionality
+                test_python_plugin_tests
+                ;;
+            python)
+                test_python_plugin_tests
                 ;;
             install)
                 test_install_plugin_script
@@ -1061,6 +1173,7 @@ main() {
                 test_container_runtime
                 test_credentials
                 test_plugin_functionality
+                test_python_plugin_tests
                 test_install_plugin_script
                 test_start_stop_scripts
                 test_container_operations

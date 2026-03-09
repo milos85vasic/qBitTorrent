@@ -1,0 +1,13 @@
+# Test dependencies for RuTracker plugin tests
+
+# HTTP client for API tests
+requests>=2.28.0
+
+# Optional: pytest for better test reporting
+pytest>=7.0.0
+
+# Optional: coverage reporting
+pytest-cov>=4.0.0
+
+# Optional: mocking HTTP requests
+responses>=0.23.0

@@ -280,7 +280,11 @@ class RuTracker(object):
         data = self._open_url(url)
         with tempfile.NamedTemporaryFile(suffix=".torrent", delete=False) as f:
             f.write(data)
-            print(f.name + " " + url)
+            f.flush()
+            os.fsync(f.fileno())
+            temp_path = f.name
+        print(temp_path + " " + url)
+        sys.stdout.flush()
 
 
 rutracker = RuTracker
