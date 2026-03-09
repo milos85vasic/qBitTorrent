@@ -1,4 +1,7 @@
 #!/bin/bash
+# Install search plugins for qBittorrent
+# This script ensures all plugins are properly installed and recognized
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,16 +11,62 @@ cd "$SCRIPT_DIR"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 print_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 
-PLUGINS=("rutracker" "rutor" "kinozal" "nnmclub")
+# List of all supported plugins (official + Russian trackers)
+PLUGINS=(
+  # Official qBittorrent plugins
+  "eztv"
+  "jackett"
+  "limetorrents"
+  "piratebay"
+  "solidtorrents"
+  "torlock"
+  "torrentproject"
+  "torrentscsv"
+  # Russian trackers
+  "rutracker"
+  "rutor"
+  "kinozal"
+  "nnmclub"
+)
 LOCAL_MODE=false
 INSTALL_ALL=false
 SELECTED_PLUGINS=()
+VERIFY_MODE=false
+TEST_MODE=false
+
+usage() {
+    cat << EOF
+Usage: $0 [OPTIONS] [PLUGIN...]
+
+Install search plugins for qBittorrent.
+
+OPTIONS:
+    --local, -l       Install for local qBittorrent (not container)
+    --all, -a         Install all available plugins
+    --verify          Verify plugin installation
+    --test            Test plugin functionality
+    --help, -h        Show this help message
+
+Available plugins: ${PLUGINS[*]}
+
+Examples:
+    $0 rutracker                    # Install RuTracker plugin
+    $0 --all                        # Install all plugins
+    $0 --local rutracker rutor      # Install locally
+    $0 --verify                     # Verify installation
+    $0 --test                       # Test all plugins
+
+EOF
+    exit 0
+}
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -29,21 +78,20 @@ while [[ $# -gt 0 ]]; do
             INSTALL_ALL=true
             shift
             ;;
+        --verify)
+            VERIFY_MODE=true
+            shift
+            ;;
+        --test)
+            TEST_MODE=true
+            shift
+            ;;
         --help|-h)
-            echo "Usage: $0 [OPTIONS] [PLUGIN...]"
-            echo ""
-            echo "Options:"
-            echo "  --local, -l     Install for local qBittorrent"
-            echo "  --all, -a       Install all plugins"
-            echo "  --help, -h      Show this help"
-            echo ""
-            echo "Available plugins: ${PLUGINS[*]}"
-            echo ""
-            echo "Examples:"
-            echo "  $0 rutracker                    # Install RuTracker plugin"
-            echo "  $0 --all                        # Install all plugins"
-            echo "  $0 --local rutracker rutor      # Install plugins locally"
-            exit 0
+            usage
+            ;;
+        -*)
+            print_error "Unknown option: $1"
+            usage
             ;;
         *)
             SELECTED_PLUGINS+=("$1")
@@ -52,79 +100,239 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Determine target directories
+if [[ "$LOCAL_MODE" == "true" ]]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        ENGINES_DIR="$HOME/Library/Application Support/qBittorrent/nova3/engines"
+    else
+        ENGINES_DIR="$HOME/.local/share/qBittorrent/nova3/engines"
+    fi
+else
+    ENGINES_DIR="$SCRIPT_DIR/config/qBittorrent/nova3/engines"
+fi
+
+verify_installation() {
+    print_info "Verifying plugin installation..."
+    
+    local all_ok=true
+    
+    for plugin in "${PLUGINS[@]}"; do
+        local plugin_file="$ENGINES_DIR/${plugin}.py"
+        if [[ -f "$plugin_file" ]]; then
+            print_success "$plugin: Installed"
+            
+            # Check file permissions
+            local perms=$(stat -c "%a" "$plugin_file" 2>/dev/null || stat -f "%A" "$plugin_file" 2>/dev/null)
+            if [[ -n "$perms" ]]; then
+                print_info "  Permissions: $perms"
+            fi
+            
+            # Check file size
+            local size=$(stat -c "%s" "$plugin_file" 2>/dev/null || stat -f "%z" "$plugin_file" 2>/dev/null)
+            if [[ $size -gt 0 ]]; then
+                print_info "  Size: $size bytes"
+            fi
+            
+            # Validate Python syntax
+            if python3 -m py_compile "$plugin_file" 2>/dev/null; then
+                print_success "  Syntax: Valid"
+            else
+                print_error "  Syntax: Invalid"
+                all_ok=false
+            fi
+        else
+            print_error "$plugin: Not installed"
+            all_ok=false
+        fi
+    done
+    
+    if [[ "$all_ok" == "true" ]]; then
+        print_success "\nAll plugins installed and valid!"
+        return 0
+    else
+        print_error "\nSome plugins are missing or invalid"
+        return 1
+    fi
+}
+
+test_plugins() {
+    print_info "Testing plugin functionality..."
+    
+    for plugin in "${PLUGINS[@]}"; do
+        local plugin_file="$ENGINES_DIR/${plugin}.py"
+        if [[ ! -f "$plugin_file" ]]; then
+            print_warning "$plugin: Not installed, skipping test"
+            continue
+        fi
+        
+        print_info "Testing $plugin..."
+        
+        # Test Python import
+        if python3 -c "import sys; sys.path.insert(0, '$ENGINES_DIR'); from ${plugin} import ${plugin^}; print('Import OK')" 2>/dev/null; then
+            print_success "  Import: OK"
+        else
+            print_error "  Import: Failed"
+            continue
+        fi
+        
+        # Check if plugin class exists
+        if python3 -c "import sys; sys.path.insert(0, '$ENGINES_DIR'); from ${plugin} import ${plugin^}; c=${plugin^}(); print('Class OK')" 2>/dev/null; then
+            print_success "  Class: OK"
+        else
+            print_error "  Class: Failed"
+        fi
+    done
+}
+
+# Run verification if requested
+if [[ "$VERIFY_MODE" == "true" ]]; then
+    verify_installation
+    exit $?
+fi
+
+# Run tests if requested
+if [[ "$TEST_MODE" == "true" ]]; then
+    test_plugins
+    exit 0
+fi
+
+# Check if plugins were specified
 if [[ "${#SELECTED_PLUGINS[@]}" -eq 0 ]] && [[ "$INSTALL_ALL" == "false" ]]; then
     print_info "No plugins specified. Use --all to install all plugins or specify plugin names."
     print_info "Available plugins: ${PLUGINS[*]}"
     exit 1
 fi
 
+# Use all plugins if --all flag is set
 if [[ "$INSTALL_ALL" == "true" ]]; then
     SELECTED_PLUGINS=("${PLUGINS[@]}")
 fi
 
-install_plugin() {
-    local plugin_name=$1
-    local plugin_file="plugins/${plugin_name}.py"
-    local plugin_icon="plugins/${plugin_name}.png"
+# Validate plugin names
+for plugin in "${SELECTED_PLUGINS[@]}"; do
+    if [[ ! " ${PLUGINS[*]} " =~ " ${plugin} " ]]; then
+        print_error "Unknown plugin: $plugin"
+        print_info "Available plugins: ${PLUGINS[*]}"
+        exit 1
+    fi
+done
+
+# Create engines directory
+mkdir -p "$ENGINES_DIR"
+print_info "Installing to: $ENGINES_DIR"
+
+# Install each plugin
+for plugin in "${SELECTED_PLUGINS[@]}"; do
+    plugin_file="plugins/${plugin}.py"
+    plugin_icon="plugins/${plugin}.png"
     
     if [[ ! -f "$plugin_file" ]]; then
         print_error "Plugin file not found: $plugin_file"
-        return 1
+        continue
     fi
     
-    if [[ "$LOCAL_MODE" == "true" ]]; then
-        local engines_dir="$HOME/.local/share/qBittorrent/nova3/engines"
-        mkdir -p "$engines_dir"
-        print_info "Installing ${plugin_name} locally to: $engines_dir"
-        cp "$plugin_file" "$engines_dir/"
-        [[ -f "$plugin_icon" ]] && cp "$plugin_icon" "$engines_dir/"
-    else
-        # Install to local config directory
-        local engines_dir="$SCRIPT_DIR/config/qBittorrent/nova3/engines"
-        mkdir -p "$engines_dir"
-        print_info "Installing ${plugin_name} to config dir: $engines_dir"
-        cp "$plugin_file" "$engines_dir/"
-        [[ -f "$plugin_icon" ]] && cp "$plugin_icon" "$engines_dir/"
-        
-        # Also copy to running container if it exists
-        if command -v podman &> /dev/null && podman ps --format "{{.Names}}" | grep -q "qbittorrent"; then
-            print_info "Copying ${plugin_name} to running container..."
-            podman cp "$plugin_file" qbittorrent:/config/qBittorrent/nova3/engines/ 2>/dev/null || true
-            [[ -f "$plugin_icon" ]] && podman cp "$plugin_icon" qbittorrent:/config/qBittorrent/nova3/engines/ 2>/dev/null || true
-            print_success "${plugin_name} copied to container"
-        elif command -v docker &> /dev/null && docker ps --format "{{.Names}}" | grep -q "qbittorrent"; then
-            print_info "Copying ${plugin_name} to running container..."
-            docker cp "$plugin_file" qbittorrent:/config/qBittorrent/nova3/engines/ 2>/dev/null || true
-            [[ -f "$plugin_icon" ]] && docker cp "$plugin_icon" qbittorrent:/config/qBittorrent/nova3/engines/ 2>/dev/null || true
-            print_success "${plugin_name} copied to container"
+    print_info "Installing ${plugin}..."
+    
+    # Copy plugin file
+    cp "$plugin_file" "$ENGINES_DIR/"
+    chmod 644 "$ENGINES_DIR/$(basename "$plugin_file")"
+    
+    # Copy icon if exists
+    if [[ -f "$plugin_icon" ]]; then
+        cp "$plugin_icon" "$ENGINES_DIR/"
+        chmod 644 "$ENGINES_DIR/$(basename "$plugin_icon")"
+    fi
+    
+    print_success "${plugin} installed"
+done
+
+# Install to running container if applicable
+if [[ "$LOCAL_MODE" == "false" ]]; then
+    CONTAINER_NAME="qbittorrent"
+    
+    # Check for podman
+    if command -v podman &> /dev/null; then
+        if podman ps --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
+            print_info "Installing to running Podman container..."
+            
+            # Create directory in container
+            podman exec "$CONTAINER_NAME" mkdir -p /config/qBittorrent/nova3/engines 2>/dev/null || true
+            
+            # Copy all plugins
+            for plugin in "${SELECTED_PLUGINS[@]}"; do
+                plugin_file="plugins/${plugin}.py"
+                plugin_icon="plugins/${plugin}.png"
+                
+                podman cp "$plugin_file" "${CONTAINER_NAME}:/config/qBittorrent/nova3/engines/" 2>/dev/null || {
+                    print_error "Failed to copy ${plugin} to container"
+                    continue
+                }
+                
+                if [[ -f "$plugin_icon" ]]; then
+                    podman cp "$plugin_icon" "${CONTAINER_NAME}:/config/qBittorrent/nova3/engines/" 2>/dev/null || true
+                fi
+                
+                # Fix permissions in container
+                podman exec "$CONTAINER_NAME" chmod 644 "/config/qBittorrent/nova3/engines/${plugin}.py" 2>/dev/null || true
+                
+                print_success "${plugin} copied to container"
+            done
+            
+            # Restart nova3 service or container to reload plugins
+            print_info "Restarting qBittorrent to load new plugins..."
+            podman restart "$CONTAINER_NAME" 2>/dev/null || true
+            sleep 2
+        else
+            print_warning "Container '$CONTAINER_NAME' not running. Plugins will be available after next start."
         fi
     fi
     
-    print_success "${plugin_name} plugin installed"
-}
-
-# Download plugin icons
-for plugin in "${SELECTED_PLUGINS[@]}"; do
-    if [[ ! -f "plugins/${plugin}.png" ]]; then
-        print_info "Downloading ${plugin} icon..."
-        curl -sL "https://raw.githubusercontent.com/imDMG/qBt_SE/master/engines/${plugin}.png" -o "plugins/${plugin}.png" 2>/dev/null || \
-        curl -sL "https://raw.githubusercontent.com/nbusseneau/qBittorrent-RuTracker-plugin/master/${plugin}.png" -o "plugins/${plugin}.png" 2>/dev/null || \
-        print_info "Could not download ${plugin} icon (optional)"
+    # Check for docker
+    if command -v docker &> /dev/null; then
+        if docker ps --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
+            print_info "Installing to running Docker container..."
+            
+            # Create directory in container
+            docker exec "$CONTAINER_NAME" mkdir -p /config/qBittorrent/nova3/engines 2>/dev/null || true
+            
+            # Copy all plugins
+            for plugin in "${SELECTED_PLUGINS[@]}"; do
+                plugin_file="plugins/${plugin}.py"
+                plugin_icon="plugins/${plugin}.png"
+                
+                docker cp "$plugin_file" "${CONTAINER_NAME}:/config/qBittorrent/nova3/engines/" 2>/dev/null || {
+                    print_error "Failed to copy ${plugin} to container"
+                    continue
+                }
+                
+                if [[ -f "$plugin_icon" ]]; then
+                    docker cp "$plugin_icon" "${CONTAINER_NAME}:/config/qBittorrent/nova3/engines/" 2>/dev/null || true
+                fi
+                
+                # Fix permissions in container
+                docker exec "$CONTAINER_NAME" chmod 644 "/config/qBittorrent/nova3/engines/${plugin}.py" 2>/dev/null || true
+                
+                print_success "${plugin} copied to container"
+            done
+            
+            # Restart container to reload plugins
+            print_info "Restarting qBittorrent to load new plugins..."
+            docker restart "$CONTAINER_NAME" 2>/dev/null || true
+            sleep 2
+        else
+            print_warning "Container '$CONTAINER_NAME' not running. Plugins will be available after next start."
+        fi
     fi
-done
-
-# Install selected plugins
-for plugin in "${SELECTED_PLUGINS[@]}"; do
-    if [[ " ${PLUGINS[*]} " =~ " ${plugin} " ]]; then
-        install_plugin "$plugin"
-    else
-        print_error "Unknown plugin: $plugin"
-        print_info "Available plugins: ${PLUGINS[*]}"
-    fi
-done
-
-if [[ "$LOCAL_MODE" == "false" ]]; then
-    print_info "Restart container to load plugins: podman restart qbittorrent"
 fi
 
+# Verify installation
+print_info "Verifying installation..."
+verify_installation
+
 print_success "Plugin installation complete!"
+
+if [[ "$LOCAL_MODE" == "false" ]]; then
+    print_info ""
+    print_info "NOTE: If using WebUI, plugins may require a browser refresh."
+    print_info "Search plugins should now be visible in: Search > Search Plugins"
+fi

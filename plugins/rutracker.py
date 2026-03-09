@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """RuTracker search engine plugin for qBittorrent with environment variable support."""
-# VERSION: 2.21-modified
+# VERSION: 2.22-fixed
 # AUTHORS: nbusseneau (https://github.com/nbusseneau/qBittorrent-RuTracker-plugin)
-# MODIFIED: Added environment variable support for credentials
+# MODIFIED: Added environment variable support and fixed download functionality
 
 import os
 import sys
@@ -105,19 +105,33 @@ except ImportError:
         spec.loader.exec_module(novaprinter)
 
 
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger()
+# Configure logging
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 class RuTracker(object):
-    """Base class for RuTracker search engine plugin for qBittorrent."""
+    """RuTracker search engine plugin for qBittorrent."""
 
     name = "RuTracker"
     url = DEFAULT_ENGINE_URL
     encoding = "cp1251"
+    supported_categories = {
+        "all": "-1",
+        "movies": "7",
+        "tv": "9",
+        "music": "2",
+        "games": "8",
+        "anime": "33",
+        "software": "35",
+        "books": "21",
+    }
 
     re_search_queries = re.compile(r'<a.+?href="tracker\.php\?(.*?start=\d+)"')
-    re_threads = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
+    re_threads = re.compile(r'<tr id="trs-tr-\d+.*?</tr>', re.S)
     re_torrent_data = re.compile(
         r'a data-topic_id="(?P<id>\d+?)".*?>(?P<title>.+?)<'
         r".+?"
@@ -153,7 +167,7 @@ class RuTracker(object):
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
         self.opener.addheaders = [
-            ("User-Agent", ""),
+            ("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"),
             ("Accept-Encoding", "gzip, deflate"),
         ]
         self.__login()
@@ -163,7 +177,7 @@ class RuTracker(object):
         self.credentials = {
             "login_username": CONFIG.username,
             "login_password": CONFIG.password,
-            "login": "Вход",
+            "login": "\u0412\u0445\u043e\u0434",
         }
 
         try:
@@ -185,9 +199,17 @@ class RuTracker(object):
         """Search for what on the search engine."""
         self.results = {}
         what = unquote(what)
+        
+        # Handle category
+        cat_id = self.supported_categories.get(cat, "-1")
+        if cat != "all":
+            query = urlencode({"nm": what, "f": cat_id})
+        else:
+            query = urlencode({"nm": what})
+        
         logger.info("Searching for {}...".format(what))
 
-        url = self.search_url(urlencode({"nm": what}))
+        url = self.search_url(query)
         other_pages = self.__execute_search(url, is_first=True)
         logger.info("{} pages of results found.".format(len(other_pages) + 1))
 
@@ -198,7 +220,11 @@ class RuTracker(object):
 
     def __execute_search(self, url: str, is_first: bool = False) -> list:
         """Execute search query."""
-        data = self._open_url(url).decode(self.encoding)
+        try:
+            data = self._open_url(url).decode(self.encoding)
+        except Exception as e:
+            logger.error(f"Search failed for {url}: {e}")
+            return []
 
         for thread in self.re_threads.findall(data):
             match = self.re_torrent_data.search(thread)
@@ -280,16 +306,42 @@ class RuTracker(object):
         raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
 
     def download_torrent(self, url: str) -> None:
-        """Download torrent file and print filename + URL as required by API"""
-        logger.info("Downloading {}...".format(url))
+        """Download torrent file using authenticated session.
+        
+        This method is called by nova2dl.py when downloading torrents.
+        It uses the authenticated session to download the .torrent file.
+        
+        Args:
+            url: The torrent download URL (e.g., https://rutracker.org/forum/dl.php?t=12345)
+            
+        Output format (required by qBittorrent):
+            <filepath> <url>
+            
+        Example:
+            /tmp/torrent_12345.torrent https://rutracker.org/forum/dl.php?t=12345
+        """
+        logger.info("Downloading torrent from: {}".format(url))
 
         try:
+            # Use the authenticated opener to download
             data = self._open_url(url)
 
             if not data:
                 raise ValueError("No data received from URL: {}".format(url))
 
-            file_handle, temp_path = tempfile.mkstemp(suffix=".torrent")
+            # Verify this looks like a torrent file (bencode format)
+            if not data.startswith(b'd'):
+                # Try to decode and check for HTML error page
+                try:
+                    decoded = data.decode('utf-8', errors='ignore')
+                    if '<html' in decoded.lower() or '<!doctype' in decoded.lower():
+                        raise ValueError("Received HTML page instead of torrent file - likely authentication error")
+                except:
+                    pass
+                raise ValueError("Downloaded data is not a valid torrent file (does not start with 'd')")
+
+            # Create temp file with proper permissions
+            file_handle, temp_path = tempfile.mkstemp(suffix=".torrent", prefix="rutracker_")
 
             try:
                 with os.fdopen(file_handle, "wb") as f:
@@ -297,13 +349,17 @@ class RuTracker(object):
                     f.flush()
                     os.fsync(f.fileno())
 
+                # Set readable permissions
                 os.chmod(temp_path, 0o644)
 
-                logger.info("Torrent file saved to: {}".format(temp_path))
+                logger.info("Torrent saved to: {}".format(temp_path))
+                
+                # Output format required by qBittorrent: "<filepath> <url>"
                 print(temp_path + " " + url)
                 sys.stdout.flush()
 
             except Exception as e:
+                # Clean up temp file on error
                 try:
                     os.unlink(temp_path)
                 except:
@@ -317,23 +373,35 @@ class RuTracker(object):
             raise
 
 
+# Create the engine class reference
 rutracker = RuTracker
 
 if __name__ == "__main__":
+    import time
     from timeit import timeit
 
-    logging.info("Testing RuTracker...")
-    engine = RuTracker()
-    logging.info("[timeit] %s", timeit(lambda: engine.search("arch linux"), number=1))
-    logging.info("[timeit] %s", timeit(lambda: engine.search("ubuntu"), number=1))
-    logging.info("[timeit] %s", timeit(lambda: engine.search("space"), number=1))
-    logging.info("[timeit] %s", timeit(lambda: engine.search("космос"), number=1))
-    logging.info(
-        "[timeit] %s",
-        timeit(
-            lambda: engine.download_torrent(
-                "https://rutracker.org/forum/dl.php?t=4578927"
-            ),
-            number=1,
-        ),
-    )
+    logging.basicConfig(level=logging.INFO)
+    
+    try:
+        logging.info("Testing RuTracker plugin...")
+        engine = RuTracker()
+        
+        # Test search
+        logging.info("\n[Test] Search for 'ubuntu':")
+        engine.results = {}
+        engine.search("ubuntu")
+        logging.info("Found {} results".format(len(engine.results)))
+        
+        if engine.results:
+            # Test download first result
+            first_result = list(engine.results.values())[0]
+            download_url = first_result["link"]
+            logging.info("\n[Test] Downloading: {}".format(download_url))
+            engine.download_torrent(download_url)
+        else:
+            logging.warning("No search results to test download")
+            
+    except Exception as e:
+        logging.error("Test failed: {}".format(e))
+        import traceback
+        traceback.print_exc()
