@@ -1,485 +1,450 @@
-# User Manual: qBitTorrent with RuTracker Plugin
+# qBitTorrent-Fixed User Manual
+
+## Complete Guide to Using All 12 Search Plugins
+
+---
 
 ## Table of Contents
 
-1. [Getting Started](#getting-started)
-2. [Using the Web Interface](#using-the-web-interface)
-3. [Using the RuTracker Plugin](#using-the-rutracker-plugin)
-4. [Managing Downloads](#managing-downloads)
-5. [Configuration Guide](#configuration-guide)
-6. [Common Tasks](#common-tasks)
-7. [FAQ](#faq)
+1. [Quick Start](#quick-start)
+2. [Plugin Overview](#plugin-overview)
+3. [Configuration](#configuration)
+4. [Using the WebUI](#using-the-webui)
+5. [Using Private Trackers](#using-private-trackers)
+6. [Troubleshooting](#troubleshooting)
+7. [Testing](#testing)
+8. [FAQ](#faq)
 
 ---
 
-## Getting Started
+## Quick Start
 
-### First Time Setup
+### 1. Installation
 
-1. **Start qBitTorrent**:
+```bash
+# Clone and setup
+git clone https://github.com/yourusername/qBitTorrent-Fixed.git
+cd qBitTorrent-Fixed
+
+# Run automated setup
+./setup.sh
+
+# Configure credentials (optional, for private trackers)
+vim .env
+```
+
+### 2. Start Everything
+
+```bash
+# Terminal 1: Start qBittorrent
+./start.sh
+
+# Terminal 2: Start WebUI Bridge (for private trackers)
+python3 webui-bridge.py
+
+# Access WebUI
+http://localhost:8085
+# Login: admin / admin
+```
+
+### 3. Verify Installation
+
+```bash
+# Run all tests
+./run-all-tests.sh
+
+# Check plugin status
+python3 tests/final_verification.py
+```
+
+---
+
+## Plugin Overview
+
+### Public Trackers (9 plugins)
+
+These work immediately without configuration:
+
+| Plugin | Content Type | WebUI | Magnet Links | Notes |
+|--------|--------------|-------|--------------|-------|
+| **The Pirate Bay** | General | ✅ | ✅ | Most popular |
+| **EZTV** | TV Shows | ✅ | ✅ | Best for TV |
+| **Rutor** | Russian | ✅ | ✅ | Russian content |
+| **LimeTorrents** | General | ✅ | ❌ | Verified torrents |
+| **Solid Torrents** | General | ✅ | ✅ | Fast search |
+| **TorrentProject** | General | ✅ | ❌ | Comprehensive |
+| **torrents-csv** | General | ✅ | ✅ | Open database |
+| **TorLock** | General | ✅ | ✅ | No fake torrents |
+| **Jackett** | Meta | ✅ | ❌ | Aggregates multiple |
+
+### Private Trackers (3 plugins)
+
+These require credentials:
+
+| Plugin | Content Type | Credentials Required | Best For |
+|--------|--------------|---------------------|----------|
+| **RuTracker** | Russian | Username/Password | Russian content |
+| **Kinozal** | Movies/TV | Username/Password | Movies and TV |
+| **NNMClub** | General | Cookies | General content |
+
+---
+
+## Configuration
+
+### Setting Up Credentials
+
+Edit `.env` file:
+
+```bash
+# Public trackers (no configuration needed)
+
+# Private trackers (optional, for WebUI support)
+RUTRACKER_USERNAME=your_rutracker_username
+RUTRACKER_PASSWORD=your_rutracker_password
+
+KINOZAL_USERNAME=your_kinozal_username
+KINOZAL_PASSWORD=your_kinozal_password
+
+# For NNMClub, get cookies from browser:
+# 1. Login to nnmclub.to in browser
+# 2. Open developer tools (F12)
+# 3. Go to Application/Storage > Cookies
+# 4. Copy uid and pass cookies
+NNMCLUB_COOKIES="uid=123456; pass=abcdef1234567890abcdef1234567890"
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `QBITTORRENT_DATA_DIR` | `/mnt/DATA` | Download directory |
+| `WEBUI_PORT` | `8085` | WebUI port |
+| `WEBUI_USERNAME` | `admin` | WebUI login |
+| `WEBUI_PASSWORD` | `admin` | WebUI password |
+| `BRIDGE_PORT` | `8666` | WebUI Bridge port |
+
+---
+
+## Using the WebUI
+
+### Basic Search
+
+1. Open `http://localhost:8085`
+2. Login with admin/admin
+3. Click "Search" tab
+4. Enter search term (e.g., "ubuntu")
+5. Select plugin from dropdown
+6. Click "Search"
+
+### Downloading Torrents
+
+#### Public Trackers (PirateBay, EZTV, etc.)
+
+1. Search for content
+2. Click download icon (⬇️)
+3. Torrent appears in Transfer list
+4. Download starts automatically
+
+#### Private Trackers (RuTracker, Kinozal, NNMClub)
+
+**Option A: Using WebUI Bridge (Recommended)**
+
+1. Start WebUI Bridge: `python3 webui-bridge.py`
+2. Search for content
+3. Click download icon
+4. Bridge handles authentication automatically
+
+**Option B: Using Desktop App**
+
+1. Install plugins locally: `./install-plugin.sh --local --all`
+2. Open qBittorrent Desktop App
+3. Go to View → Search Engine
+4. Downloads work without bridge
+
+**Option C: Manual Download**
+
+1. Search in WebUI
+2. Note the torrent name
+3. Go to tracker website directly
+4. Download .torrent file
+5. Upload to qBittorrent WebUI
+
+---
+
+## Using Private Trackers
+
+### RuTracker
+
+**Requirements:**
+- Active account on rutracker.org
+- Valid username and password
+
+**Setup:**
+```bash
+# Add to .env
+RUTRACKER_USERNAME=your_username
+RUTRACKER_PASSWORD=your_password
+
+# Restart container
+./restart.sh
+```
+
+**Usage:**
+1. Enable RuTracker in Search Plugins
+2. Search for Russian content
+3. Click download (works with WebUI Bridge)
+
+**Tips:**
+- RuTracker has the best Russian content
+- Very reliable for software and movies
+- Works best with WebUI Bridge
+
+### Kinozal
+
+**Requirements:**
+- Active account on kinozal.tv
+- Valid username and password
+
+**Setup:**
+```bash
+# Add to .env
+KINOZAL_USERNAME=your_username
+KINOZAL_PASSWORD=your_password
+```
+
+**Usage:**
+1. Enable Kinozal in Search Plugins
+2. Search for movies/TV shows
+3. Works with WebUI Bridge
+
+### NNMClub
+
+**Requirements:**
+- Active account on nnmclub.to
+- Cookie-based authentication
+
+**Setup:**
+```bash
+# Get cookies from browser
+# Add to .env
+NNMCLUB_COOKIES="uid=your_uid; pass=your_pass_hash"
+```
+
+**Getting Cookies:**
+1. Login to nnmclub.to in browser
+2. Press F12 (Developer Tools)
+3. Go to Application/Storage → Cookies
+4. Find `uid` and `pass` cookies
+5. Copy values to .env
+
+---
+
+## Troubleshooting
+
+### Issue: Plugin Not Showing in WebUI
+
+**Solution:**
+```bash
+# Restart container
+./restart.sh
+
+# Hard refresh browser (Ctrl+Shift+R)
+```
+
+### Issue: Download Doesn't Start (Private Trackers)
+
+**Cause:** WebUI bypasses authentication
+
+**Solutions:**
+
+1. **Use WebUI Bridge (Recommended)**
    ```bash
-   cd /path/to/qBitTorrent
-   ./start.sh
+   python3 webui-bridge.py
    ```
 
-2. **Access Web UI**:
-   - Open your web browser
-   - Go to: `http://localhost:8085`
-   - Default login:
-     - Username: `admin`
-     - Password: `admin`
+2. **Use Desktop App**
+   ```bash
+   ./install-plugin.sh --local --all
+   # Then use Desktop App
+   ```
 
-3. **Change Password** (Important!):
-   - Click **Tools** → **Options**
-   - Go to **Web UI** tab
-   - Under **Authentication**, set new username and password
-   - Click **Save**
+3. **Check Credentials**
+   ```bash
+   cat .env
+   # Verify username/password are correct
+   ```
 
-4. **Configure Data Directory**:
-   - The data directory is set via `QBITTORRENT_DATA_DIR` environment variable
-   - Default: `/mnt/DATA`
-   - To customize, add to `.env`:
-     ```bash
-     QBITTORRENT_DATA_DIR=/your/custom/path
-     ```
-   - Restart the container for changes to take effect
-   - Required subdirectories are created automatically:
-     - `Incomplete/` - Partial downloads
-     - `Torrents/All/` - All .torrent files
-     - `Torrents/Completed/` - Completed .torrent files
+### Issue: Search Returns No Results
 
----
+**Check:**
+1. Internet connection
+2. Plugin is enabled
+3. Try different search terms
+4. Check container logs: `podman logs qbittorrent`
 
-## Using the Web Interface
+### Issue: Column Data Shows Zeros
 
-### Main Interface Overview
+**Status:** Fixed in this version
 
-The qBitTorrent Web UI has several main sections:
+All plugins now return real data for seeds, leech, and size.
 
-| Section | Purpose |
-|---------|---------|
-| **Transfers** | View and manage active downloads |
-| **Search** | Search for torrents using plugins |
-| **RSS** | Subscribe to RSS feeds for automatic downloads |
-| **Execution Log** | View application logs |
+### Issue: Container Won't Start
 
-### Adding Torrents
-
-**Method 1: From File**
-1. Click **File** → **Add Torrent File**
-2. Select your `.torrent` file
-3. Choose download location
-4. Click **Upload**
-
-**Method 2: From URL/Magnet Link**
-1. Click **File** → **Add Torrent Link**
-2. Paste the URL or magnet link
-3. Choose download location
-4. Click **Download**
-
-### Managing Downloads
-
-| Action | How To |
-|--------|--------|
-| **Pause** | Right-click torrent → **Pause** |
-| **Resume** | Right-click torrent → **Resume** |
-| **Delete** | Right-click torrent → **Delete** |
-| **Set Priority** | Right-click → **Set priority** → High/Normal/Low |
-| **Limit Speed** | Right-click → **Set download/upload limit** |
-
-### Viewing Download Details
-
-Click on any torrent to see:
-- **General**: Status, progress, size, hashes
-- **Trackers**: Tracker status and peers
-- **Peers**: Connected peers list
-- **HTTP Sources**: HTTP/FTP sources
-- **Content**: Files in the torrent
-
----
-
-## Using the RuTracker Plugin
-
-### Prerequisites
-
-Before using the RuTracker plugin, ensure:
-
-1. You have a RuTracker account
-2. Credentials are configured in `.env` or `~/.qbit.env`
-
-To verify:
+**Solution:**
 ```bash
-./install-plugin.sh --verify
-```
-
-### Searching on RuTracker
-
-1. **Open Search Tab**:
-   - Click on **Search** in the left sidebar
-
-2. **Configure Search**:
-   - In the search box, type your query
-   - Select **RuTracker** from the "Select search engine" dropdown
-   - Click **Search** or press Enter
-
-3. **Filter Results**:
-   - Use category filters on the left
-   - Sort by columns (name, size, seeders, etc.)
-
-4. **Download**:
-   - Double-click a result to download
-   - Or right-click → **Download**
-
-### Search Tips
-
-| Tip | Description |
-|-----|-------------|
-| **Use Russian** | Searches work better in Russian |
-| **Exact phrase** | Use quotes: `"exact phrase"` |
-| **Exclude terms** | Use minus: `term -unwanted` |
-| **Category filter** | Browse by category on RuTracker website first |
-
-### Troubleshooting Search
-
-**No results found:**
-1. Check credentials: `./install-plugin.sh --test`
-2. Visit RuTracker website and login manually
-3. Clear any CAPTCHA by logging in via browser
-4. Check if RuTracker mirrors are accessible
-
-**Login failed:**
-1. Verify username/password in `.env`
-2. Ensure no special characters are causing issues
-3. Try logging in via browser with same credentials
-
----
-
-## Managing Downloads
-
-### Download Categories
-
-Organize downloads with categories:
-
-1. Go to **Tools** → **Options** → **Downloads**
-2. Under **Torrent Management Mode**, select **Automatic**
-3. Create categories in the sidebar
-
-**Creating a Category:**
-1. Right-click **Category** in sidebar
-2. Select **Add category**
-3. Enter name and save path
-
-### Scheduling Downloads
-
-Limit bandwidth during certain hours:
-
-1. Go to **Tools** → **Options** → **Speed**
-2. Enable **Alternative rate limits**
-3. Set **Scheduler**:
-   - Select time range
-   - Choose which limits to apply
-
-### RSS Automation
-
-Automatically download from RSS feeds:
-
-1. Go to **RSS** tab
-2. Click **New subscription**
-3. Add RSS feed URL
-4. Create download rules:
-   - Click **RSS Downloader**
-   - Add rules matching specific content
-
----
-
-## Configuration Guide
-
-### Essential Settings
-
-Access via: **Tools** → **Options**
-
-#### Downloads Tab
-
-| Setting | Recommended Value |
-|---------|-------------------|
-| Default Save Path | `/DATA` (mapped from `QBITTORRENT_DATA_DIR`) |
-| Keep incomplete torrents in | `/DATA/Incomplete` |
-| Torrent Management Mode | Automatic |
-| Pre-allocate disk space | Enabled (for less fragmentation) |
-
-> **Note:** The `/DATA` path inside the container is mapped to the host directory specified by `QBITTORRENT_DATA_DIR` (default: `/mnt/DATA`).
-
-#### Connection Tab
-
-| Setting | Recommended Value |
-|---------|-------------------|
-| Port for incoming connections | Random or specific port |
-| Global maximum connections | 500 |
-| Maximum active downloads | 3-5 |
-| Maximum active uploads | 3-5 |
-
-#### Speed Tab
-
-| Setting | Recommended Value |
-|---------|-------------------|
-| Global Download Limit | 0 (unlimited) or set as needed |
-| Global Upload Limit | Set based on your connection |
-| Alternative rate limits | Configure for off-peak hours |
-
-#### BitTorrent Tab
-
-| Setting | Recommended Value |
-|---------|-------------------|
-| Enable DHT | Enabled |
-| Enable PeX | Enabled |
-| Enable LSD | Enabled |
-| Encryption mode | Prefer encryption |
-
-#### Web UI Tab
-
-| Setting | Recommended Value |
-|---------|-------------------|
-| Port | 8085 (or your choice) |
-| Use UPnP | Optional |
-| Authentication | **Enabled** (change default!) |
-| Enable clickjacking protection | Enabled |
-
----
-
-## Common Tasks
-
-### Backing Up Configuration
-
-```bash
-# Backup config directory
-tar -czf qbittorrent-config-backup.tar.gz config/
-
-# Backup only essential files
-tar -czf qbittorrent-essential-backup.tar.gz \
-    config/qBittorrent/qBittorrent.ini \
-    config/qBittorrent/fastresume/ \
-    config/qBittorrent/BT_backup/
-```
-
-### Restoring Configuration
-
-```bash
-./stop.sh
-tar -xzf qbittorrent-config-backup.tar.gz
+# Full reset
+./stop.sh -r
+podman system prune -f
 ./start.sh
 ```
 
-### Exporting/Importing Torrents
+---
 
-**Export:**
-1. Select torrents to export
-2. Right-click → **Export .torrent**
-3. Choose save location
+## Testing
 
-**Import:**
-1. Drag and drop `.torrent` files into the UI
-2. Or use **File** → **Add Torrent File**
-
-### Checking Disk Space
+### Run All Tests
 
 ```bash
-# Check download directory space
-df -h /path/to/downloads
+# Comprehensive test suite
+./run-all-tests.sh
 
-# Check config directory space
-du -sh config/
+# Individual tests
+python3 tests/comprehensive_test.py
+python3 tests/final_verification.py
+python3 tests/test_all_plugins.py
 ```
 
-### Updating qBitTorrent
+### Test Results
 
-```bash
-./stop.sh
-./start.sh -p    # Pull latest image
-```
+Tests cover:
+- ✅ Plugin structure validation
+- ✅ Search functionality
+- ✅ Download functionality
+- ✅ Column data validation (seeds, leech, size)
+- ✅ Authentication handling
 
-### Viewing Logs
-
-```bash
-# Container logs
-podman logs -f qbittorrent
-
-# Or use Docker
-docker compose logs -f qbittorrent
-
-# Application logs
-# View in Web UI: Tools → Execution Log
-```
+Expected result: **100% success rate**
 
 ---
 
 ## FAQ
 
-### General Questions
+### Q: Why create a fork instead of fixing upstream?
 
-**Q: How do I change the Web UI port?**
-> Edit `.env` and change `WEBUI_PORT=8085` to your desired port, then restart.
+**A:** The WebUI limitation is in qBittorrent's core design. This fork provides a working solution while maintaining compatibility.
 
-**Q: How do I change the data/download directory?**
-> Set `QBITTORRENT_DATA_DIR` in one of these locations:
-> 1. Project `.env` file: `QBITTORRENT_DATA_DIR=/your/path`
-> 2. `~/.qbit.env` file: `QBITTORRENT_DATA_DIR=/your/path`
-> 3. Shell environment (`~/.bashrc`): `export QBITTORRENT_DATA_DIR=/your/path`
->
-> Then restart the container: `./stop.sh && ./start.sh`
+### Q: Do I need to run WebUI Bridge?
 
-**Q: Can I access qBitTorrent remotely?**
-> Yes, but secure it first:
-> 1. Change default credentials
-> 2. Use HTTPS (via reverse proxy)
-> 3. Consider VPN for additional security
+**A:** Only if you want to use private trackers (RuTracker, Kinozal, NNMClub) in WebUI. Public trackers work without it.
 
-**Q: Why are downloads slow?**
-> Check:
-> 1. Seeders/peers count
-> 2. Connection settings (Tools → Options → Connection)
-> 3. Bandwidth limits (Tools → Options → Speed)
-> 4. Port forwarding configuration
+### Q: Is this legal?
 
-**Q: How do I move completed downloads?**
-> qBitTorrent can't automatically move files, but you can:
-> 1. Use categories with different save paths
-> 2. Use external scripts with the "Run external program" feature
+**A:** The software itself is legal (Apache 2.0 license). Usage depends on your local laws and the content you download.
 
-### Plugin Questions
+### Q: Will this break with qBittorrent updates?
 
-**Q: RuTracker plugin shows no results**
-> 1. Check credentials: `./install-plugin.sh --verify`
-> 2. Login to RuTracker website manually to clear CAPTCHA
-> 3. Ensure mirrors are accessible from your network
+**A:** The plugin API is stable. Updates to qBittorrent should not break functionality.
 
-**Q: How do I update the plugin?**
-> ```bash
-> ./stop.sh
-> ./install-plugin.sh --container
-> ./start.sh
-> ```
+### Q: Can I add more plugins?
 
-**Q: Can I use multiple search plugins?**
-> Yes! qBitTorrent supports multiple plugins. Install them in the same `engines` directory.
+**A:** Yes! See `docs/PLUGINS.md` for adding custom plugins.
 
-### Container Questions
+### Q: Why does RuTracker work in Desktop App but not WebUI?
 
-**Q: Container keeps restarting**
-> Check logs:
-> ```bash
-> podman logs qbittorrent
-> ```
-> Common causes:
-> - Permission issues (check PUID/PGID)
-> - Volume mount failures
-> - Port conflicts
+**A:** Desktop App uses nova2dl.py with authentication. WebUI sends URLs directly without auth. The WebUI Bridge fixes this.
 
-**Q: How do I access files downloaded inside the container?**
-> Files in `/DATA` inside the container are mapped to your host path (configured in `docker-compose.yml`)
+### Q: How do I update plugins?
 
-**Q: Can I run multiple qBitTorrent instances?**
-> Yes, but:
-> 1. Use different ports
-> 2. Use different config directories
-> 3. Use different container names
-
-### Performance Questions
-
-**Q: How to optimize download speed?**
-> 1. Enable DHT, PeX, LSD (Connection tab)
-> 2. Increase max connections (Connection tab)
-> 3. Ensure port is forwarded if behind NAT
-> 4. Use wired connection instead of WiFi
-
-**Q: qBitTorrent uses too much memory**
-> 1. Reduce cache size (Advanced → Disk cache)
-> 2. Reduce maximum connections
-> 3. Reduce number of active torrents
-
-**Q: How to limit bandwidth during the day?**
-> Use the scheduler in Tools → Options → Speed:
-> 1. Enable "Alternative rate limits"
-> 2. Configure scheduler with time ranges
-> 3. Set lower limits for "alternative" period
-
----
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+N` | Add torrent link |
-| `Ctrl+O` | Add torrent file |
-| `Ctrl+P` | Open options |
-| `Del` | Delete selected torrent |
-| `Ctrl+A` | Select all torrents |
-| `Ctrl+U` | Add torrent link |
-| `Space` | Pause/Resume selected |
-
----
-
-## Getting Help
-
-### Logs Location
-
-| Type | Location |
-|------|----------|
-| Container logs | `podman logs qbittorrent` |
-| Application logs | Web UI: Tools → Execution Log |
-| Config files | `config/qBittorrent/` |
-
-### Useful Commands
-
+**A:**
 ```bash
-# Check if container is running
-./start.sh -s
-
-# View container logs
-podman logs -f qbittorrent
-
-# Run validation tests
-./test.sh --full
-
-# Verify plugin configuration
-./install-plugin.sh --test
-
-# Restart container
-./stop.sh && ./start.sh
+./install-plugin.sh --all
+./restart.sh
 ```
 
-### Support Resources
+### Q: Where are downloads saved?
 
-- [qBitTorrent Forum](https://qbforums.shiki.hu/)
-- [qBitTorrent Reddit](https://www.reddit.com/r/qBittorrent/)
-- [LinuxServer.io Discord](https://discord.gg/linuxserver)
-- [Project Issues](https://github.com/your-repo/issues)
+**A:** Default: `/mnt/DATA` (configurable in `.env`)
 
----
-
-## Quick Reference Card
-
+Structure:
 ```
-┌─────────────────────────────────────────────────────┐
-│                  ESSENTIAL COMMANDS                  │
-├─────────────────────────────────────────────────────┤
-│  ./start.sh           Start container               │
-│  ./stop.sh            Stop container                │
-│  ./test.sh            Run validation tests          │
-│  ./install-plugin.sh  Install RuTracker plugin      │
-├─────────────────────────────────────────────────────┤
-│                   WEB UI ACCESS                      │
-├─────────────────────────────────────────────────────┤
-│  URL:      http://localhost:8085                    │
-│  User:     admin                                    │
-│  Pass:     admin (CHANGE IMMEDIATELY!)              │
-├─────────────────────────────────────────────────────┤
-│                  CONFIGURATION                       │
-├─────────────────────────────────────────────────────┤
-│  Edit .env file for settings                        │
-│  Web UI: Tools → Options for detailed config        │
-└─────────────────────────────────────────────────────┘
+/mnt/DATA/
+├── Incomplete/          # Partial downloads
+├── Torrents/
+│   ├── All/            # All .torrent files
+│   └── Completed/      # Completed .torrent files
+└── [completed files]   # Finished downloads
 ```
 
 ---
 
-*Last updated: March 2026*
+## Advanced Topics
+
+### Custom Plugin Development
+
+See `docs/PLUGIN_DEVELOPMENT.md` for creating custom search plugins.
+
+### WebUI Bridge Configuration
+
+Edit `webui-bridge.py`:
+```python
+QBITTORRENT_HOST = 'localhost'  # Change if remote
+QBITTORRENT_PORT = 8085         # WebUI port
+BRIDGE_PORT = 8666              # Bridge port
+```
+
+### Backup and Restore
+
+**Backup:**
+```bash
+# Config
+tar czf qbittorrent-backup-$(date +%Y%m%d).tar.gz config/
+
+# Plugins
+tar czf plugins-backup-$(date +%Y%m%d).tar.gz plugins/
+```
+
+**Restore:**
+```bash
+tar xzf qbittorrent-backup-YYYYMMDD.tar.gz
+tar xzf plugins-backup-YYYYMMDD.tar.gz
+./restart.sh
+```
+
+---
+
+## Support
+
+### Getting Help
+
+1. **Documentation:** Read all docs in `docs/` folder
+2. **Tests:** Run `./run-all-tests.sh` to diagnose issues
+3. **Logs:** Check `podman logs qbittorrent`
+4. **Issues:** Report on GitHub
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make changes
+4. Run tests: `./run-all-tests.sh`
+5. Submit pull request
+
+---
+
+## Version History
+
+### v2.0.0 (Current)
+- ✅ All 12 plugins working
+- ✅ WebUI Bridge for private trackers
+- ✅ Comprehensive test suite
+- ✅ Full documentation
+
+### v1.0.0
+- Initial release
+- 4 Russian trackers
+
+---
+
+**Last Updated:** March 2025  
+**Version:** 2.0.0  
+**License:** Apache 2.0
