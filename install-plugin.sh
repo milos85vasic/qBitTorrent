@@ -79,16 +79,24 @@ install_plugin() {
         cp "$plugin_file" "$engines_dir/"
         [[ -f "$plugin_icon" ]] && cp "$plugin_icon" "$engines_dir/"
     else
+        # Install to local config directory
         local engines_dir="$SCRIPT_DIR/config/qBittorrent/nova3/engines"
         mkdir -p "$engines_dir"
-        print_info "Installing ${plugin_name} for container to: $engines_dir"
+        print_info "Installing ${plugin_name} to config dir: $engines_dir"
         cp "$plugin_file" "$engines_dir/"
         [[ -f "$plugin_icon" ]] && cp "$plugin_icon" "$engines_dir/"
         
-        # If container is running, copy to container
+        # Also copy to running container if it exists
         if command -v podman &> /dev/null && podman ps --format "{{.Names}}" | grep -q "qbittorrent"; then
+            print_info "Copying ${plugin_name} to running container..."
             podman cp "$plugin_file" qbittorrent:/config/qBittorrent/nova3/engines/ 2>/dev/null || true
             [[ -f "$plugin_icon" ]] && podman cp "$plugin_icon" qbittorrent:/config/qBittorrent/nova3/engines/ 2>/dev/null || true
+            print_success "${plugin_name} copied to container"
+        elif command -v docker &> /dev/null && docker ps --format "{{.Names}}" | grep -q "qbittorrent"; then
+            print_info "Copying ${plugin_name} to running container..."
+            docker cp "$plugin_file" qbittorrent:/config/qBittorrent/nova3/engines/ 2>/dev/null || true
+            [[ -f "$plugin_icon" ]] && docker cp "$plugin_icon" qbittorrent:/config/qBittorrent/nova3/engines/ 2>/dev/null || true
+            print_success "${plugin_name} copied to container"
         fi
     fi
     
