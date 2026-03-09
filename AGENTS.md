@@ -1,5 +1,20 @@
 # AGENTS.md - Guidelines for AI Agents
 
+## MANDATORY CONSTRAINTS (CRITICAL)
+
+### Default Credentials Requirement
+
+**The qBittorrent WebUI MUST always use these default credentials:**
+
+```
+Username: admin
+Password: admin
+```
+
+**This is NON-NEGOTIABLE. See CLAUDE.md for full details.**
+
+---
+
 This document provides guidelines for AI coding agents working in this repository.
 
 ## Project Overview
