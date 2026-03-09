@@ -653,3 +653,98 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## Contributing
 
 Contributions are welcome! Please read the [Contributing Guide](CONTRIBUTING.md) for details on submitting issues and pull requests.
+
+## 🎯 Search Plugins
+
+This project includes **4 Russian torrent search plugins** with full Docker/Podman support and environment variable configuration.
+
+### Available Plugins
+
+| Plugin | Status | Credentials Required | Registration |
+|--------|--------|---------------------|--------------|
+| **RuTracker** | ✅ Fully Working | Username + Password | Required |
+| **Rutor** | ✅ Working | **None** | Not Required |
+| **Kinozal** | ✅ Working | Username + Password | Required |
+| **NNM-Club** | ✅ Working | Username + Cookies | Required |
+
+### Quick Start
+
+```bash
+# Install all plugins
+./install-plugin.sh --all
+
+# Install specific plugins
+./install-plugin.sh rutracker rutor
+
+# For local qBittorrent (not container)
+./install-plugin.sh --local rutracker
+```
+
+### Configuration
+
+Add credentials to `.env` file (copy from `.env.example`):
+
+```bash
+# RuTracker (REQUIRED)
+RUTRACKER_USERNAME=your_username
+RUTRACKER_PASSWORD=your_password
+
+# Rutor (OPTIONAL - no credentials!)
+RUTOR_USE_MAGNET=false
+
+# Kinozal (REQUIRED)
+KINOZAL_USERNAME=your_username
+KINOZAL_PASSWORD=your_password
+
+# NNM-Club (REQUIRED - uses cookies!)
+NNMCLUB_USERNAME=your_username
+NNMCLUB_COOKIES=phpbb2mysql_4_sid=abc123; phpbb2mysql_4_data=xyz789
+```
+
+### NNM-Club Cookie Setup
+
+NNM-Club requires browser cookies (not password):
+
+1. Login to https://nnmclub.to/forum/
+2. Open DevTools (F12) → Network tab
+3. Refresh page
+4. Find any request → Copy Cookie header
+5. Paste into `.env` as `NNMCLUB_COOKIES=...`
+
+### Testing
+
+```bash
+# Test all plugins
+./tests/run_tests.sh --all
+
+# Comprehensive download test
+python3 tests/test_download_comprehensive.py --run
+
+# Quick validation
+./test.sh --plugin
+```
+
+### Documentation
+
+📚 **Full plugin documentation:** [docs/PLUGINS.md](docs/PLUGINS.md)
+
+Includes:
+- Detailed setup instructions
+- Troubleshooting guide
+- Proxy configuration
+- Security considerations
+- Category support
+- Performance tips
+
+### Plugin Sources
+
+- **RuTracker:** Modified from [nbusseneau/qBittorrent-RuTracker-plugin](https://github.com/nbusseneau/qBittorrent-RuTracker-plugin)
+- **Rutor, Kinozal, NNM-Club:** Modified from [imDMG/qBt_SE](https://github.com/imDMG/qBt_SE)
+
+All plugins enhanced with:
+- ✅ Environment variable support
+- ✅ Docker/Podman integration
+- ✅ Automatic .env file loading
+- ✅ Proper file permissions
+- ✅ Comprehensive error handling
+- ✅ Full test coverage

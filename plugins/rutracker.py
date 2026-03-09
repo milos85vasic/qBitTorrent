@@ -14,21 +14,26 @@ def _load_env_file():
     env_paths = [
         os.path.join(os.path.dirname(__file__), ".env"),
         os.path.join(os.path.dirname(__file__), "..", ".env"),
+        os.path.join(os.path.dirname(__file__), "..", "..", ".env"),
+        "/config/.env",
         os.path.expanduser("~/.qbit.env"),
         os.path.expanduser("~/.config/qbittorrent/.env"),
     ]
 
     for env_path in env_paths:
-        if os.path.isfile(env_path):
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and "=" in line:
-                        key, value = line.split("=", 1)
-                        key = key.strip()
-                        value = value.strip().strip('"').strip("'")
-                        if key and key not in os.environ:
-                            os.environ[key] = value
+        try:
+            if os.path.isfile(env_path):
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            key, value = line.split("=", 1)
+                            key = key.strip()
+                            value = value.strip().strip('"').strip("'")
+                            if key and key not in os.environ:
+                                os.environ[key] = value
+        except Exception:
+            pass
 
 
 _load_env_file()
@@ -277,14 +282,39 @@ class RuTracker(object):
     def download_torrent(self, url: str) -> None:
         """Download torrent file and print filename + URL as required by API"""
         logger.info("Downloading {}...".format(url))
-        data = self._open_url(url)
-        with tempfile.NamedTemporaryFile(suffix=".torrent", delete=False) as f:
-            f.write(data)
-            f.flush()
-            os.fsync(f.fileno())
-            temp_path = f.name
-        print(temp_path + " " + url)
-        sys.stdout.flush()
+
+        try:
+            data = self._open_url(url)
+
+            if not data:
+                raise ValueError("No data received from URL: {}".format(url))
+
+            file_handle, temp_path = tempfile.mkstemp(suffix=".torrent")
+
+            try:
+                with os.fdopen(file_handle, "wb") as f:
+                    f.write(data)
+                    f.flush()
+                    os.fsync(f.fileno())
+
+                os.chmod(temp_path, 0o644)
+
+                logger.info("Torrent file saved to: {}".format(temp_path))
+                print(temp_path + " " + url)
+                sys.stdout.flush()
+
+            except Exception as e:
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+                raise e
+
+        except Exception as e:
+            logger.error("Failed to download torrent: {}".format(e))
+            print("", file=sys.stderr)
+            sys.stderr.flush()
+            raise
 
 
 rutracker = RuTracker

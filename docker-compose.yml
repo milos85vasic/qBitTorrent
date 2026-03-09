@@ -10,6 +10,8 @@ services:
       - WEBUI_PORT=8085                           # Web UI port (inside container)
       - WEBUI_USERNAME=admin                      # Web UI username
       - WEBUI_PASSWORD=admin                      # Web UI password (change this!)
+      - RUTRACKER_USERNAME=${RUTRACKER_USERNAME}  # RuTracker username for plugin
+      - RUTRACKER_PASSWORD=${RUTRACKER_PASSWORD}  # RuTracker password for plugin
     volumes:
       - ./config:/config                          # Stores settings
       - ${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/downloads  # Data directory (configurable via QBITTORRENT_DATA_DIR)

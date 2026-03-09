@@ -109,3 +109,22 @@ def _has_pytest():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+def run_download_tests():
+    """Run comprehensive download tests."""
+    print("\n" + "=" * 70)
+    print("Running RuTracker Plugin Download Tests")
+    print("=" * 70)
+    
+    result = subprocess.run(
+        [sys.executable, os.path.join(tests_dir, "test_download_comprehensive.py"), "--run"],
+        cwd=tests_dir
+    )
+    
+    return result.returncode == 0
+
+if __name__ == "__main__":
+    # Add download tests to the main test suite
+    if "--download" in sys.argv or "--all" in sys.argv:
+        success = run_download_tests()
+        sys.exit(0 if success else 1)
