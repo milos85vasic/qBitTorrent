@@ -130,14 +130,14 @@ update_qbittorrent_config() {
 Accepted=true
 
 [BitTorrent]
-Session\DefaultSavePath=/DATA
-Session\TempPath=/DATA/Incomplete
+Session\DefaultSavePath=/downloads
+Session\TempPath=/downloads/Incomplete
 Session\TempPathEnabled=true
 Session\IncompleteFilesExtension=.!qB
 
 [Preferences]
-Downloads\SavePath=/DATA
-Downloads\TempPath=/DATA/Incomplete
+Downloads\SavePath=/downloads
+Downloads\TempPath=/downloads/Incomplete
 Downloads\TempPathEnabled=true
 Downloads\IncompleteFilesExt=!qB
 Downloads\PreAllocation=false
@@ -168,6 +168,8 @@ General\ExitCheckDownloads=true
 WebUI\Enabled=true
 WebUI\Port=8085
 WebUI\Address=*
+WebUI\Username=admin
+WebUI\Password_PBKDF2="@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)"
 WebUI\LocalHostAuth=false
 WebUI\AuthSubnetWhitelist=0.0.0.0/0
 WebUI\AuthSubnetWhitelistEnabled=true

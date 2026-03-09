@@ -8,8 +8,10 @@ services:
       - PGID=1000                                 # Your GID (run `id -g` to check)
       - TZ=Europe/Moscow                          # Set your timezone
       - WEBUI_PORT=8085                           # Web UI port (inside container)
+      - WEBUI_USERNAME=admin                      # Web UI username
+      - WEBUI_PASSWORD=admin                      # Web UI password (change this!)
     volumes:
       - ./config:/config                          # Stores settings
-      - ${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/DATA  # Data directory (configurable via QBITTORRENT_DATA_DIR)
+      - ${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/downloads  # Data directory (configurable via QBITTORRENT_DATA_DIR)
     network_mode: host                            # Use host network to bypass VPN completely
     restart: unless-stopped
