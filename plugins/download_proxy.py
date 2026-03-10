@@ -1,39 +1,42 @@
 #!/usr/bin/env python3
 """
-Download Proxy for qBittorrent WebUI - Fixed version with proper header handling
+Download Proxy for qBittorrent WebUI - Fixed version
+Intercepts RuTracker URLs and downloads via nova2dl.py with authentication
+Passes through all other requests (including magnet links)
 """
 
 import sys
 import os
 import urllib.request
 import urllib.parse
-from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import subprocess
 import logging
-import tempfile
-import threading
+import re
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 QBITTORRENT_HOST = os.environ.get("QBITTORRENT_HOST", "localhost")
-QBITTORRENT_PORT = os.environ.get("QBITTORRENT_PORT", "8085")
-PROXY_PORT = int(os.environ.get("PROXY_PORT", "8666"))
+QBITTORRENT_PORT = os.environ.get("QBITTORRENT_PORT", "18085")
+PROXY_PORT = int(os.environ.get("PROXY_PORT", "8085"))
 
-PLUGIN_URL_PATTERNS = {
-    "rutracker": ["rutracker.org", "rutracker.net", "rutracker.nl"],
-    "kinozal": ["kinozal.tv"],
-    "nnmclub": ["nnmclub.to"],
+PLUGIN_PATTERNS = {
+    "rutracker": [r"rutracker\.org", r"rutracker\.net", r"rutracker\.nl"],
+}
+
+COMPILED_PATTERNS = {
+    plugin: [re.compile(p, re.I) for p in patterns]
+    for plugin, patterns in PLUGIN_PATTERNS.items()
 }
 
 
 def identify_plugin(url):
-    url_lower = url.lower()
-    for plugin, patterns in PLUGIN_URL_PATTERNS.items():
+    for plugin, patterns in COMPILED_PATTERNS.items():
         for pattern in patterns:
-            if pattern in url_lower:
+            if pattern.search(url):
                 return plugin
     return None
 
@@ -43,7 +46,7 @@ def download_via_nova2dl(plugin, url):
     try:
         cmd = ["python3", "/config/qBittorrent/nova3/nova2dl.py", plugin, url]
         logger.info(f"Executing: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
         if result.returncode != 0:
             logger.error(f"nova2dl.py failed: {result.stderr}")
@@ -56,7 +59,7 @@ def download_via_nova2dl(plugin, url):
 
         parts = output.split(" ", 1)
         if len(parts) != 2:
-            logger.error(f"Unexpected output format: {output}")
+            logger.error(f"Unexpected output: {output}")
             return None
 
         torrent_path = parts[0]
@@ -64,101 +67,82 @@ def download_via_nova2dl(plugin, url):
             logger.error(f"Torrent file not found: {torrent_path}")
             return None
 
-        logger.info(f"Successfully downloaded to: {torrent_path}")
+        logger.info(f"Downloaded to: {torrent_path}")
         return torrent_path
+    except subprocess.TimeoutExpired:
+        logger.error("nova2dl.py timed out")
+        return None
     except Exception as e:
         logger.error(f"Error in download_via_nova2dl: {e}")
         return None
 
 
 class DownloadHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    
     def log_message(self, format, *args):
-        logger.info(f"{self.address_string()} - {format % args}")
+        if "/api/" in self.path:
+            logger.info(f"{self.address_string()} - {format % args}")
 
     def do_GET(self):
-        self.handle_request()
+        self.handle_request(None)
 
     def do_POST(self):
-        self.handle_request()
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length) if content_length > 0 else None
+        self.handle_request(body)
 
-    def handle_request(self):
+    def handle_request(self, body):
         try:
-            parsed = urllib.parse.urlparse(self.path)
-            path = parsed.path
-            query = urllib.parse.parse_qs(parsed.query)
+            path = urllib.parse.urlparse(self.path).path
 
-            # Only log non-static file requests
-            if not any(
-                path.endswith(ext)
-                for ext in [".css", ".js", ".png", ".jpg", ".ico", ".svg"]
-            ):
-                logger.info(f"Handling request: {self.command} {path}")
+            # Only intercept /api/v2/torrents/add for private tracker URLs
+            if path == "/api/v2/torrents/add" and self.command == "POST" and body:
+                body_str = body.decode("utf-8")
+                params = urllib.parse.parse_qs(body_str)
+                urls = params.get("urls", [""])[0]
 
-            # Intercept /api/v2/torrents/add for private trackers
-            if path == "/api/v2/torrents/add" and self.command == "POST":
-                content_length = int(self.headers.get("Content-Length", 0))
-                if content_length > 0:
-                    body = self.rfile.read(content_length)
-                    body_str = body.decode("utf-8")
-                    params = urllib.parse.parse_qs(body_str)
-                    urls = params.get("urls", [""])[0]
+                if urls:
+                    plugin = identify_plugin(urls)
+                    if plugin:
+                        logger.info(f"Intercepting {plugin} URL: {urls[:80]}...")
 
-                    if urls:
-                        plugin = identify_plugin(urls)
-                        if plugin:
-                            logger.info(
-                                f"Intercepted torrents/add for {plugin}: {urls}"
-                            )
+                        torrent_file = download_via_nova2dl(plugin, urls)
 
-                            # Download via nova2dl.py - this saves to shared-tmp
-                            torrent_file = download_via_nova2dl(plugin, urls)
+                        if torrent_file:
+                            params["urls"] = [f"file://{torrent_file}"]
+                            new_body = urllib.parse.urlencode(params, doseq=True).encode("utf-8")
+                            
+                            self.proxy_to_qbittorrent(new_body)
 
-                            if torrent_file:
-                                logger.info(
-                                    f"Downloaded to {torrent_file}, forwarding to qBittorrent"
-                                )
-                                params["urls"] = [f"file://{torrent_file}"]
-                                new_body = urllib.parse.urlencode(
-                                    params, doseq=True
-                                ).encode("utf-8")
-                                self.proxy_to_qbittorrent_with_body(new_body)
+                            try:
+                                os.unlink(torrent_file)
+                            except:
+                                pass
+                            return
+                        else:
+                            logger.error("Failed to download torrent")
+                            self.send_error(502, "Failed to download torrent")
+                            return
 
-                                # Clean up after forwarding
-                                try:
-                                    os.unlink(torrent_file)
-                                except:
-                                    pass
-                                return
-                            else:
-                                logger.error("Failed to download via nova2dl.py")
-                                self.send_error(502, "Failed to download torrent")
-                                return
-
-            # Default: proxy to qBittorrent
-            self.proxy_to_qbittorrent()
+            # Pass through all other requests
+            self.proxy_to_qbittorrent(body)
 
         except Exception as e:
             logger.error(f"Error handling request: {e}")
-            self.send_error(500, str(e))
+            try:
+                self.send_error(500, str(e))
+            except:
+                pass
 
-    def proxy_to_qbittorrent(self):
-        body = None
-        if self.command == "POST":
-            content_length = int(self.headers.get("Content-Length", 0))
-            if content_length > 0:
-                body = self.rfile.read(content_length)
-        self.proxy_to_qbittorrent_with_body(body)
-
-    def proxy_to_qbittorrent_with_body(self, body):
+    def proxy_to_qbittorrent(self, body):
         try:
             target_url = f"http://{QBITTORRENT_HOST}:{QBITTORRENT_PORT}{self.path}"
             req = urllib.request.Request(target_url, data=body, method=self.command)
 
-            # Copy headers, but fix Referer and Origin to match qBittorrent's expected origin
             for header, value in self.headers.items():
                 header_lower = header.lower()
                 if header_lower not in ["host", "content-length"]:
-                    # Rewrite referer and origin headers to match qBittorrent's port
                     if header_lower == "referer":
                         value = value.replace(f":{PROXY_PORT}", f":{QBITTORRENT_PORT}")
                     elif header_lower == "origin":
@@ -168,29 +152,37 @@ class DownloadHandler(BaseHTTPRequestHandler):
             with urllib.request.urlopen(req, timeout=30) as response:
                 self.send_response(response.status)
                 for header, value in response.headers.items():
-                    self.send_header(header, value)
+                    if header.lower() not in ["transfer-encoding"]:
+                        self.send_header(header, value)
                 self.end_headers()
-                self.wfile.write(response.read())
+                
+                content = response.read()
+                self.wfile.write(content)
 
         except urllib.request.HTTPError as e:
-            self.send_error(e.code, e.reason)
+            logger.error(f"HTTP Error {e.code}: {e.reason}")
+            try:
+                self.send_error(e.code, e.reason)
+            except:
+                pass
         except Exception as e:
             logger.error(f"Error proxying to qBittorrent: {e}")
-            self.send_error(502, "Bad Gateway")
+            try:
+                self.send_error(502, "Bad Gateway")
+            except:
+                pass
 
 
 def run_server():
-    """Run the download proxy server."""
     server_address = ("", PROXY_PORT)
     httpd = ThreadingHTTPServer(server_address, DownloadHandler)
 
-    logger.info(f"=" * 70)
-    logger.info(f"Download Proxy Server Starting")
-    logger.info(f"=" * 70)
+    logger.info("=" * 60)
+    logger.info("Download Proxy Server Started")
     logger.info(f"Proxy Port: {PROXY_PORT}")
     logger.info(f"qBittorrent: http://{QBITTORRENT_HOST}:{QBITTORRENT_PORT}")
-    logger.info(f"Supported private trackers: {', '.join(PLUGIN_URL_PATTERNS.keys())}")
-    logger.info(f"=" * 70)
+    logger.info(f"Supported trackers: {list(PLUGIN_PATTERNS.keys())}")
+    logger.info("=" * 60)
 
     try:
         httpd.serve_forever()
