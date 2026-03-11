@@ -1,4 +1,4 @@
-# VERSION: 4.15
+# VERSION: 4.16
 # AUTHORS: Lima66
 # CONTRIBUTORS: Diego de las Heras (ngosang@hotmail.es)
 # MODIFIED: Returns magnet links in search results for WebUI compatibility
@@ -8,9 +8,11 @@ import logging
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from typing import Callable, Dict, List, Mapping, Match, Tuple, Union
-from urllib.parse import quote
+from urllib.parse import quote, unquote
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
 
-from helpers import retrieve_url, build_magnet_link
+from helpers import retrieve_url
 from novaprinter import prettyPrinter
 
 logging.basicConfig(level=logging.WARNING)
@@ -30,14 +32,6 @@ class limetorrents:
         "tv": "tv",
     }
 
-    TRACKERS = [
-        "udp://tracker.opentrackr.org:1337/announce",
-        "udp://open.stealth.si:80/announce",
-        "udp://tracker.torrent.eu.org:451/announce",
-        "udp://tracker.bittor.pw:1337/announce",
-        "udp://exodus.desync.com:6969/announce",
-    ]
-
     class MyHtmlParser(HTMLParser):
         """Sub-class for parsing results"""
 
@@ -46,10 +40,9 @@ class limetorrents:
 
         A, TD, TR, HREF = ("a", "td", "tr", "href")
 
-        def __init__(self, url: str, parent: "limetorrents") -> None:
+        def __init__(self, url: str) -> None:
             HTMLParser.__init__(self)
             self.url = url
-            self.parent = parent
             self.current_item: Dict[str, object] = {}
             self.page_items = 0
             self.inside_table = False
@@ -129,43 +122,97 @@ class limetorrents:
                     self.results.append(self.current_item.copy())
                     self.page_items += 1
 
+    def _fetch_url_with_retry(self, url: str, max_retries: int = 3) -> str:
+        """Fetch URL with retry logic."""
+        for attempt in range(max_retries):
+            try:
+                req = Request(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+                    },
+                )
+                with urlopen(req, timeout=15) as response:
+                    html = response.read().decode("utf-8", errors="ignore")
+                    return html
+            except (URLError, HTTPError) as e:
+                logger.warning(
+                    f"Attempt {attempt + 1}/{max_retries} failed for {url}: {e}"
+                )
+                if attempt == max_retries - 1:
+                    raise
+        return ""
+
     def _fetch_magnet_from_page(self, info_url: str) -> str:
-        """Fetch magnet link from info page."""
+        """Fetch magnet link from info page with multiple extraction methods."""
         try:
-            info_page = retrieve_url(info_url)
-            magnet_match = re.search(r'href\s*=\s*"(magnet[^"]+)"', info_page)
-            if magnet_match and magnet_match.groups():
-                return magnet_match.groups()[0]
+            logger.info(f"Fetching magnet from: {info_url}")
+            info_page = self._fetch_url_with_retry(info_url)
+
+            # Method 1: Standard magnet link in href
+            magnet_patterns = [
+                r'href\s*=\s*"(magnet:\?xt=urn:btih:[a-fA-F0-9]{40}[^"]*)"',
+                r"href\s*=\s*\'(magnet:\?xt=urn:btih:[a-fA-F0-9]{40}[^\']*)\'",
+                r'"(magnet:\?xt=urn:btih:[a-fA-F0-9]{40}[^"]*)"',
+            ]
+
+            for pattern in magnet_patterns:
+                magnet_match = re.search(pattern, info_page)
+                if magnet_match and magnet_match.groups():
+                    magnet = magnet_match.groups()[0]
+                    logger.info(f"✅ Found magnet link: {magnet[:80]}...")
+                    return magnet
+
+            logger.warning(f"No magnet link found in page: {info_url}")
+
         except Exception as e:
-            logger.warning(f"Failed to fetch magnet from {info_url}: {e}")
+            logger.error(f"Failed to fetch magnet from {info_url}: {e}")
+
         return ""
 
     def search(self, query: str, cat: str = "all") -> None:
-        """Performs search and returns magnet links"""
+        """Performs search and returns magnet links only."""
         query = query.replace("%20", "-")
         category = self.supported_categories[cat]
 
-        for page in range(1, 5):
+        for page in range(1, 3):  # Reduced from 5 to 3 pages for speed
             page_url = f"{self.url}/search/{category}/{query}/seeds/{page}/"
-            html = retrieve_url(page_url)
-            parser = self.MyHtmlParser(self.url, self)
+
+            try:
+                html = retrieve_url(page_url)
+            except Exception as e:
+                logger.error(f"Failed to fetch search page {page}: {e}")
+                continue
+
+            parser = self.MyHtmlParser(self.url)
             parser.feed(html)
             parser.close()
 
+            logger.info(f"Page {page}: Found {len(parser.results)} results")
+
             for result in parser.results:
                 info_url = result.get("_info_link", "")
-                magnet_link = ""
 
-                if info_url:
-                    magnet_link = self._fetch_magnet_from_page(info_url)
+                if not info_url:
+                    logger.warning("Skipping result: no info link")
+                    continue
+
+                # Fetch magnet link
+                magnet_link = self._fetch_magnet_from_page(info_url)
 
                 if magnet_link:
                     result["link"] = magnet_link
+                    result.pop("_info_link", None)
+                    logger.info(
+                        f"✅ Returning result with magnet: {result.get('name', 'Unknown')[:50]}"
+                    )
+                    prettyPrinter(result)
                 else:
-                    result["link"] = info_url
-
-                result.pop("_info_link", None)
-                prettyPrinter(result)
+                    # Skip results without magnet links
+                    logger.warning(
+                        f"Skipping result without magnet: {result.get('name', 'Unknown')[:50]}"
+                    )
+                    continue
 
             if parser.page_items < 20:
                 break
@@ -173,21 +220,20 @@ class limetorrents:
     def download_torrent(self, info: str) -> None:
         """Handle magnet links and .torrent downloads."""
         import sys
-        import os
-        import tempfile
-        import urllib.request
 
         if info.startswith("magnet:"):
             print(info + " " + info)
             sys.stdout.flush()
             return
 
-        info_page = retrieve_url(info)
-        magnet_match = re.search(r'href\s*=\s*"(magnet[^"]+)"', info_page)
-        if magnet_match and magnet_match.groups():
-            magnet = magnet_match.groups()[0]
-            print(magnet + " " + info)
-            sys.stdout.flush()
-            return
+        # Fallback for HTTP URLs - try to get magnet
+        try:
+            magnet = self._fetch_magnet_from_page(info)
+            if magnet:
+                print(magnet + " " + info)
+                sys.stdout.flush()
+                return
+        except Exception as e:
+            logger.error(f"Download failed: {e}")
 
         raise ValueError("Error: Could not find magnet link")
