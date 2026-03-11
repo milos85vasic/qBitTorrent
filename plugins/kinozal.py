@@ -99,12 +99,8 @@ def date_normalize(date_str: str) -> int:
     if "сегодня" in pub_date:
         pub_date = time.strftime("%d.%m.%Y", time.localtime())
     elif "вчера" in pub_date:
-        pub_date = time.strftime(
-            "%d.%m.%Y", time.localtime(time.time() - 86400)
-        )
-    return int(
-        time.mktime(time.strptime(f"{pub_date} {pub_time}", "%d.%m.%Y %H:%M"))
-    )
+        pub_date = time.strftime("%d.%m.%Y", time.localtime(time.time() - 86400))
+    return int(time.mktime(time.strptime(f"{pub_date} {pub_time}", "%d.%m.%Y %H:%M")))
 
 
 class EngineError(Exception): ...
@@ -114,15 +110,11 @@ class EngineError(Exception): ...
 class Config:
     username: str = "USERNAME"
     password: str = "PASSWORD"
-    magnet: bool = False
+    magnet: bool = True  # Changed from False to True - return magnet links by default
     proxy: bool = False
     # dynamic_proxy: bool = True
-    proxies: dict[str, str] = field(
-        default_factory=lambda: {"http": "", "https": ""}
-    )
-    ua: str = (
-        "Mozilla/5.0 (X11; Linux i686; rv:38.0) Gecko/20100101 Firefox/38.0 "
-    )
+    proxies: dict[str, str] = field(default_factory=lambda: {"http": "", "https": ""})
+    ua: str = "Mozilla/5.0 (X11; Linux i686; rv:38.0) Gecko/20100101 Firefox/38.0 "
 
     def __post_init__(self) -> None:
         try:
@@ -139,9 +131,7 @@ class Config:
     def to_dict(self) -> dict[str, Any]:
         return {self._to_camel(k): v for k, v in self.__dict__.items()}
 
-    def _validate_json(
-        self, obj: dict[str, Union[str, bool, dict[str, str]]]
-    ) -> bool:
+    def _validate_json(self, obj: dict[str, Union[str, bool, dict[str, str]]]) -> bool:
         is_valid = True
         for k, v in self.__dict__.items():
             _val = obj.get(self._to_camel(k))
@@ -158,9 +148,7 @@ class Config:
 
     @staticmethod
     def _to_camel(s: str) -> str:
-        return "".join(
-            x.title() if i else x for i, x in enumerate(s.split("_"))
-        )
+        return "".join(x.title() if i else x for i, x in enumerate(s.split("_")))
 
 
 config = Config()
@@ -204,9 +192,7 @@ class Kinozal:
         self._request(self.url_login, data_encoded)
         logger.debug(f"That we have: {[cookie for cookie in self.mcj]}")
         if "uid" not in [cookie.name for cookie in self.mcj]:
-            raise EngineError(
-                "We not authorized, please check your credentials!"
-            )
+            raise EngineError("We not authorized, please check your credentials!")
         self.mcj.save(str(FILE_C), ignore_discard=True, ignore_expires=True)
         logger.info("We successfully authorized")
 
@@ -233,9 +219,7 @@ class Kinozal:
         return torrents_found
 
     def draw(self, html: str) -> None:
-        table = str.maketrans(
-            {"Т": "T", "Г": "G", "М": "M", "К": "K", "Б": "B"}
-        )
+        table = str.maketrans({"Т": "T", "Г": "G", "М": "M", "К": "K", "Б": "B"})
         for tor in RE_TORRENTS.finditer(html):
             prettyPrinter(
                 {

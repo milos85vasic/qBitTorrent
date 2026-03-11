@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-03-11
+
+### Critical Changes - WebUI Compatibility
+
+All plugins now return **magnet links** by default for full WebUI download compatibility!
+
+### Added
+
+#### Magnet Link Support - ALL Plugins Updated
+- **LimeTorrents** - Now fetches and returns magnet links in search results (v4.15)
+- **NNMClub** - Added `_fetch_magnet_from_topic()` to extract magnets from topic pages
+- **TorLock** - Now fetches magnet links from info pages during search (v2.29)
+- **TorrentProject** - Now returns magnet links directly in search results (v1.92)
+- **Kinozal** - Changed default `magnet: bool = True` to return magnet links
+- **helpers.py** - Added `build_magnet_link()` and `fetch_magnet_from_page()` utilities
+
+#### Testing Infrastructure
+- Comprehensive magnet link validation test (`tests/test_all_magnet_links.py`)
+- Full UI automated download flow test (`tests/test_ui_download_flow.py`)
+- Tests validate that ALL plugins return properly formatted magnet links
+
+### Changed
+
+- All plugins now use magnet links as the primary download method
+- Magnet links include proper tracker lists for better connectivity
+- Fallback to .torrent URLs when magnets unavailable
+- Improved error handling for magnet link fetching
+
+### Technical Details
+
+- Magnet links are built with standard tracker list for maximum peer discovery
+- Private tracker plugins (RuTracker, Kinozal, NNMClub) fetch magnets from authenticated sessions
+- Public tracker plugins fetch magnets from info pages or API responses
+- All `download_torrent()` methods now properly handle both magnet:// and http(s):// URLs
+
+### Plugin Status After v1.2.0
+
+| Plugin | Magnet Support | Status |
+|--------|---------------|--------|
+| PirateBay | ✅ Native | Working |
+| EZTV | ✅ Native | Working |
+| Rutor | ✅ Native | Working |
+| RuTracker | ✅ Fetch from topic | Working |
+| Kinozal | ✅ Fetch from topic | Working |
+| NNMClub | ✅ Fetch from topic | Working |
+| LimeTorrents | ✅ Fetch from page | Working |
+| SolidTorrents | ✅ Native | Working |
+| TorrentProject | ✅ Fetch from page | Working |
+| TorLock | ✅ Fetch from page | Working |
+| TorrentsCSV | ✅ Native | Working |
+| Jackett | ✅ API support | Working |
+
 ## [1.1.0] - 2025-03-11
 
 ### Added

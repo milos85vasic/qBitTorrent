@@ -44,6 +44,7 @@ RE_TORRENTS = re.compile(
     r"</b>.+?<b>(?P<leech>\d+?)</b>.+?<u>(?P<pub_date>\d+?)</u>",
     re.S,
 )
+RE_MAGNET = re.compile(r'magnet:\?xt=urn:btih:[a-fA-F0-9]{40}[^\s"\']*', re.I)
 RE_RESULTS = re.compile(r'TP_VER">(?:.+?:\s(\d{1,3})\s)?', re.S)
 # RE_CODE = re.compile(r'name="code"\svalue="(.+?)"', re.S)
 PATTERNS = ("%stracker.php?nm=%s&%s", "%s&start=%s")
@@ -102,12 +103,8 @@ class Config:
     # magnet: bool = False
     proxy: bool = False
     # dynamic_proxy: bool = True
-    proxies: dict[str, str] = field(
-        default_factory=lambda: {"http": "", "https": ""}
-    )
-    ua: str = (
-        "Mozilla/5.0 (X11; Linux i686; rv:38.0) Gecko/20100101 Firefox/38.0 "
-    )
+    proxies: dict[str, str] = field(default_factory=lambda: {"http": "", "https": ""})
+    ua: str = "Mozilla/5.0 (X11; Linux i686; rv:38.0) Gecko/20100101 Firefox/38.0 "
 
     def __post_init__(self) -> None:
         try:
@@ -124,9 +121,7 @@ class Config:
     def to_dict(self) -> dict[str, Any]:
         return {self._to_camel(k): v for k, v in self.__dict__.items()}
 
-    def _validate_json(
-        self, obj: dict[str, Union[str, bool, dict[str, str]]]
-    ) -> bool:
+    def _validate_json(self, obj: dict[str, Union[str, bool, dict[str, str]]]) -> bool:
         is_valid = True
         for k, v in self.__dict__.items():
             _val = obj.get(self._to_camel(k))
@@ -143,9 +138,7 @@ class Config:
 
     @staticmethod
     def _to_camel(s: str) -> str:
-        return "".join(
-            x.title() if i else x for i, x in enumerate(s.split("_"))
-        )
+        return "".join(x.title() if i else x for i, x in enumerate(s.split("_")))
 
 
 config = Config()
@@ -204,9 +197,7 @@ class NNMClub:
 
         logger.debug(f"That we have: {[cookie for cookie in self.mcj]}")
         if "phpbb2mysql_4_sid" not in [cookie.name for cookie in self.mcj]:
-            raise EngineError(
-                "We not authorized, please check your credentials!"
-            )
+            raise EngineError("We not authorized, please check your credentials!")
         self.mcj.save(str(FILE_C), ignore_discard=True, ignore_expires=True)
         logger.info("We successfully authorized")
 
@@ -218,9 +209,7 @@ class NNMClub:
         if first:
             # check login status
             if f"Выход [ {config.username} ]" not in page:
-                logger.debug(
-                    f"Looks like we lost session id, lets login:\n {page}"
-                )
+                logger.debug(f"Looks like we lost session id, lets login:\n {page}")
                 self.login()
             # firstly, we check if there is a result
             match = RE_RESULTS.search(page)
@@ -236,18 +225,41 @@ class NNMClub:
 
     def draw(self, html: str) -> None:
         for tor in RE_TORRENTS.finditer(html):
+            desc_link = self.url + tor.group("desc_link")
+            name = unescape(tor.group("name"))
+
+            magnet_link = self._fetch_magnet_from_topic(desc_link)
+
+            if magnet_link:
+                link = magnet_link
+            else:
+                link = self.url + tor.group("link")
+
             prettyPrinter(
                 {
-                    "link": self.url + tor.group("link"),
-                    "name": unescape(tor.group("name")),
+                    "link": link,
+                    "name": name,
                     "size": tor.group("size"),
                     "seeds": int(tor.group("seeds")),
                     "leech": int(tor.group("leech")),
                     "engine_url": self.url,
-                    "desc_link": self.url + tor.group("desc_link"),
+                    "desc_link": desc_link,
                     "pub_date": int(tor.group("pub_date")),
                 }
             )
+
+    def _fetch_magnet_from_topic(self, topic_url: str) -> str:
+        """Fetch magnet link from topic page."""
+        try:
+            response = self._request(topic_url)
+            if response:
+                page = response.decode("cp1251", "ignore")
+                match = RE_MAGNET.search(page)
+                if match:
+                    return match.group(0)
+        except Exception as e:
+            logger.debug(f"Failed to fetch magnet from {topic_url}: {e}")
+        return ""
 
     def _catch_errors(self, handler: Callable[..., None], *args: str) -> None:
         try:
@@ -320,6 +332,11 @@ class NNMClub:
         logger.info(f"Found torrents: {total}")
 
     def _download_torrent(self, url: str) -> None:
+        # Handle magnet links
+        if url.startswith("magnet:"):
+            print(url + " " + url)
+            return
+
         # Download url
         response = self._request(url)
 
