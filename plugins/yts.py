@@ -146,5 +146,13 @@ class score(object):
         else:
             """ None """
 
+    def download_torrent(self, url):
+        """Download torrent - returns magnet link directly."""
+        import sys
+        print(url + " " + url)
+        sys.stdout.flush()
+
 if __name__=="__main__":
     """ debug """
+    y = yts()
+    y.search('ubuntu')

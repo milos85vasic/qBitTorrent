@@ -141,7 +141,7 @@ CLASS_NAMES = {
     'tokyotoshokan': 'tokyotoshokan',
     'torrentdownload': 'torrentdownload',
     'torrentgalaxy': 'torrentgalaxy',
-    'torrentproject2': 'torrentproject2',
+    'torrentproject': 'torrentproject',
     'yourbittorrent': 'yourbittorrent',
     'yts': 'yts',
     'megapeer': 'megapeer',
