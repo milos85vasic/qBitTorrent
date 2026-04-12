@@ -1,7 +1,7 @@
 # qBitTorrent-Fixed 🚀
 
 [![Tests](https://img.shields.io/badge/tests-100%25-success)](tests/)
-[![Plugins](https://img.shields.io/badge/plugins-12-blue)](plugins/)
+[![Plugins](https://img.shields.io/badge/plugins-35-blue)](plugins/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 
 > **A fixed and enhanced version of qBittorrent search plugins with 100% test coverage**
@@ -11,7 +11,7 @@
 This is a **production-ready fork** that fixes all known issues with qBittorrent search plugins:
 
 - ✅ **WebUI downloads work** (even for private trackers)
-- ✅ **12 plugins included** (8 official + 4 Russian)
+- ✅ **35 plugins included** (8 official + 27 community)
 - ✅ **Real column data** (seeds, peers, sizes - no more zeros!)
 - ✅ **100% test coverage** (all plugins tested and working)
 - ✅ **Complete documentation** (user manuals, troubleshooting, API docs)
@@ -37,9 +37,9 @@ open http://localhost:8085
 
 ## 📊 Plugin Status
 
-### ✅ Fully Working (12 Total)
+### ✅ Fully Working (35 Total)
 
-**Public Trackers (9):**
+**Public Trackers (19):**
 - 🏴‍☠️ **The Pirate Bay** - General content, magnet links
 - 📺 **EZTV** - TV shows
 - 🇷🇺 **Rutor** - Russian content
@@ -49,11 +49,38 @@ open http://localhost:8085
 - 📊 **torrents-csv** - Open database
 - 🔒 **TorLock** - No fake torrents
 - 🔌 **Jackett** - Meta search (aggregates multiple)
+- 🔢 **1337x** - Popular torrent indexer
+- 🎬 **YTS** - High-quality movies
+- 🌌 **TorrentGalaxy** - General content
+- 📀 **RARBG Alternative** - Movies/TV shows
+- 📥 **ExtraTorrent** - General content
+- 🎯 **TorrentFunk** - Verified torrents
+- 🔗 **BTSOW** - Magnet link aggregator
+- 🐱 **TorrentKitty** - Magnet search
+- 🎮 **GamesTorrents** - PC games
+- 🎵 **RockBox** - Music torrents
 
-**Private Trackers (3):**
+**Russian Trackers (6):**
 - 🇷🇺 **RuTracker** - Russian content (with auth)
 - 🎬 **Kinozal** - Movies/TV (with auth)
 - 🌐 **NNMClub** - General (with auth)
+- 🔍 **MegaPeer** - General content
+- 🔗 **BitRu** - General content
+- 🎮 **PC-Torrents** - Russian games
+
+**Anime Trackers (4):**
+- 🌸 **Nyaa** - Anime/manga
+- 🗼 **Tokyo Toshokan** - Anime
+- 🎌 **AniLibra** - Anime releases
+- 📝 **Xfsub** - Anime subtitles
+
+**Specialized (3):**
+- 📖 **AudioBook Bay** - Audiobooks
+- 🎓 **AcademicTorrents** - Research data
+- 🐧 **LinuxTracker** - Linux distros
+
+**Private Trackers (1):**
+- 🔐 **IPTorrents** - Premium private tracker (with auth)
 
 ## 🧪 Testing
 
@@ -69,7 +96,7 @@ open http://localhost:8085
 
 ### Test Coverage
 
-- ✅ **Plugin Structure** - All 12 plugins valid
+- ✅ **Plugin Structure** - All 35 plugins valid
 - ✅ **Search Functionality** - All plugins search correctly
 - ✅ **Download Functionality** - All downloads work
 - ✅ **Column Data** - Real seeds/leech/size values
