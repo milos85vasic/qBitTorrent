@@ -1,6 +1,10 @@
-# AGENTS.md - Guidelines for AI Agents
+# AGENTS.md - AI Agent Guidelines for qBitTorrent-Fixed
 
-## MANDATORY CONSTRAINTS (CRITICAL)
+<!-- This file provides essential context for AI coding agents working on this project -->
+
+---
+
+## 🔴 MANDATORY CONSTRAINTS (CRITICAL)
 
 ### Default Credentials Requirement
 
@@ -11,168 +15,270 @@ Username: admin
 Password: admin
 ```
 
-**This is NON-NEGOTIABLE. See CLAUDE.md for full details.**
+**This is NON-NEGOTIABLE.** These credentials are hardcoded in multiple configuration files and scripts. Changing them will break the setup.
 
 ---
 
-This document provides guidelines for AI coding agents working in this repository.
+## 📋 Project Overview
 
-## Project Overview
+**qBitTorrent-Fixed** is a production-ready Docker/Podman containerized deployment of qBittorrent with enhanced search plugins. This is an infrastructure-as-code project that fixes known issues with qBittorrent search plugins, particularly for private trackers.
 
-This is a Docker/Podman Compose configuration project for running qBitTorrent in a containerized environment with RuTracker search plugin. It contains infrastructure-as-code rather than application code. The setup supports both Podman and Docker (auto-detected).
+### Key Capabilities
 
-## Build/Run/Test Commands
+- **12 Search Plugins**: 8 official plugins + 4 Russian trackers
+- **WebUI Bridge**: Enables private tracker downloads in WebUI (normally impossible)
+- **100% Test Coverage**: Comprehensive test suite for all plugins
+- **Auto-Detection**: Works with both Docker and Podman
+- **Multi-Source Credentials**: Supports `.env`, `~/.qbit.env`, and environment variables
 
-### Using Helper Scripts (Recommended)
+### Plugin Architecture
+
+| Category | Plugins | WebUI Support | Auth Required |
+|----------|---------|---------------|---------------|
+| **Public Trackers** | PirateBay, EZTV, Rutor, LimeTorrents, SolidTorrents, TorrentProject, torrents-csv, TorLock | ✅ Magnet links | No |
+| **Meta Search** | Jackett | ✅ Configurable | Optional |
+| **Private Trackers** | RuTracker, Kinozal, NNMClub | ⚠️ Requires Bridge | Yes |
+
+---
+
+## 🏗️ Technology Stack
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Container Runtime** | Docker / Podman (auto-detected) | Application containerization |
+| **Orchestration** | Docker Compose / podman-compose | Multi-service management |
+| **Base Image** | lscr.io/linuxserver/qbittorrent | qBittorrent application |
+| **Plugins** | Python 3 | Search engine plugins |
+| **Bridge** | Python 3 + http.server | WebUI proxy for auth handling |
+| **Automation** | Bash 4+ | Setup and management scripts |
+| **Configuration** | YAML / ENV files | Service configuration |
+
+### Runtime Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         HOST SYSTEM                              │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐  │
+│  │  start.sh   │    │  webui-     │    │   install-plugin.sh │  │
+│  │  test.sh    │    │  bridge.py  │    │   setup.sh          │  │
+│  └──────┬──────┘    └──────┬──────┘    └─────────────────────┘  │
+│         │                  │                                      │
+│  ┌──────▼──────────────────▼──────────────────────────────┐     │
+│  │              DOCKER / PODMAN RUNTIME                    │     │
+│  │  ┌─────────────────┐    ┌─────────────────────────┐    │     │
+│  │  │   qbittorrent   │◄──►│   download-proxy        │    │     │
+│  │  │   (container)   │    │   (webui-bridge.py)     │    │     │
+│  │  │                 │    │                         │    │     │
+│  │  │  Port: 18085    │    │  Port: 8085 (proxy)     │    │     │
+│  │  │  Image:         │    │  Image: python:3.12     │    │     │
+│  │  │  linuxserver/   │    │                         │    │     │
+│  │  │  qbittorrent    │    │                         │    │     │
+│  │  └─────────────────┘    └─────────────────────────┘    │     │
+│  └─────────────────────────────────────────────────────────┘     │
+│         │                  │                                      │
+│  ┌──────▼──────────────────▼──────────────────────────────┐     │
+│  │                    VOLUME MOUNTS                         │     │
+│  │  ./config → /config (persistent config)                  │     │
+│  │  ./.env → /config/.env (credentials)                     │     │
+│  │  ./tmp → /shared-tmp (torrent files)                     │     │
+│  │  /mnt/DATA → /downloads (download location)              │     │
+│  └─────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📁 Project Structure
+
+```
+qBitTorrent/
+├── docker-compose.yml          # Main container configuration (2 services)
+├── .env.example                # Example environment configuration
+├── .env                        # Actual credentials (gitignored)
+│
+├── 🚀 STARTUP SCRIPTS
+│   ├── setup.sh                # One-time comprehensive setup
+│   ├── start.sh                # Start containers with auto-detection
+│   ├── stop.sh                 # Stop/remove containers
+│   └── start-proxy.sh          # Proxy startup script (container internal)
+│
+├── 🔌 PLUGINS (12 total)
+│   ├── eztv.py                 # TV shows
+│   ├── jackett.py              # Meta search
+│   ├── limetorrents.py         # Verified torrents
+│   ├── piratebay.py            # Most popular public tracker
+│   ├── solidtorrents.py        # Fast search
+│   ├── torlock.py              # No fake torrents
+│   ├── torrentproject.py       # Comprehensive search
+│   ├── torrentscsv.py          # Open database
+│   ├── rutracker.py            # Russian private tracker
+│   ├── rutor.py                # Russian public tracker
+│   ├── kinozal.py              # Movies/TV private tracker
+│   ├── nnmclub.py              # General private tracker
+│   │
+│   └── 🔧 SUPPORT FILES
+│       ├── helpers.py          # Shared helper functions
+│       ├── nova2.py            # Search engine core
+│       ├── novaprinter.py      # Output formatting
+│       ├── socks.py            # Proxy support
+│       └── download_proxy.py   # Download proxy for WebUI
+│
+├── 🌉 WEBUI BRIDGE
+│   └── webui-bridge.py         # Enables private tracker downloads in WebUI
+│
+├── 🧪 TEST SUITE
+│   ├── run-all-tests.sh        # Master test runner
+│   ├── test.sh                 # Validation script
+│   └── tests/
+│       ├── comprehensive_test.py      # Full plugin testing
+│       ├── test_all_plugins.py        # Unit tests
+│       ├── test_plugin_integration.py # Integration tests
+│       ├── final_verification.py      # Provider tests
+│       └── ... (25+ test files)
+│
+├── 🔧 MANAGEMENT
+│   └── install-plugin.sh       # Plugin installation for local/container
+│
+├── 📚 DOCUMENTATION
+│   ├── README.md               # Main project documentation
+│   ├── PLUGIN_STATUS.md        # Plugin compatibility matrix
+│   ├── FORK_SUMMARY.md         # Architecture & fixes overview
+│   ├── CHANGELOG.md            # Version history
+│   └── docs/
+│       ├── USER_MANUAL.md      # Complete usage guide
+│       ├── PLUGIN_TROUBLESHOOTING.md
+│       ├── PLUGINS.md
+│       ├── DOWNLOAD_FIX.md
+│       └── ...
+│
+├── ⚙️ CONFIGURATION (gitignored, created at runtime)
+│   └── config/
+│       └── qBittorrent/
+│           ├── config/qBittorrent.conf  # Main config
+│           └── nova3/engines/           # Installed plugins
+│
+└── 📥 DATA (external, configurable)
+    └── /mnt/DATA/               # Downloads (configurable)
+        ├── Incomplete/          # Partial downloads
+        └── Torrents/            # .torrent files
+```
+
+---
+
+## 🚀 Build/Run/Test Commands
+
+### Quick Start (Recommended)
 
 ```bash
-# Start qBitTorrent container
-./start.sh
+# Complete setup (one command)
+./setup.sh
 
-# Start with latest image pull
-./start.sh -p
+# Start services
+./start.sh                    # Terminal 1: Start qBittorrent
+python3 webui-bridge.py       # Terminal 2: Enable private tracker support
 
-# Stop container
-./stop.sh
+# Access
+open http://localhost:8085    # Login: admin / admin
+```
 
-# Stop and remove container
-./stop.sh -r
+### Container Management
 
-# Show container status
-./start.sh -s
+```bash
+# Start with options
+./start.sh              # Basic start
+./start.sh -p           # Pull latest image first
+./start.sh -s           # Show status only
+./start.sh --no-plugins # Skip plugin installation
+./start.sh -v           # Verbose mode
+
+# Stop options
+./stop.sh               # Stop containers
+./stop.sh -r            # Stop and remove containers
+./stop.sh --purge       # Stop, remove, and clean images
 ```
 
 ### Plugin Management
 
 ```bash
-# Install RuTracker plugin for container
-./install-plugin.sh
+# Install for container (default)
+./install-plugin.sh --all              # Install all 12 plugins
+./install-plugin.sh rutracker rutor    # Install specific plugins
+./install-plugin.sh --verify           # Verify installation
+./install-plugin.sh --test             # Test plugin functionality
 
 # Install for local qBittorrent
-./install-plugin.sh --local
-
-# Test plugin configuration
-./install-plugin.sh --test
-
-# Verify credentials only
-./install-plugin.sh --verify
+./install-plugin.sh --local --all      # Install to ~/.local/share/...
 ```
 
-### Validation & Testing
+### Testing Commands
 
 ```bash
-# Quick validation (default)
-./test.sh
+# Master test suite (RECOMMENDED)
+./run-all-tests.sh
 
-# Run all validation tests
-./test.sh --all
+# Validation script
+./test.sh               # Quick validation (default)
+./test.sh --all         # All validation tests
+./test.sh --plugin      # RuTracker plugin only
+./test.sh --full        # Complete test suite
+./test.sh --container   # Container status only
 
-# Test RuTracker plugin only
-./test.sh --plugin
-
-# Run full test suite
-./test.sh --full
-
-# Test container status only
-./test.sh --container
-
-# Comprehensive test suite (detailed)
-./tests/run_tests.sh
-
-# Run specific test suite
-./tests/run_tests.sh --suite plugin
-
-# List available test suites
-./tests/run_tests.sh --list
-
-# Quick tests only
-./tests/run_tests.sh --quick
+# Individual test suites
+python3 tests/comprehensive_test.py       # Full coverage tests
+python3 tests/test_all_plugins.py         # Unit tests
+python3 tests/test_plugin_integration.py  # Integration tests
+python3 tests/final_verification.py       # Provider tests
 ```
 
 ### Manual Docker/Podman Commands
 
 ```bash
-# Start (Docker)
-docker compose up -d
-
-# Start (Podman)
-podman-compose up -d
+# Start
+podman-compose up -d           # Podman
+docker compose up -d           # Docker
 
 # Stop
-docker compose down        # or podman-compose down
+podman-compose down            # Podman
+docker compose down            # Docker
 
 # View logs
-docker compose logs -f qbittorrent
+podman logs -f qbittorrent     # Podman
+docker compose logs -f qbittorrent  # Docker
 
-# Pull latest image
-docker compose pull
+# Execute in container
+podman exec -it qbittorrent /bin/sh
+docker exec -it qbittorrent /bin/sh
 ```
 
-### Validation Commands
+---
 
-```bash
-# Validate docker-compose.yml syntax
-docker compose config
-podman-compose config
-
-# Validate with verbose output
-docker compose config --verbose
-```
-
-## Project Structure
-
-```
-.
-├── docker-compose.yml       # Main container configuration
-├── start.sh                 # Start script (Podman/Docker auto-detect)
-├── stop.sh                  # Stop script (Podman/Docker auto-detect)
-├── test.sh                  # Validation and testing script
-├── install-plugin.sh        # Plugin installation script
-├── plugins/                 # Search plugins source
-│   └── rutracker.py         # RuTracker search plugin
-├── config/                  # qBitTorrent configuration (gitignored)
-│   └── qBittorrent/         # Persistent config storage
-│       ├── nova3/engines/   # Installed plugins
-│       └── .gitkeep         # Keeps directory in git
-├── docs/                    # Documentation
-│   └── USER_MANUAL.md       # User manual
-├── .env.example             # Example environment file
-├── LICENSE                  # Apache 2.0 License
-├── README.md                # Project documentation
-└── AGENTS.md                # This file
-```
-
-## Code Style Guidelines
+## 🎨 Code Style Guidelines
 
 ### Bash Scripts
 
-- Use `set -euo pipefail` for strict mode
-- Add help text with `-h, --help` flags
-- Use functions for modularity
-- Prefer `[[ ]]` over `[ ]` for conditionals
-- Quote all variables to prevent word splitting
-- Use meaningful variable names
-- Add color output for user feedback
-- Check for command availability with `command -v`
-- Use consistent error handling with exit codes
-
-### Bash Script Template
+All bash scripts follow strict conventions:
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -euo pipefail                    # Strict mode: exit on error, undefined vars, pipe fails
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+cd "$SCRIPT_DIR"                     # Always work from script directory
 
+# Standard color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-NC='\033[0m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'                         # No Color
 
+# Standard print functions
 print_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Container runtime detection (standard pattern)
 detect_runtime() {
     if command -v podman &> /dev/null; then
         echo "podman"
@@ -180,297 +286,515 @@ detect_runtime() {
         echo "docker"
     fi
 }
+
+# Always quote variables
+[[ -f "$file" ]] || print_error "Missing: $file"
 ```
+
+**Bash Style Rules:**
+- Use `[[ ]]` for conditionals, never `[ ]`
+- Quote ALL variables: `"$variable"` not `$variable`
+- Use `local` for function variables
+- Functions use `snake_case`
+- Constants use `UPPER_CASE`
+- Indent with 4 spaces
+- Add `-h, --help` flags to all scripts
 
 ### Python (Plugin Code)
 
-- Follow PEP 8 style guide
-- Use type hints where appropriate
-- Add docstrings to functions and classes
-- Handle exceptions gracefully
+```python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Plugin description - one line summary."""
+# VERSION: X.Y
+# AUTHORS: Name (URL)
+
+import os
+import sys
+from typing import Optional, List, Dict
+
+class PluginName:
+    """Main plugin class - docstring explaining purpose."""
+    
+    url = "https://tracker.example.com"
+    name = "Plugin Name"
+    supported_categories = {
+        'all': '0',
+        'movies': '1',
+        # ...
+    }
+    
+    def __init__(self):
+        """Initialize with configuration."""
+        self.config = self._load_config()
+    
+    def search(self, what: str, cat: str = 'all') -> None:
+        """
+        Search for torrents.
+        
+        Args:
+            what: Search query
+            cat: Category key from supported_categories
+        """
+        # Implementation
+        pass
+    
+    def download_torrent(self, url: str) -> str:
+        """
+        Download torrent file or return magnet link.
+        
+        Args:
+            url: Download URL
+            
+        Returns:
+            Path to torrent file or magnet link string
+        """
+        # Implementation
+        pass
+```
+
+**Python Style Rules:**
+- Follow PEP 8
+- Use type hints for function signatures
+- Add docstrings to all classes and public methods
+- Handle exceptions gracefully with try/except
 - Support environment variables for configuration
 - Maintain backward compatibility with qBittorrent API
 
 ### YAML/Docker Compose
 
-- Use 2-space indentation
-- Include version specification at top
-- Use descriptive service names (e.g., `qbittorrent`, not `app`)
-- Document environment variables with inline comments
-- Group related configuration sections together
-- Use consistent quoting style (prefer unquoted when safe)
-
-### Formatting Example
-
 ```yaml
 version: '3.8'
+
 services:
-  service-name:
-    image: repository/image:tag
-    container_name: descriptive-name
+  service-name:                      # Descriptive names
+    image: repository/image:tag      # Specific tags preferred
+    container_name: descriptive-name # For easier management
+    
     environment:
-      - VARIABLE_NAME=value    # Description of variable
+      - VARIABLE_NAME=value          # Description of variable
+    
     volumes:
-      - ./local:/container     # Purpose of mount
-    restart: unless-stopped
+      - ./local:/container:ro        # Purpose of mount
+      - ${ENV_VAR:-default}:/path    # With default
+    
+    network_mode: host               # Or specific networks
+    restart: unless-stopped          # Always include restart policy
+    
+    depends_on:                      # Document dependencies
+      - other-service
 ```
 
-### Environment Variables
+**YAML Style Rules:**
+- Use 2-space indentation
+- Document environment variables inline
+- Group related configuration
+- Prefer unquoted when safe
+- Use specific image tags, not `latest` where possible
 
-- Use uppercase with underscores: `PUID`, `WEBUI_PORT`, `RUTRACKER_USERNAME`, `QBITTORRENT_DATA_DIR`
-- Document each variable with inline comments
-- Keep sensitive values in `.env` files (add to .gitignore)
-- Provide sensible defaults where possible
-- Support multiple credential sources (project .env, ~/.qbit.env, environment)
+---
 
-### Data Directory Configuration
+## 🔧 Configuration System
 
-The `QBITTORRENT_DATA_DIR` environment variable controls where downloads are stored:
+### Environment Variables Priority
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `QBITTORRENT_DATA_DIR` | Base directory for all downloads | `/mnt/DATA` |
+Credentials and configuration are loaded in this order (first wins):
 
-**Directory Structure Created Automatically:**
+1. **Shell environment** (already exported)
+2. **Project `.env`** (`./.env`)
+3. **Home config** (`~/.qbit.env`)
+4. **Container env** (from docker-compose.yml)
 
-| Path | Purpose |
-|------|---------|
-| `$QBITTORRENT_DATA_DIR/` | Main download directory |
-| `$QBITTORRENT_DATA_DIR/Incomplete/` | Incomplete/partial downloads |
-| `$QBITTORRENT_DATA_DIR/Torrents/All/` | All .torrent files |
-| `$QBITTORRENT_DATA_DIR/Torrents/Completed/` | Completed .torrent files |
+### Key Environment Variables
 
-**Configuration Sources (in priority order):**
-1. Project `.env` file (`./.env`)
-2. Home directory config (`~/.qbit.env`)
-3. Shell environment (from `~/.bashrc` exports)
-4. Default value (`/mnt/DATA`)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `QBITTORRENT_DATA_DIR` | `/mnt/DATA` | Download directory |
+| `WEBUI_PORT` | `8085` | WebUI access port |
+| `WEBUI_USERNAME` | `admin` | WebUI login |
+| `WEBUI_PASSWORD` | `admin` | WebUI password |
+| `RUTRACKER_USERNAME` | - | RuTracker login |
+| `RUTRACKER_PASSWORD` | - | RuTracker password |
+| `KINOZAL_USERNAME` | - | Kinozal login |
+| `KINOZAL_PASSWORD` | - | Kinozal password |
+| `NNMCLUB_COOKIES` | - | NNMClub auth cookies |
+| `PUID` | `1000` | User ID for container |
+| `PGID` | `1000` | Group ID for container |
+| `TZ` | `Europe/Moscow` | Timezone |
 
-### Naming Conventions
+### Data Directory Structure
 
-- **Files**: lowercase with hyphens: `docker-compose.yml`, `start.sh`
-- **Directories**: lowercase: `config/`, `plugins/`, `docs/`
-- **Containers**: lowercase with hyphens: `qbittorrent`
-- **Environment variables**: SCREAMING_SNAKE_CASE
+```
+$QBITTORRENT_DATA_DIR/
+├── Incomplete/                 # Partial downloads
+├── Torrents/
+│   ├── All/                   # All .torrent files
+│   └── Completed/             # Completed .torrent files
+└── [completed downloads]      # Finished files
+```
 
-### Comments
+---
 
-- Add comments for non-obvious configuration choices
-- Document why specific ports or paths are used
-- Explain any deviation from default settings
-- Keep comments concise and relevant
+## 🧪 Testing Strategy
 
-## Error Handling
+### Test Architecture
 
-### Container Issues
+```
+┌─────────────────────────────────────────────────────────┐
+│                    TEST LAYERS                          │
+├─────────────────────────────────────────────────────────┤
+│  1. UNIT TESTS (test_plugin_unit.py)                    │
+│     - Plugin class instantiation                        │
+│     - Method availability                               │
+│     - Basic syntax validation                           │
+├─────────────────────────────────────────────────────────┤
+│  2. INTEGRATION TESTS (test_plugin_integration.py)      │
+│     - Plugin loading in container                       │
+│     - Import verification                               │
+│     - Cross-plugin compatibility                        │
+├─────────────────────────────────────────────────────────┤
+│  3. FUNCTIONAL TESTS (comprehensive_test.py)            │
+│     - Search functionality                              │
+│     - Download capability                               │
+│     - Column data extraction                            │
+├─────────────────────────────────────────────────────────┤
+│  4. END-TO-END TESTS (test_e2e_download.py)             │
+│     - Full download flow                                │
+│     - WebUI integration                                 │
+│     - Authentication flow                               │
+├─────────────────────────────────────────────────────────┤
+│  5. VALIDATION (test.sh)                                │
+│     - File structure                                    │
+│     - Configuration                                     │
+│     - Container status                                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Running Tests
 
 ```bash
-# Check container logs for errors
-docker compose logs qbittorrent
-podman logs qbittorrent
+# Full test suite (REQUIRED before committing)
+./run-all-tests.sh
 
-# Inspect container state
-docker inspect qbittorrent
-podman inspect qbittorrent
+# Expected output:
+# ✅ ALL TESTS PASSED - 100% SUCCESS RATE!
 
-# Verify network connectivity
-docker exec qbittorrent ping -c 3 google.com
-podman exec qbittorrent ping -c 3 google.com
+# Quick validation during development
+./test.sh --quick
 
-# Check file permissions
-ls -la config/
+# Test specific areas
+./test.sh --plugin      # Plugin credentials and structure
+./test.sh --container   # Container health
 ```
 
-### Plugin Issues
+### Test Requirements
+
+- All 12 plugins must pass structure validation
+- Private trackers need valid credentials for full tests
+- Container must be running for integration tests
+- Tests generate timestamped reports: `test_report_YYYYMMDD_HHMMSS.txt`
+
+---
+
+## 🔒 Security Considerations
+
+### Critical Security Rules
+
+1. **NEVER commit credentials**
+   - `.env` is in `.gitignore`
+   - `~/.qbit.env` should also be gitignored
+   - No credential files in repository
+
+2. **Default credentials are intentional**
+   - WebUI uses `admin/admin` by design
+   - These are hardcoded in config generation
+   - Changing them requires updating multiple files
+
+3. **Private tracker authentication**
+   - Credentials passed via environment variables
+   - Plugins load from `.env` files at runtime
+   - Session cookies handled by `nova2dl.py`
+
+4. **File permissions**
+   - Plugins: `644` (readable, not executable)
+   - Scripts: `755` (executable)
+   - Config: `600` recommended for credential files
+
+5. **Network security**
+   - Uses `network_mode: host` for simplicity
+   - WebUI accessible on localhost only by default
+   - No HTTPS configured (add reverse proxy for production)
+
+### Credential Storage Options
 
 ```bash
-# Test plugin configuration
-./install-plugin.sh --test
+# Option 1: Project .env (gitignored)
+echo "RUTRACKER_USERNAME=myuser" >> .env
+echo "RUTRACKER_PASSWORD=mypass" >> .env
+chmod 600 .env
 
-# Verify credentials
-./install-plugin.sh --verify
+# Option 2: Home directory config
+echo "RUTRACKER_USERNAME=myuser" >> ~/.qbit.env
+chmod 600 ~/.qbit.env
 
-# Check plugin syntax
-python3 -m py_compile plugins/rutracker.py
-
-# Test plugin loading manually
-cd plugins && python3 -c "import rutracker; print(rutracker.CONFIG.username)"
+# Option 3: Shell exports (session only)
+export RUTRACKER_USERNAME=myuser
+export RUTRACKER_PASSWORD=mypass
 ```
+
+---
+
+## 🐛 Troubleshooting Guide
 
 ### Common Issues
 
-1. **Permission denied**: Ensure PUID/PGID match your user's UID/GID
-2. **Port conflicts**: Check if WEBUI_PORT is already in use
-3. **Volume mount failures**: Verify host paths exist and are accessible
-4. **Network issues**: With `network_mode: host`, ensure no firewall blocking
-5. **Plugin not loading**: Check credentials in .env file
-6. **RuTracker login failed**: Verify credentials and check for CAPTCHA
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Container won't start | Port conflict | Check port 8085/18085: `ss -tln \| grep 8085` |
+| Plugin not showing | Cache issue | Restart container + hard refresh (Ctrl+Shift+R) |
+| Private tracker download fails | Auth bypass | Run `python3 webui-bridge.py` |
+| Permission denied | PUID/PGID mismatch | Run `id` on host, update `.env` |
+| Stale config errors | Old config file | Run `./start.sh` (auto-cleans) |
+| Tests fail | Container not running | Start container: `./start.sh` |
+| RuTracker login fails | CAPTCHA | Login via browser first |
 
-## Container Runtime Detection
+### Debug Commands
 
-The scripts auto-detect the container runtime in this order:
-1. **Podman** - Preferred on Linux systems (rootless by default)
-2. **Docker** - Fallback option
-
-Detection logic:
 ```bash
-if command -v podman &> /dev/null; then
-    CONTAINER_RUNTIME="podman"
-    COMPOSE_CMD="podman-compose"
-elif command -v docker &> /dev/null; then
-    CONTAINER_RUNTIME="docker"
-    COMPOSE_CMD="docker compose"
-fi
+# Check container status
+podman ps -a | grep qbittorrent
+docker compose ps
+
+# View logs
+podman logs -f qbittorrent
+docker compose logs -f qbittorrent
+
+# Check plugin installation
+podman exec qbittorrent ls /config/qBittorrent/nova3/engines/
+
+# Test plugin directly
+podman exec -u abc qbittorrent \
+  python3 /config/qBittorrent/nova3/nova2dl.py \
+  rutracker 'https://rutracker.org/forum/dl.php?t=12345'
+
+# Verify credentials in container
+podman exec qbittorrent env | grep -E "RUTRACKER|KINOZAL|NNMCLUB"
+
+# Check file permissions
+ls -la config/qBittorrent/nova3/engines/
 ```
 
-## Plugin Architecture
+---
 
-### Credential Loading Priority
-
-The RuTracker plugin loads credentials from multiple sources in order:
-
-1. Environment variables (`RUTRACKER_USERNAME`, `RUTRACKER_PASSWORD`)
-2. Project `.env` file (`./.env`)
-3. Home directory config (`~/.qbit.env`)
-4. Shell environment (from `~/.bashrc` exports)
-
-### Plugin Installation Locations
-
-| Target | Path |
-|--------|------|
-| Container | `./config/qBittorrent/nova3/engines/` |
-| Local Linux | `~/.local/share/qBittorrent/nova3/engines/` |
-| Local macOS | `~/Library/Application Support/qBittorrent/nova3/engines/` |
-
-## Security Considerations
-
-- Never commit sensitive data (passwords, API keys) to repository
-- `.env` files are in `.gitignore` and must not be committed
-- Change default Web UI credentials immediately after first login
-- Keep qBitTorrent version updated for security patches
-- Consider using VPN for torrent traffic (not configured in this setup)
-- Review container permissions and capabilities
-- Store RuTracker credentials securely using environment files
-
-## Git Workflow
-
-### Commit Messages
-
-- Use present tense: "Add environment variable" not "Added"
-- Be descriptive but concise
-- Reference issues if applicable
+## 📝 Git Workflow
 
 ### What to Commit
 
-- Configuration files: `docker-compose.yml`
-- Scripts: `start.sh`, `stop.sh`, `test.sh`, `install-plugin.sh`
-- Plugin source: `plugins/rutracker.py`
-- Documentation: `README.md`, `AGENTS.md`, `docs/USER_MANUAL.md`
-- Example config: `.env.example`
-- Ignore: `config/` contents, `.env` files, plugin icons
+✅ **DO commit:**
+- Configuration files: `docker-compose.yml`, `.env.example`
+- Scripts: `*.sh`, `*.py` (except generated)
+- Plugins: `plugins/*.py`
+- Documentation: `*.md`
+- Tests: `tests/*.py`
 
-## Configuration Changes
+❌ **NEVER commit:**
+- `.env` files (contain credentials)
+- `config/qBittorrent/*` (runtime config)
+- `downloads/` (downloaded content)
+- `tmp/` (temporary files)
+- `__pycache__/` (Python cache)
+- `*.pyc`, `*.pyo` (compiled Python)
 
-When modifying `docker-compose.yml`:
+### Commit Message Format
 
-1. Validate syntax: `docker compose config`
-2. Test changes: `./start.sh`
-3. Verify functionality: Check Web UI access
-4. Review logs: `docker compose logs qbittorrent`
-5. Document changes in commit message
+```
+Type: Brief description
 
-## Best Practices
+- Use present tense: "Add feature" not "Added"
+- Be specific: "Fix RuTracker login timeout" not "Fix bug"
+- Reference issues: "Fix #123: Description"
 
-1. **Idempotency**: Changes should be repeatable without side effects
-2. **Documentation**: Keep README.md updated with any changes
-3. **Minimal privileges**: Use least permissive settings that work
-4. **Resource limits**: Consider adding memory/CPU limits if needed
-5. **Health checks**: Add healthcheck directive for critical services
-6. **Validation**: Run `./test.sh --full` before committing changes
-7. **Security**: Never commit credentials or sensitive data
-
-## Testing
-
-### Before Committing
-
-Always run tests before committing changes:
-
-```bash
-# Quick validation
-./test.sh
-
-# Full test suite
-./test.sh --full
+Types:
+- feat: New feature
+- fix: Bug fix
+- docs: Documentation
+- test: Tests
+- refactor: Code restructuring
+- chore: Maintenance
 ```
 
-### Test Categories
-
-| Test | Command | Description |
-|------|---------|-------------|
-| Quick | `./test.sh` | Basic validation |
-| All | `./test.sh --all` | All validation tests |
-| Plugin | `./test.sh --plugin` | Plugin configuration |
-| Full | `./test.sh --full` | Complete test suite |
-| Container | `./test.sh --container` | Container status only |
-
-### Manual Testing Checklist
-
-1. [ ] Start container: `./start.sh`
-2. [ ] Check container status: `./start.sh -s`
-3. [ ] Access Web UI: http://localhost:8085
-4. [ ] Login with credentials
-5. [ ] Check RuTracker plugin in search engines
-6. [ ] Test search functionality
-7. [ ] Stop container: `./stop.sh`
-
-## Extending the Configuration
-
-To add additional services:
-
-1. Add new service block in `docker-compose.yml`
-2. Document purpose and configuration
-3. Test inter-service communication if applicable
-4. Update README.md with new service information
-5. Run validation tests: `./test.sh --all`
-
-To add additional plugins:
-
-1. Add `.py` file to `plugins/` directory
-2. Update `install-plugin.sh` if needed
-3. Document in README.md
-4. Test plugin loading: `./install-plugin.sh --test`
-
-## Useful Commands Reference
+### Pre-Commit Checklist
 
 ```bash
-# List all containers
-docker ps -a
-podman ps -a
+# 1. Run full test suite
+./run-all-tests.sh
 
-# View resource usage
-docker stats qbittorrent
-podman stats qbittorrent
+# 2. Verify no credentials leaked
+grep -r "RUTRACKER_PASSWORD" --include="*.py" --include="*.sh" --include="*.md" .
+# Should only show .env.example with placeholder
 
-# Execute command in container
-docker exec -it qbittorrent /bin/sh
-podman exec -it qbittorrent /bin/sh
+# 3. Check syntax
+bash -n start.sh stop.sh test.sh install-plugin.sh
+python3 -m py_compile plugins/*.py
 
-# Copy file from container
-docker cp qbittorrent:/config/qBittorrent/config.conf ./
-podman cp qbittorrent:/config/qBittorrent/config.conf ./
-
-# Inspect container networks
-docker network ls
-podman network ls
-
-# Check plugin syntax
-python3 -m py_compile plugins/rutracker.py
-
-# Test bash script syntax
-bash -n start.sh
-bash -n stop.sh
+# 4. Validate docker-compose
+docker compose config  # or podman-compose config
 ```
 
-## License
+---
 
-This project is licensed under Apache 2.0. When contributing, ensure all code is compatible with this license.
+## 🔌 Plugin Development
+
+### Plugin Template
+
+```python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""MyTracker search plugin for qBittorrent."""
+# VERSION: 1.0
+
+import os
+import sys
+from urllib.parse import urlencode
+from urllib.request import build_opener
+
+try:
+    import novaprinter
+except ImportError:
+    pass
+
+
+class MyTracker:
+    """MyTracker search engine plugin."""
+    
+    url = "https://mytracker.example.com"
+    name = "MyTracker"
+    supported_categories = {
+        'all': '0',
+        'movies': '1',
+        'tv': '2',
+        'music': '3',
+    }
+    
+    def __init__(self):
+        """Initialize plugin."""
+        self.opener = build_opener()
+        self.opener.addheaders = [
+            ('User-Agent', 'Mozilla/5.0 (compatible; qBittorrent)')
+        ]
+    
+    def search(self, what: str, cat: str = 'all') -> None:
+        """Search for torrents."""
+        category = self.supported_categories.get(cat, '0')
+        search_url = f"{self.url}/search?q={what}&cat={category}"
+        
+        # Fetch and parse results
+        # Call novaprinter.print() for each result
+        # Format: name, link, size, seeds, leech, engine_url, desc_link
+        
+    def download_torrent(self, url: str) -> str:
+        """Download torrent file or return magnet link."""
+        # Return magnet link directly
+        if url.startswith('magnet:'):
+            return url
+        
+        # Or download .torrent file
+        # Return format: "filepath url" or just "magnet_link"
+        pass
+
+
+# For standalone testing
+if __name__ == "__main__":
+    plugin = MyTracker()
+    plugin.search("test")
+```
+
+### Required Plugin Methods
+
+| Method | Required | Description |
+|--------|----------|-------------|
+| `__init__` | Yes | Initialize plugin, set up HTTP opener |
+| `search(what, cat)` | Yes | Main search method, outputs via novaprinter |
+| `download_torrent(url)` | Yes | Download torrent or return magnet |
+
+### Output Format (novaprinter)
+
+```python
+novaprinter.print(
+    name="Ubuntu 22.04 LTS",           # Torrent name
+    link="magnet:?xt=urn:btih:...",    # Download URL or magnet
+    size="2377711616",                 # Size in bytes
+    seeds="25",                        # Seeders count
+    leech="3",                         # Leechers count
+    engine_url="https://tracker.com", # Tracker URL
+    desc_link="https://...",          # Description page
+    pub_date="1647261600"             # Unix timestamp (optional)
+)
+```
+
+---
+
+## 📚 Reference Documentation
+
+| Document | Purpose |
+|----------|---------|
+| `README.md` | Main project overview |
+| `PLUGIN_STATUS.md` | Plugin compatibility matrix |
+| `FORK_SUMMARY.md` | Architecture and fixes overview |
+| `docs/USER_MANUAL.md` | Complete usage guide |
+| `docs/PLUGIN_TROUBLESHOOTING.md` | Debug guide |
+| `docs/PLUGINS.md` | Plugin development guide |
+| `CHANGELOG.md` | Version history |
+| `LICENSE` | Apache 2.0 license |
+
+---
+
+## 🎯 Quick Reference
+
+### One-Liners
+
+```bash
+# Complete setup from scratch
+./setup.sh && python3 webui-bridge.py
+
+# Restart everything
+./stop.sh -r && ./start.sh
+
+# Test everything
+./run-all-tests.sh
+
+# Check what's installed
+./install-plugin.sh --verify
+
+# View logs
+podman logs -f qbittorrent 2>&1 | grep -i error
+```
+
+### File Permissions Quick Fix
+
+```bash
+# Fix plugin permissions
+chmod 644 plugins/*.py
+chmod 644 config/qBittorrent/nova3/engines/*.py
+
+# Fix script permissions
+chmod 755 *.sh
+
+# Secure credential files
+chmod 600 .env ~/.qbit.env 2>/dev/null || true
+```
+
+---
+
+## 📞 Support
+
+- **Documentation**: Check `docs/` folder
+- **Tests**: Run `./run-all-tests.sh` to diagnose
+- **Logs**: `podman logs qbittorrent`
+- **Status**: Check `PLUGIN_STATUS.md` for known issues
+
+---
+
+**Version**: 2.0.0  
+**License**: Apache 2.0  
+**Last Updated**: April 2025
