@@ -14,7 +14,7 @@ from novaprinter import prettyPrinter
 from helpers import retrieve_url
 
 class yts(object):
-    url = 'https://yts.mx'
+    url = 'https://movies-api.accel.li'
     name = 'YTS'
     supported_categories = {'all': 'All', 'movies': 'Movie'}
 

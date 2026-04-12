@@ -123,7 +123,16 @@ class limetorrents:
                     self.page_items += 1
 
     def _fetch_url_with_retry(self, url: str, max_retries: int = 3) -> str:
-        """Fetch URL with retry logic."""
+        """Fetch URL with retry logic and proper URL encoding."""
+        from urllib.parse import quote
+        
+        # Fix URL encoding - spaces and special characters need to be encoded
+        # Split URL into parts to encode only the path
+        if ' ' in url or '%20' in url:
+            # URL contains spaces, need to fix encoding
+            url = url.replace('%20', ' ')
+            url = quote(url, safe='/:=?&()[]')  # Keep URL structure characters safe
+        
         for attempt in range(max_retries):
             try:
                 req = Request(

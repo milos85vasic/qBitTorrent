@@ -1,24 +1,6 @@
-# VERSION: 2.8
+# VERSION: 2.9
 # AUTHORS: nKlido
-
-# LICENSING INFORMATION
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# NOTE: Site currently experiencing issues (solidtorrents.to / bitsearch.to)
 
 from datetime import datetime
 from html.parser import HTMLParser
@@ -30,6 +12,7 @@ from novaprinter import prettyPrinter
 
 class solidtorrents:
     url = 'https://solidtorrents.to'
+    alt_url = 'https://bitsearch.to'
     name = 'Solid Torrents'
     supported_categories = {'all': 'all', 'music': 'Audio', 'books': 'eBook'}
 
@@ -108,7 +91,7 @@ class solidtorrents:
 
         def handle_endtag(self, tag: str) -> None:
             if self.torrentReady:
-                prettyPrinter(self.torrent_info)  # type: ignore[arg-type] # refactor later
+                prettyPrinter(self.torrent_info)
                 self.torrentReady = False
                 self.torrent_info = self.empty_torrent_info()
                 self.totalResults += 1
@@ -141,7 +124,7 @@ class solidtorrents:
                     [month, day, year] = data.replace(',', '').lower().split()
                     date = datetime(int(year), int(months.index(month) + 1), int(day))
                     self.torrent_info['pub_date'] = int(date.timestamp())
-                except Exception:  # pylint: disable=broad-exception-caught
+                except Exception:
                     self.torrent_info['pub_date'] = -1
                 self.parseDate = False
                 self.foundStats = False
@@ -156,8 +139,13 @@ class solidtorrents:
 
         for page in range(1, 5):
             parser = self.TorrentInfoParser(self.url)
-            parser.feed(self.request(what, category, page))
-            parser.close()
+            try:
+                html = self.request(what, category, page)
+                parser.feed(html)
+                parser.close()
+            except Exception as e:
+                # Site may be down, silently fail
+                break
             if parser.totalResults < 15:
                 break
 
@@ -165,13 +153,13 @@ class solidtorrents:
         """Handle magnet links - just pass through."""
         import sys
         if url.startswith('magnet:'):
-            # For magnet links, output as-is (qBittorrent handles them)
             print(url + " " + url)
             sys.stdout.flush()
         else:
             # Fallback to direct download
             import tempfile
             import urllib.request
+            import os
             try:
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req, timeout=30) as response:
@@ -181,11 +169,9 @@ class solidtorrents:
                 with os.fdopen(fd, "wb") as f:
                     f.write(data)
                 
-                import os
                 os.chmod(path, 0o644)
                 print(path + " " + url)
                 sys.stdout.flush()
             except Exception as e:
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
-

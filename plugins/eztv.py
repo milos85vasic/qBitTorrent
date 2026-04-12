@@ -50,10 +50,19 @@ class Eztv(object):
         search_url = f'{self.url}/search/{what}'
         
         try:
-            # Make request
-            req = Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urlopen(req, timeout=10) as response:
-                html = response.read().decode('utf-8')
+            # Make request with enhanced headers to avoid 403
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+            req = Request(search_url, headers=headers)
+            with urlopen(req, timeout=15) as response:
+                html = response.read().decode('utf-8', errors='ignore')
             
             # Parse results
             for match in self.re_result.finditer(html):
