@@ -129,6 +129,12 @@ class torrentgalaxy(object):
         for thread in threads:
             thread.join()
 
+    def download_torrent(self, url):
+        """Download torrent - returns magnet link directly."""
+        import sys
+        print(url + " " + url)
+        sys.stdout.flush()
+
 if __name__ == '__main__':
     a = torrentgalaxy()
     a.search('ncis new', 'all')
