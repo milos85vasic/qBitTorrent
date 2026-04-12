@@ -87,29 +87,29 @@ class linuxtracker(object):
         def handle_data(self, data):
             if self.wait_for_data is True:
                 # We process the data in order of name, size, seeds, leechers
-                if self.strong_count is 0 and self.curr:
+                if self.strong_count == 0 and self.curr:
                     # Get title
                     self.curr['name'] = data.strip()
-                elif self.strong_count is 3 and self.curr:
+                elif self.strong_count == 3 and self.curr:
                     # Get size
                         # Strip all comma's since it screws with
                         # prettyPrinter
                         if "," in data:
                             data = re.sub(",", '', data)
                         self.curr["size"] = data.strip()
-                elif self.strong_count is 4 and self.curr:
+                elif self.strong_count == 4 and self.curr:
                     # Get seeds
                     try:
                         self.curr["seeds"] = int(data.strip())
                     except:
                         pass
-                elif self.strong_count is 5 and self.curr:
+                elif self.strong_count == 5 and self.curr:
                     # Get leechers
                     try:
                         self.curr["leech"] = int(data.strip())
                     except:
                         pass
-                elif self.strong_count is 6:
+                elif self.strong_count == 6:
                     # Reset strong counter
                     self.strong_count = 0
                 self.wait_for_data = False
