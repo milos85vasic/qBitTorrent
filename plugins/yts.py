@@ -18,6 +18,12 @@ class yts(object):
     name = 'YTS'
     supported_categories = {'all': 'All', 'movies': 'Movie'}
 
+    def download_torrent(self, url):
+        """Download torrent - returns magnet link directly."""
+        import sys
+        print(url + " " + url)
+        sys.stdout.flush()
+
     def search(self, keyword, cat='all'):
         job = score()
         params = job.paramBuilder(unquote(keyword))
@@ -43,17 +49,17 @@ class yts(object):
             url_path = list(map(lambda i: i in params and params[i] or url_params[i], url_params))
             url = job.urlBuilder(self.url,url_path,'page' in params and {'page':params['page']})
             data = retrieve_url(url)
-            data = re.sub("\s\s+", "", data).replace('\n', '').replace('\r', '')
-            data_container = re.findall('<div class="browse-content"><div class="container">.*?<section><div class="row">(.*?)</div></section>.*?</div></div>', data)
+            data = re.sub(r"\s\s+", "", data).replace('\n', '').replace('\r', '')
+            data_container = re.findall(r'<div class="browse-content"><div class="container">.*?<section><div class="row">(.*?)</div></section>.*?</div></div>', data)
             if data_container and data_container[0]:
-                page_of = re.findall('<li class="pagination-bordered">(.*?)</li>', data)[0] # 1 of 5
-                page_of = page_of and re.sub(' +','',page_of).strip() or '?'
+                page_of = re.findall(r'<li class="pagination-bordered">(.*?)</li>', data)[0] # 1 of 5
+                page_of = page_of and re.sub(r' +','',page_of).strip() or '?'
                 data_movie = re.findall('<div class=".?browse-movie-wrap.*?">.*?</div></div></div>', data_container[0])
                 for hM in data_movie:
-                    movie_link = re.findall('<a href="(.*?)" class="browse-movie-link">.*?</a>', hM)[0]
+                    movie_link = re.findall(r'<a href="(.*?)" class="browse-movie-link">.*?</a>', hM)[0]
                     response_detail = retrieve_url(movie_link)
-                    response_detail = re.sub("\s\s+", "", response_detail).replace('\n', '').replace('\r', '')
-                    movie_id = re.findall('data-movie-id="(\d+)"', response_detail)[0]
+                    response_detail = re.sub(r"\s\s+", "", response_detail).replace('\n', '').replace('\r', '')
+                    movie_id = re.findall(r'data-movie-id="(\d+)"', response_detail)[0]
                     if movie_id:
                         url = job.urlBuilder(self.url,['api', 'v2', 'movie_details.json'],{'movie_id':movie_id})
                         data_detail = retrieve_url(url)
@@ -89,15 +95,15 @@ class yts(object):
 class score(object):
     supported_browse_params = {'browse':'browse-movies','query_term':'0', 'quality':'all','genre':'all','minimum_rating':'0','sort_by':'latest'}
     default_params = {
-        'genre':{'x':'(term=\w+[\s+|$]?)'},
-        'quality':{'x':'(term=\w+[\s+|$]?)'},
-        'minimum_rating':{'x':'(term=?[0-9]*[.]?[0-9]+[\s+|$]?)'},
-        'sort_by':{'x':'(term=\w+[\s+|$]?)'},
-        'order_by':{'x':'(term=\w+[\s+|$]?)'},
-        'with_rt_ratings':{'x':'(term=\w+[\s+|$]?)'},
-        'page':{'x':'(term=\w+[\s+|$]?)','value':'1'},
-        'limit':{'x':'(term=.*[\s+|$]?)','value':'1'},
-        'query_term':{'x':'(term=.*[\s+|$]?)','value':'%%'}}
+        'genre':{'x':r'(term=\w+[\s+|$]?)'},
+        'quality':{'x':r'(term=\w+[\s+|$]?)'},
+        'minimum_rating':{'x':r'(term=?[0-9]*[.]?[0-9]+[\s+|$]?)'},
+        'sort_by':{'x':r'(term=\w+[\s+|$]?)'},
+        'order_by':{'x':r'(term=\w+[\s+|$]?)'},
+        'with_rt_ratings':{'x':r'(term=\w+[\s+|$]?)'},
+        'page':{'x':r'(term=\w+[\s+|$]?)','value':'1'},
+        'limit':{'x':r'(term=.*[\s+|$]?)','value':'1'},
+        'query_term':{'x':r'(term=.*[\s+|$]?)','value':'%%'}}
 
     tracker = ['udp://open.demonii.com:1337/announce',
         'udp://tracker.openbittorrent.com:80',
@@ -146,12 +152,6 @@ class score(object):
             prettyPrinter(res)
         else:
             """ None """
-
-    def download_torrent(self, url):
-        """Download torrent - returns magnet link directly."""
-        import sys
-        print(url + " " + url)
-        sys.stdout.flush()
 
 if __name__=="__main__":
     """ debug """

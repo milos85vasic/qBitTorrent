@@ -1,0 +1,20 @@
+[
+  {
+    "timestamp": "2026-04-12T19:37:59.367106",
+    "tests": {
+      "master_suite": {
+        "status": "failed",
+        "returncode": 1,
+        "output": "\n\u001b[1m\u001b[94m======================================================================\u001b[0m\n\u001b[1m\u001b[94m               MASTER TEST SUITE - QBITTORRENT PLUGINS                \u001b[0m\n\u001b[1m\u001b[94m======================================================================\u001b[0m\n\nTesting 43 plugins...\nTime: 2026-04-12 19:37:59\n\nWill test 5 plugins\n\n\u001b[1mTesting: rutracker\u001b[0m\n\u001b[93m! Skipping rutracker - no credentials found\u001b[0m\n\n\u001b[1mTesting: rutor\u001b[0m\n  Testing syntax... \u001b[92m\u2713 OK\u001b[0m\n  Testing import... \u001b[92m\u2713 OK\u001b[0m\n  Testing structure... \u001b[92m\u2713 OK\u001b[0m\n  Testing search... \u001b[92m\u2713 OK - Found 235 results\u001b[0m\n  Testing seeders data... \u001b[92m\u2713 OK - Real seeders/peers data found in 3 results\u001b[0m\n  Testing magnet links... \u001b[92m\u2713 OK - 235 results have magnet links\u001b[0m\n  Testing download function... \u001b[92m\u2713 OK - download_torrent method exists\u001b[0m\n\n\u001b[1mTesting: kinozal\u001b[0m\n\u001b[93m! Skipping kinozal - no credentials found\u001b[0m\n\n\u001b[1mTesting: nnmclub\u001b[0m\n\u001b[93m! Skipping nnmclub - no credentials found\u001b[0m\n\n\u001b[1mTesting: eztv\u001b[0m\n  Testing syntax... \u001b[92m\u2713 OK\u001b[0m\n  Testing import... \u001b[92m\u2713 OK\u001b[0m\n  Testing structure... \u001b[92m\u2713 OK\u001b[0m\n  Testing search... \u001b[91m\u2717 FAILED: No results found\u001b[0m\n\n\u001b[1m\u001b[94m======================================================================\u001b[0m\n\u001b[1m\u001b[94m                             TEST SUMMARY                             \u001b[0m\n\u001b[1m\u001b[94m======================================================================\u001b[0m\n\n\n\u001b[1mOverall Results:\u001b[0m\n  Total Plugins Tested: 5\n  \u001b[92mPassed: 1\u001b[0m\n  \u001b[91mFailed: 1\u001b[0m\n  \u001b[93mSkipped: 3\u001b[0m\n\n\u001b[91mFailed Plugins:\u001b[0m\n  - eztv\n    \u2022 search: No results found\n\n\u001b[96mDetailed report saved to: test_report.json\u001b[0m\n"
+      },
+      "extended": {
+        "status": "failed",
+        "returncode": 1
+      },
+      "download": {
+        "status": "failed",
+        "returncode": 1
+      }
+    }
+  }
+]

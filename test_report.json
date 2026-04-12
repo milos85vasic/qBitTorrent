@@ -1,0 +1,125 @@
+{
+  "summary": {
+    "total_plugins": 5,
+    "start_time": "2026-04-12T19:37:59.427889",
+    "end_time": "2026-04-12T19:38:00.762345",
+    "duration_seconds": 1.334456
+  },
+  "results": {
+    "rutracker": {
+      "tests": {
+        "auth_check": {
+          "passed": false,
+          "details": {},
+          "error": "No credentials (set RUTRACKER_USERNAME)",
+          "timestamp": "2026-04-12T19:37:59.428438"
+        }
+      },
+      "overall_status": "skipped"
+    },
+    "rutor": {
+      "tests": {
+        "syntax": {
+          "passed": true,
+          "details": {},
+          "error": null,
+          "timestamp": "2026-04-12T19:37:59.430860"
+        },
+        "import": {
+          "passed": true,
+          "details": {},
+          "error": null,
+          "timestamp": "2026-04-12T19:37:59.444920"
+        },
+        "structure": {
+          "passed": true,
+          "details": {},
+          "error": null,
+          "timestamp": "2026-04-12T19:37:59.444938"
+        },
+        "search": {
+          "passed": true,
+          "details": {
+            "results_count": 235
+          },
+          "error": null,
+          "timestamp": "2026-04-12T19:38:00.403389"
+        },
+        "seeders": {
+          "passed": true,
+          "details": {
+            "message": "Real seeders/peers data found in 3 results"
+          },
+          "error": null,
+          "timestamp": "2026-04-12T19:38:00.403410"
+        },
+        "magnets": {
+          "passed": true,
+          "details": {
+            "message": "235 results have magnet links"
+          },
+          "error": null,
+          "timestamp": "2026-04-12T19:38:00.403434"
+        },
+        "download": {
+          "passed": true,
+          "details": {},
+          "error": null,
+          "timestamp": "2026-04-12T19:38:00.408450"
+        }
+      },
+      "overall_status": "passed"
+    },
+    "kinozal": {
+      "tests": {
+        "auth_check": {
+          "passed": false,
+          "details": {},
+          "error": "No credentials (set KINOZAL_USERNAME)",
+          "timestamp": "2026-04-12T19:38:00.408506"
+        }
+      },
+      "overall_status": "skipped"
+    },
+    "nnmclub": {
+      "tests": {
+        "auth_check": {
+          "passed": false,
+          "details": {},
+          "error": "No credentials (set NNMCLUB_USERNAME)",
+          "timestamp": "2026-04-12T19:38:00.408514"
+        }
+      },
+      "overall_status": "skipped"
+    },
+    "eztv": {
+      "tests": {
+        "syntax": {
+          "passed": true,
+          "details": {},
+          "error": null,
+          "timestamp": "2026-04-12T19:38:00.409039"
+        },
+        "import": {
+          "passed": true,
+          "details": {},
+          "error": null,
+          "timestamp": "2026-04-12T19:38:00.409461"
+        },
+        "structure": {
+          "passed": true,
+          "details": {},
+          "error": null,
+          "timestamp": "2026-04-12T19:38:00.409474"
+        },
+        "search": {
+          "passed": false,
+          "details": {},
+          "error": "No results found",
+          "timestamp": "2026-04-12T19:38:00.762316"
+        }
+      },
+      "overall_status": "failed"
+    }
+  }
+}
