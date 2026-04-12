@@ -1,9 +1,9 @@
 {
   "summary": {
     "total_plugins": 5,
-    "start_time": "2026-04-12T19:37:59.427889",
-    "end_time": "2026-04-12T19:38:00.762345",
-    "duration_seconds": 1.334456
+    "start_time": "2026-04-12T20:09:01.973818",
+    "end_time": "2026-04-12T20:09:03.424065",
+    "duration_seconds": 1.450247
   },
   "results": {
     "rutracker": {
@@ -12,7 +12,7 @@
           "passed": false,
           "details": {},
           "error": "No credentials (set RUTRACKER_USERNAME)",
-          "timestamp": "2026-04-12T19:37:59.428438"
+          "timestamp": "2026-04-12T20:09:01.974349"
         }
       },
       "overall_status": "skipped"
@@ -23,19 +23,19 @@
           "passed": true,
           "details": {},
           "error": null,
-          "timestamp": "2026-04-12T19:37:59.430860"
+          "timestamp": "2026-04-12T20:09:01.976471"
         },
         "import": {
           "passed": true,
           "details": {},
           "error": null,
-          "timestamp": "2026-04-12T19:37:59.444920"
+          "timestamp": "2026-04-12T20:09:01.992478"
         },
         "structure": {
           "passed": true,
           "details": {},
           "error": null,
-          "timestamp": "2026-04-12T19:37:59.444938"
+          "timestamp": "2026-04-12T20:09:01.992505"
         },
         "search": {
           "passed": true,
@@ -43,15 +43,15 @@
             "results_count": 235
           },
           "error": null,
-          "timestamp": "2026-04-12T19:38:00.403389"
+          "timestamp": "2026-04-12T20:09:03.091104"
         },
         "seeders": {
           "passed": true,
           "details": {
-            "message": "Real seeders/peers data found in 3 results"
+            "message": "Real seeders/peers data found in 2 results"
           },
           "error": null,
-          "timestamp": "2026-04-12T19:38:00.403410"
+          "timestamp": "2026-04-12T20:09:03.091121"
         },
         "magnets": {
           "passed": true,
@@ -59,13 +59,13 @@
             "message": "235 results have magnet links"
           },
           "error": null,
-          "timestamp": "2026-04-12T19:38:00.403434"
+          "timestamp": "2026-04-12T20:09:03.091147"
         },
         "download": {
           "passed": true,
           "details": {},
           "error": null,
-          "timestamp": "2026-04-12T19:38:00.408450"
+          "timestamp": "2026-04-12T20:09:03.096096"
         }
       },
       "overall_status": "passed"
@@ -76,7 +76,7 @@
           "passed": false,
           "details": {},
           "error": "No credentials (set KINOZAL_USERNAME)",
-          "timestamp": "2026-04-12T19:38:00.408506"
+          "timestamp": "2026-04-12T20:09:03.096149"
         }
       },
       "overall_status": "skipped"
@@ -87,7 +87,7 @@
           "passed": false,
           "details": {},
           "error": "No credentials (set NNMCLUB_USERNAME)",
-          "timestamp": "2026-04-12T19:38:00.408514"
+          "timestamp": "2026-04-12T20:09:03.096156"
         }
       },
       "overall_status": "skipped"
@@ -98,25 +98,25 @@
           "passed": true,
           "details": {},
           "error": null,
-          "timestamp": "2026-04-12T19:38:00.409039"
+          "timestamp": "2026-04-12T20:09:03.096800"
         },
         "import": {
           "passed": true,
           "details": {},
           "error": null,
-          "timestamp": "2026-04-12T19:38:00.409461"
+          "timestamp": "2026-04-12T20:09:03.097202"
         },
         "structure": {
           "passed": true,
           "details": {},
           "error": null,
-          "timestamp": "2026-04-12T19:38:00.409474"
+          "timestamp": "2026-04-12T20:09:03.097213"
         },
         "search": {
           "passed": false,
           "details": {},
           "error": "No results found",
-          "timestamp": "2026-04-12T19:38:00.762316"
+          "timestamp": "2026-04-12T20:09:03.424018"
         }
       },
       "overall_status": "failed"
