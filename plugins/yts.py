@@ -69,7 +69,8 @@ class yts(object):
                             'desc_link': movies['url']}
                             job.done(res)
                         else:
-                            # TODO: ??
+                            # Fallback: Extract movie details from browse page HTML when API doesn't return results
+                            # This handles cases where the movie exists in browse but not in direct API
                             movie_title = re.findall('<a.*?class="browse-movie-title".*?>(.*?)</a>', hM)[0]
                             movie_year = re.findall('<div.?class="browse-movie-year".*?>(.*?)</div>', hM)[0]
                             movie_rate = re.findall('<h4.?class="rating".*?>(.*?)</h4>', hM)[0]
