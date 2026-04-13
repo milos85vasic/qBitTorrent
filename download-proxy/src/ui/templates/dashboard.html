@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merge Search - Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        h1 { color: #333; font-size: 24px; }
+        .card { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h2 { color: #555; font-size: 18px; margin-bottom: 15px; }
+        .search-form { display: flex; gap: 10px; margin-bottom: 20px; }
+        .search-form input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
+        .search-form button { padding: 12px 24px; background: #4a90d9; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
+        .search-form button:hover { background: #357abd; }
+        .results { margin-top: 20px; }
+        .result-item { padding: 15px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 10px; }
+        .result-item h3 { color: #333; margin-bottom: 8px; }
+        .result-item .meta { color: #888; font-size: 14px; }
+        .result-item .download-btn { margin-top: 10px; padding: 8px 16px; background: #28a745; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        .status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; }
+        .status.running { background: #fff3cd; color: #856404; }
+        .status.completed { background: #d4edda; color: #155724; }
+        .status.failed { background: #f8d7da; color: #721c24; }
+        .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; }
+        .tab { padding: 12px 24px; cursor: pointer; border: none; background: none; font-size: 14px; color: #666; }
+        .tab.active { border-bottom: 2px solid #4a90d9; color: #4a90d9; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { color: #555; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Merge Search Dashboard</h1>
+        </header>
+
+        <div class="card">
+            <h2>Search</h2>
+            <form class="search-form" action="/search" method="post">
+                <input type="text" name="query" placeholder="Enter search query (e.g., Ubuntu 22.04)" required>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('results')">Results</button>
+                <button class="tab" onclick="switchTab('history')">History</button>
+                <button class="tab" onclick="switchTab('trackers')">Trackers</button>
+                <button class="tab" onclick="switchTab('schedules')">Schedules</button>
+            </div>
+
+            <div id="results-tab">
+                <p style="color: #888; text-align: center; padding: 40px;">No search results yet. Enter a query above.</p>
+            </div>
+
+            <div id="history-tab" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Query</th>
+                            <th>Time</th>
+                            <th>Results</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: #888;">No search history</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="trackers-tab" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tracker</th>
+                            <th>URL</th>
+                            <th>Status</th>
+                            <th>Last Check</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Rutracker</td>
+                            <td>https://rutracker.org</td>
+                            <td><span class="status completed">Healthy</span></td>
+                            <td>Just now</td>
+                        </tr>
+                        <tr>
+                            <td>Kinozal</td>
+                            <td>https://kinozal.tv</td>
+                            <td><span class="status completed">Healthy</span></td>
+                            <td>Just now</td>
+                        </tr>
+                        <tr>
+                            <td>NNM Club</td>
+                            <td>https://nnmclub.to</td>
+                            <td><span class="status running">Unknown</span></td>
+                            <td>-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="schedules-tab" style="display: none;">
+                <p style="color: #888; text-align: center; padding: 40px;">No scheduled searches configured.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Active Downloads</h2>
+            <p style="color: #888; text-align: center; padding: 20px;">No active downloads</p>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('[id$="-tab"]').forEach(t => t.style.display = 'none');
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

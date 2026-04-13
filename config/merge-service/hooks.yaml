@@ -1,0 +1,23 @@
+# Hooks configuration for merge service
+
+hooks:
+  # Example hook configurations
+  # Uncomment and customize as needed
+
+  # - name: log_search_events
+  #   event: search_complete
+  #   script_path: /config/hooks/log_event.sh
+  #   enabled: true
+  #   timeout: 30
+
+  # - name: notify_on_download
+  #   event: download_complete
+  #   script_path: /config/hooks/notify.sh
+  #   enabled: false
+  #   timeout: 30
+
+# Logging
+logging:
+  enabled: true
+  log_file: /config/merge-service/hook_logs.json
+  max_log_entries: 1000
