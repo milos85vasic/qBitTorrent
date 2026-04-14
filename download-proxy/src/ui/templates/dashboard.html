@@ -285,8 +285,12 @@
             })
             .catch(function(err) {
                 btn.disabled = false;
-                status.textContent = 'Error: ' + err.message;
-                document.getElementById('results-tab').innerHTML = '<p class="empty-state">Search failed</p>';
+                if (err.message && err.message.indexOf('Failed to fetch') !== -1) {
+                    status.innerHTML = '<span style="color:#dc3545">Service unavailable. Please ensure the container is running.</span>';
+                } else {
+                    status.textContent = 'Error: ' + err.message;
+                }
+                document.getElementById('results-tab').innerHTML = '<p class="empty-state">Search failed — is the service running?</p>';
             });
         }
 

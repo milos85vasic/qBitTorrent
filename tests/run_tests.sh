@@ -576,12 +576,12 @@ test_container_operations() {
         test_skip "Container not running (start with ./start.sh)"
     fi
     
-    test_start "Check if port 8085 is listening"
+    test_start "Check if port 78085 is listening"
     if assert_container_running "qbittorrent"; then
-        if assert_port_listening "8085"; then
-            test_pass "Port 8085 is listening"
+        if assert_port_listening "78085"; then
+            test_pass "Port 78085 is listening"
         else
-            test_fail "Port 8085 is not listening"
+            test_fail "Port 78085 is not listening"
         fi
     else
         test_skip "Container not running"
@@ -591,7 +591,7 @@ test_container_operations() {
     if assert_container_running "qbittorrent"; then
         if command -v curl &> /dev/null; then
             local http_code
-            http_code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "http://localhost:8085" 2>/dev/null) || http_code="000"
+            http_code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "http://localhost:78085" 2>/dev/null) || http_code="000"
             if [[ "$http_code" =~ ^(200|401|403)$ ]]; then
                 test_pass "Web UI accessible (HTTP $http_code)"
             else

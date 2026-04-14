@@ -65,7 +65,7 @@ def print_header(text): print(f"\n{Colors.BOLD}{Colors.BLUE}{text}{Colors.ENDC}"
 class WebUIAutomationTester:
     """Automates WebUI testing using Playwright."""
     
-    def __init__(self, host='localhost', port=8085, username='admin', password='admin', headed=False):
+    def __init__(self, host='localhost', port=78085, username='admin', password='admin', headed=False):
         self.host = host
         self.port = port
         self.username = username

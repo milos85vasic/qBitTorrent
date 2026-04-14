@@ -344,7 +344,7 @@ successfully.
   from the container network. API keys for OMDb and TMDB will be
   configured via environment variables (free tier keys are sufficient).
 - The qBittorrent Web API v2 is available and accessible from the
-  download-proxy container at `localhost:18085`.
+  download-proxy container at `localhost:79085`.
 - Tracker scrape endpoints follow the standard BEP 48 protocol
   (replacing `/announce` with `/scrape`).
 - Hook scripts are stored in a configurable directory and are

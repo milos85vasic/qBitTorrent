@@ -11,10 +11,10 @@
 
 Two-container setup via `docker-compose.yml`:
 
-- **qbittorrent** (lscr.io/linuxserver/qbittorrent:latest) — port **18085**
-- **qbittorrent-proxy** (python:3.12-alpine) — ports **8085** (proxy), **8086** (merge service)
+- **qbittorrent** (lscr.io/linuxserver/qbittorrent:latest) — port **79085**
+- **qbittorrent-proxy** (python:3.12-alpine) — ports **78085** (proxy), **78086** (merge service)
 
-`webui-bridge.py` is a host process on port **8666** for private tracker downloads. Not a container.
+`webui-bridge.py` is a host process on port **78666** for private tracker downloads. Not a container.
 
 Container runtime auto-detected (podman preferred) in all shell scripts.
 
@@ -22,10 +22,10 @@ Container runtime auto-detected (podman preferred) in all shell scripts.
 
 | Port | Service | Access |
 |------|---------|--------|
-| 8085 | Download proxy → qBittorrent WebUI | `http://localhost:8085` |
-| 8086 | Merge Search Service (FastAPI) | `http://localhost:8086/` |
-| 18085 | qBittorrent WebUI (container-internal) | proxied via 8085 |
-| 8666 | webui-bridge.py (host process) | manual start |
+| 78085 | Download proxy → qBittorrent WebUI | `http://localhost:78085` |
+| 78086 | Merge Search Service (FastAPI) | `http://localhost:78086/` |
+| 79085 | qBittorrent WebUI (container-internal) | proxied via 78085 |
+| 78666 | webui-bridge.py (host process) | manual start |
 
 ## Key Commands
 
@@ -58,11 +58,11 @@ podman cp download-proxy/src/ qbittorrent-proxy:/app/src/
 
 ## Merge Search Service
 
-FastAPI app running **inside** `qbittorrent-proxy` on port **8086**.
+FastAPI app running **inside** `qbittorrent-proxy` on port **78086**.
 
 - Searches **RuTracker**, **Kinozal**, **NNMClub** in parallel with deduplication
 - Download proxy intercepts tracker URLs, fetches with auth cookies
-- Dashboard at `http://localhost:8086/`
+- Dashboard at `http://localhost:78086/`
 
 Key files:
 - `download-proxy/src/api/__init__.py` — FastAPI app setup
@@ -95,5 +95,5 @@ Key: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD`, `NNMCLUB_COOKIE
 - `run-all-tests.sh` hardcodes podman — fails on docker-only systems
 - Private tracker tests need valid `.env` credentials + sometimes CAPTCHA
 - Empty root files (`CONFIG`, `SCRIPT`, `EOF`) may be referenced — don't remove
-- `webui-bridge.py` port is 8666, not 8085
+- `webui-bridge.py` port is 78666, not 78085
 - No CI pipeline, no linter config — only `bash -n` and `py_compile` validate

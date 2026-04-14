@@ -61,7 +61,7 @@ def print_header(text): print(f"\n{Colors.BOLD}{Colors.BLUE}{text}{Colors.ENDC}"
 class QBittorrentAPI:
     """qBittorrent Web API client."""
     
-    def __init__(self, host='localhost', port=8085, username='admin', password='admin'):
+    def __init__(self, host='localhost', port=78085, username='admin', password='admin'):
         self.host = host
         self.port = port
         self.username = username

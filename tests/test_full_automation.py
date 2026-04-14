@@ -14,7 +14,7 @@ import requests
 class QBittorrentTester:
     """Main test class for qBittorrent automation"""
 
-    BASE_URL = "http://localhost:8085"
+    BASE_URL = "http://localhost:78085"
     USERNAME = "admin"
     PASSWORD = "admin"
 

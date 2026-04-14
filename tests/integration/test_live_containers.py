@@ -19,9 +19,9 @@ import urllib.error
 
 import pytest
 
-QBITTORRENT_URL = os.environ.get("QBITTORRENT_URL", "http://localhost:18085")
-PROXY_URL = os.environ.get("PROXY_URL", "http://localhost:8085")
-MERGE_URL = os.environ.get("MERGE_URL", "http://localhost:8086")
+QBITTORRENT_URL = os.environ.get("QBITTORRENT_URL", "http://localhost:79085")
+PROXY_URL = os.environ.get("PROXY_URL", "http://localhost:78085")
+MERGE_URL = os.environ.get("MERGE_URL", "http://localhost:78086")
 WEBUI_USER = os.environ.get("QBITTORRENT_USER", "admin")
 WEBUI_PASS = os.environ.get("QBITTORRENT_PASS", "admin")
 
@@ -98,7 +98,7 @@ class TestContainerRuntime:
 
 
 # ──────────────────────────────────────────────
-# qBittorrent WebUI (port 18085)
+# qBittorrent WebUI (port 79085)
 # ──────────────────────────────────────────────
 
 
@@ -135,7 +135,7 @@ class TestQbittorrentWebUI:
 
 
 # ──────────────────────────────────────────────
-# Download Proxy (port 8085)
+# Download Proxy (port 78085)
 # ──────────────────────────────────────────────
 
 
@@ -151,14 +151,14 @@ class TestDownloadProxy:
         status, body, _ = _fetch(f"{PROXY_URL}/")
         if status is None:
             pytest.skip(
-                "Download proxy on port 8085 not started (original proxy thread may have failed)"
+                "Download proxy on port 78085 not started (original proxy thread may have failed)"
             )
         assert status is not None, f"Proxy not reachable at {PROXY_URL}"
 
     def test_proxy_forwards_to_qbittorrent(self):
         status, body, _ = _fetch(f"{PROXY_URL}/")
         if status is None:
-            pytest.skip("Download proxy on port 8085 not started")
+            pytest.skip("Download proxy on port 78085 not started")
         assert status == 200, f"Proxy forward failed: status={status}"
         assert "qBittorrent" in body or "html" in body.lower(), (
             "Proxy not forwarding to qBittorrent WebUI"
@@ -187,7 +187,7 @@ class TestDownloadProxy:
 
 
 # ──────────────────────────────────────────────
-# Merge Search Service (port 8086)
+# Merge Search Service (port 78086)
 # ──────────────────────────────────────────────
 
 
@@ -264,7 +264,7 @@ class TestContainerEnvironment:
 
     def test_proxy_port_env(self):
         r = _exec("qbittorrent-proxy", "echo $PROXY_PORT")
-        assert r.stdout.strip() in ("8085", ""), (
+        assert r.stdout.strip() in ("78085", ""), (
             f"PROXY_PORT unexpected: {r.stdout.strip()}"
         )
 
@@ -272,8 +272,8 @@ class TestContainerEnvironment:
         r = _exec("qbittorrent-proxy", "echo $MERGE_SERVICE_PORT")
         port = r.stdout.strip()
         if not port:
-            pytest.skip("MERGE_SERVICE_PORT not explicitly set (uses default 8086)")
-        assert port == "8086", f"MERGE_SERVICE_PORT is: {port}"
+            pytest.skip("MERGE_SERVICE_PORT not explicitly set (uses default 78086)")
+        assert port == "78086", f"MERGE_SERVICE_PORT is: {port}"
 
     def test_shared_tmp_mount(self):
         r = _exec("qbittorrent-proxy", "ls -la /shared-tmp/ 2>/dev/null || true")

@@ -12,9 +12,7 @@ import sys
 import threading
 import logging
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +42,7 @@ def start_fastapi_server():
         from api import app
 
         # Configure uvicorn
-        merge_port = int(os.environ.get("MERGE_SERVICE_PORT", "8086"))
+        merge_port = int(os.environ.get("MERGE_SERVICE_PORT", "78086"))
         config = uvicorn.Config(
             app,
             host="0.0.0.0",

@@ -14,7 +14,7 @@ Users were unable to download any torrent opened from a `.torrent` file through 
 
 ## Root Cause
 
-The `download_proxy.py` proxy server (sitting in front of qBittorrent on port 8085) attempted to decode **all** POST request bodies to `/api/v2/torrents/add` as UTF-8 text at line 101:
+The `download_proxy.py` proxy server (sitting in front of qBittorrent on port 78085) attempted to decode **all** POST request bodies to `/api/v2/torrents/add` as UTF-8 text at line 101:
 
 ```python
 body_str = body.decode("utf-8")
@@ -44,11 +44,11 @@ Search plugin downloads go through a different code path (`nova2dl.py`) that the
 User Browser
     |
     v
-:8085  download_proxy.py (Python HTTP proxy)
+:78085  download_proxy.py (Python HTTP proxy)
     |       - Intercepts RuTracker URLs -> downloads via nova2dl.py
     |       - Passes through all other requests
     v
-:18085 qBittorrent WebUI (native)
+:79085 qBittorrent WebUI (native)
 ```
 
 The proxy exists to handle RuTracker authentication for torrent downloads. It intercepts all API requests but should pass through non-RuTracker traffic unchanged.
@@ -131,8 +131,8 @@ Located in: `tests/test_torrents/`
 ### Test Classes
 
 #### TestProxyInfrastructure (5 tests)
-- qBittorrent direct accessibility (port 18085)
-- Proxy accessibility (port 8085)
+- qBittorrent direct accessibility (port 79085)
+- Proxy accessibility (port 78085)
 - Version match through proxy
 - Transfer info passthrough
 - Local torrent file availability
@@ -182,16 +182,16 @@ Tests verified on freshly restarted containers (full stop/start cycle).
 ## Deployment
 
 Containers restarted and verified:
-- `qbittorrent` - qBittorrent v5.1.4-r2-ls444 on port 18085
-- `qbittorrent-proxy` - Python proxy on port 8085
+- `qbittorrent` - qBittorrent v5.1.4-r2-ls444 on port 79085
+- `qbittorrent-proxy` - Python proxy on port 78085
 
 ### Manual Testing
 
-The WebUI is now available at: **http://localhost:8085**  
+The WebUI is now available at: **http://localhost:78085**  
 Credentials: `admin` / `admin`
 
 To manually verify:
-1. Open http://localhost:8085 in browser
+1. Open http://localhost:78085 in browser
 2. Login with admin/admin
 3. Click the "+" icon or drag a `.torrent` file onto the window
 4. Set a destination path (e.g., `/downloads/`)

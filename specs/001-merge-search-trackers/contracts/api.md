@@ -4,7 +4,7 @@
 
 The merge search feature exposes a new API endpoint on the download-proxy service. All endpoints return JSON unless otherwise specified.
 
-**Base URL**: `http://localhost:8085/api/merge/v1`
+**Base URL**: `http://localhost:78085/api/merge/v1`
 
 ## Authentication
 

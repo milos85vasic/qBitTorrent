@@ -10,7 +10,7 @@ import requests
 from datetime import datetime
 from playwright.sync_api import sync_playwright, Page
 
-BASE_URL = "http://localhost:8085"
+BASE_URL = "http://localhost:78085"
 USERNAME = "admin"
 PASSWORD = "admin"
 SCREENSHOT_DIR = "/tmp/qb_screenshots"

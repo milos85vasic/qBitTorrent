@@ -23,8 +23,8 @@ import urllib.parse
 
 # Configuration
 QBITTORRENT_HOST = os.environ.get("QBITTORRENT_HOST", "localhost")
-QBITTORRENT_PORT = int(os.environ.get("QBITTORRENT_PORT", "18085"))
-BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "8666"))
+QBITTORRENT_PORT = int(os.environ.get("QBITTORRENT_PORT", "79085"))
+BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "78666"))
 
 # Private tracker URL patterns
 PRIVATE_TRACKERS = {
@@ -145,9 +145,7 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
 
             body = []
             body.append(f"------{boundary}".encode())
-            body.append(
-                b'Content-Disposition: form-data; name="torrents"; filename="torrent.torrent"'
-            )
+            body.append(b'Content-Disposition: form-data; name="torrents"; filename="torrent.torrent"')
             body.append(b"Content-Type: application/x-bittorrent")
             body.append(b"")
             body.append(file_data)

@@ -3,7 +3,7 @@ IPTorrents integration tests — freeleech detection, search, and download.
 
 Requires:
   - IPTORRENTS_USERNAME and IPTORRENTS_PASSWORD in .env
-  - qbittorrent-proxy container running (merge service on 8086)
+  - qbittorrent-proxy container running (merge service on 78086)
 
 Run:
     python3 -m pytest tests/integration/test_iptorrents.py -v --import-mode=importlib
@@ -20,7 +20,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-MERGE_URL = os.environ.get("MERGE_URL", "http://localhost:8086")
+MERGE_URL = os.environ.get("MERGE_URL", "http://localhost:78086")
 
 
 def _fetch(

@@ -12,27 +12,27 @@ Two-container setup via `docker-compose.yml` (both `network_mode: host`):
 
 | Container | Image | Ports | Purpose |
 |-----------|-------|-------|---------|
-| **qbittorrent** | `lscr.io/linuxserver/qbittorrent:latest` | 18085 | qBittorrent WebUI |
-| **qbittorrent-proxy** | `python:3.12-alpine` | 8085, 8086 | Download proxy + Merge Search Service |
+| **qbittorrent** | `lscr.io/linuxserver/qbittorrent:latest` | 79085 | qBittorrent WebUI |
+| **qbittorrent-proxy** | `python:3.12-alpine` | 78085, 78086 | Download proxy + Merge Search Service |
 
 **Port map:**
 
 | Port | Service | Where |
 |------|---------|-------|
-| 18085 | qBittorrent WebUI | qbittorrent container |
-| 8085 | Download proxy | qbittorrent-proxy container |
-| 8086 | Merge Search Service (FastAPI) | qbittorrent-proxy container |
-| 8666 | webui-bridge | Host process (run manually) |
+| 79085 | qBittorrent WebUI | qbittorrent container |
+| 78085 | Download proxy | qbittorrent-proxy container |
+| 78086 | Merge Search Service (FastAPI) | qbittorrent-proxy container |
+| 78666 | webui-bridge | Host process (run manually) |
 
-Users access `http://localhost:8085` (proxy → qBittorrent on 18085).
-Merge Search dashboard at `http://localhost:8086/`.
+Users access `http://localhost:78085` (proxy → qBittorrent on 79085).
+Merge Search dashboard at `http://localhost:78086/`.
 `webui-bridge.py` is a **separate host process** — run manually: `python3 webui-bridge.py`.
 
 Container runtime is **auto-detected** (podman preferred over docker) in all shell scripts.
 
 ## Merge Search Service
 
-FastAPI application in `download-proxy/src/api/`. Runs inside the qbittorrent-proxy container on port 8086.
+FastAPI application in `download-proxy/src/api/`. Runs inside the qbittorrent-proxy container on port 78086.
 
 ### Source Structure
 
@@ -163,7 +163,7 @@ Loaded in priority order (first wins): shell env → `./.env` → `~/.qbit.env` 
 
 Key variables: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD`, `NNMCLUB_COOKIES`, `IPTORRENTS_USERNAME/PASSWORD`, `QBITTORRENT_DATA_DIR` (default `/mnt/DATA`), `PUID/PGID` (default `1000`).
 
-Merge service also uses: `MERGE_SERVICE_PORT` (default 8086), `PROXY_PORT` (default 8085).
+Merge service also uses: `MERGE_SERVICE_PORT` (default 78086), `PROXY_PORT` (default 78085).
 
 ### Credentials for Merge Service Trackers
 
@@ -182,7 +182,7 @@ Merge service also uses: `MERGE_SERVICE_PORT` (default 8086), `PROXY_PORT` (defa
 - **Kinozal/NNMClub need credentials in `.env`** — `KINOZAL_USERNAME/PASSWORD` and `NNMCLUB_COOKIES` are required for live testing.
 - `.ruff_cache/` is **not in `.gitignore`** — it should be.
 - Several empty root files exist (`CONFIG`, `SCRIPT`, `EOF`) — do not remove, they may be referenced.
-- `webui-bridge.py` default port is 8666, not 8085 or 18085.
+- `webui-bridge.py` default port is 78666, not 78085 or 79085.
 - The proxy container runs `start-proxy.sh` which installs `requests` at startup.
 - Plugin install destination: `config/qBittorrent/nova3/engines/` (not `plugins/`).
 - The merge service hooks file is at `/config/download-proxy/hooks.json` inside the container.

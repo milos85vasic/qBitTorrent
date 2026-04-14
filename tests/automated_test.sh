@@ -7,7 +7,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-BASE_URL="http://localhost:8085"
+BASE_URL="http://localhost:78085"
 COOKIE_FILE="/tmp/qb_test_cookies.txt"
 FAILED=0
 

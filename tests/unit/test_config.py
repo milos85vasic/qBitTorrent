@@ -15,10 +15,10 @@ class TestEnvConfig:
         with patch.dict(os.environ, {}, clear=True):
             config = load_env()
             assert config.qbittorrent_host == "localhost"
-            assert config.qbittorrent_port == 18085
+            assert config.qbittorrent_port == 79085
             assert config.qbittorrent_username == "admin"
             assert config.qbittorrent_password == "admin"
-            assert config.proxy_port == 8085
+            assert config.proxy_port == 78085
             assert config.log_level == "INFO"
 
     def test_explicit_user_pass_vars(self):

@@ -49,16 +49,12 @@ def load_env() -> EnvConfig:
 
     # qBittorrent settings
     qbittorrent_host = os.environ.get("QBITTORRENT_HOST", "localhost")
-    qbittorrent_port = int(os.environ.get("QBITTORRENT_PORT", "18085"))
-    qbittorrent_username = os.environ.get(
-        "QBITTORRENT_USER", os.environ.get("QBITTORRENT_USERNAME", "admin")
-    )
-    qbittorrent_password = os.environ.get(
-        "QBITTORRENT_PASS", os.environ.get("QBITTORRENT_PASSWORD", "admin")
-    )
+    qbittorrent_port = int(os.environ.get("QBITTORRENT_PORT", "79085"))
+    qbittorrent_username = os.environ.get("QBITTORRENT_USER", os.environ.get("QBITTORRENT_USERNAME", "admin"))
+    qbittorrent_password = os.environ.get("QBITTORRENT_PASS", os.environ.get("QBITTORRENT_PASSWORD", "admin"))
 
     # Service settings
-    proxy_port = int(os.environ.get("PROXY_PORT", "8085"))
+    proxy_port = int(os.environ.get("PROXY_PORT", "78085"))
     log_level = os.environ.get("LOG_LEVEL", "INFO")
 
     # Metadata API keys
@@ -94,9 +90,7 @@ def load_env() -> EnvConfig:
         iptorrents_password=iptorrents_password,
     )
 
-    logger.info(
-        f"Loaded configuration for qBittorrent at {qbittorrent_host}:{qbittorrent_port}"
-    )
+    logger.info(f"Loaded configuration for qBittorrent at {qbittorrent_host}:{qbittorrent_port}")
 
     return config
 

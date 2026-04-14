@@ -18,8 +18,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 QBITTORRENT_HOST = os.environ.get("QBITTORRENT_HOST", "localhost")
-QBITTORRENT_PORT = os.environ.get("QBITTORRENT_PORT", "18085")
-PROXY_PORT = int(os.environ.get("PROXY_PORT", "8085"))
+QBITTORRENT_PORT = os.environ.get("QBITTORRENT_PORT", "79085")
+PROXY_PORT = int(os.environ.get("PROXY_PORT", "78085"))
 
 PLUGIN_PATTERNS = {
     "rutracker": [r"rutracker\.org", r"rutracker\.net", r"rutracker\.nl"],

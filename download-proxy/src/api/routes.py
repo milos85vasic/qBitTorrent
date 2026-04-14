@@ -38,9 +38,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., description="Search query", min_length=1)
     category: str = Field(default="all", description="Category filter")
     limit: int = Field(default=50, description="Maximum results", ge=1, le=100)
-    enable_metadata: bool = Field(
-        default=True, description="Enable metadata enrichment"
-    )
+    enable_metadata: bool = Field(default=True, description="Enable metadata enrichment")
     validate_trackers: bool = Field(default=True, description="Validate tracker health")
 
 
@@ -149,10 +147,7 @@ async def search(request: SearchRequest, req: Request):
         if not best:
             continue
         resp = _to_response(best)
-        resp.sources = [
-            {"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers}
-            for r in m.original_results
-        ]
+        resp.sources = [{"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers} for r in m.original_results]
         resp.download_urls = list(dict.fromkeys(r.link for r in m.original_results))
         resp.seeds = m.total_seeds
         resp.leechers = m.total_leechers
@@ -196,9 +191,7 @@ async def search(request: SearchRequest, req: Request):
                 "errors": metadata.errors,
                 "message": "RuTracker requires CAPTCHA. Use /api/v1/auth/rutracker/captcha to solve it.",
                 "started_at": metadata.started_at.isoformat(),
-                "completed_at": metadata.completed_at.isoformat()
-                if metadata.completed_at
-                else None,
+                "completed_at": metadata.completed_at.isoformat() if metadata.completed_at else None,
             },
         )
 
@@ -211,9 +204,7 @@ async def search(request: SearchRequest, req: Request):
         merged_results=len(merged),
         trackers_searched=metadata.trackers_searched,
         started_at=metadata.started_at.isoformat(),
-        completed_at=metadata.completed_at.isoformat()
-        if metadata.completed_at
-        else None,
+        completed_at=metadata.completed_at.isoformat() if metadata.completed_at else None,
     )
 
     await dispatch_event(
@@ -236,9 +227,7 @@ async def search_stream(search_id: str, req: Request):
     from .streaming import SSEHandler
 
     orch = _get_orchestrator(req)
-    return SSEHandler.create_streaming_response(
-        SSEHandler.search_results_stream(search_id, orch)
-    )
+    return SSEHandler.create_streaming_response(SSEHandler.search_results_stream(search_id, orch))
 
 
 @router.get("/search/{search_id}", response_model=SearchResponse)
@@ -256,9 +245,7 @@ async def get_search(search_id: str, req: Request):
         merged_results=metadata.merged_results,
         trackers_searched=metadata.trackers_searched,
         started_at=metadata.started_at.isoformat(),
-        completed_at=metadata.completed_at.isoformat()
-        if metadata.completed_at
-        else None,
+        completed_at=metadata.completed_at.isoformat() if metadata.completed_at else None,
     )
 
 
@@ -266,7 +253,7 @@ async def get_search(search_id: str, req: Request):
 async def get_active_downloads():
     import aiohttp
 
-    qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:18085")
+    qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:79085")
     qbit_user = os.getenv("QBITTORRENT_USER", "admin")
     qbit_pass = os.getenv("QBITTORRENT_PASS", "admin")
 
@@ -280,9 +267,7 @@ async def get_active_downloads():
                     return {"downloads": [], "count": 0, "error": "auth failed"}
                 cookies = resp.cookies
 
-            async with session.get(
-                f"{qbit_url}/api/v2/torrents/info", cookies=cookies
-            ) as resp:
+            async with session.get(f"{qbit_url}/api/v2/torrents/info", cookies=cookies) as resp:
                 if resp.status == 200:
                     torrents = await resp.json()
                     downloads = []
@@ -355,7 +340,7 @@ async def initiate_download(request: DownloadRequest, req: Request):
             "url_count": len(request.download_urls),
         },
     )
-    qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:18085")
+    qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:79085")
     qbit_user = os.getenv("QBITTORRENT_USER", "admin")
     qbit_pass = os.getenv("QBITTORRENT_PASS", "admin")
 
@@ -390,9 +375,7 @@ async def initiate_download(request: DownloadRequest, req: Request):
                                 }
                             )
                             continue
-                        with tempfile.NamedTemporaryFile(
-                            suffix=".torrent", delete=False
-                        ) as tmp:
+                        with tempfile.NamedTemporaryFile(suffix=".torrent", delete=False) as tmp:
                             tmp.write(torrent_data)
                             tmp_path = tmp.name
                         try:

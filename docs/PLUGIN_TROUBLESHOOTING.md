@@ -259,11 +259,11 @@ docker logs -f qbittorrent
 ```bash
 # Get list of installed plugins
 curl -X POST \
-  http://localhost:8085/api/v2/auth/login \
+  http://localhost:78085/api/v2/auth/login \
   -d "username=admin&password=admin"
 
 curl -X GET \
-  http://localhost:8085/api/v2/search/plugins \
+  http://localhost:78085/api/v2/search/plugins \
   -b "SID=your_session_id"
 ```
 

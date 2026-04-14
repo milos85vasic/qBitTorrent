@@ -9,10 +9,10 @@
 
 ## Features
 
-- **Merge Search Service** — FastAPI service (port 8086) that searches multiple trackers simultaneously, deduplicates results, and proxies authenticated downloads
+- **Merge Search Service** — FastAPI service (port 78086) that searches multiple trackers simultaneously, deduplicates results, and proxies authenticated downloads
 - **35+ Search Plugins** — Public, private, and specialized tracker plugins
 - **WebUI Download Fix** — Private tracker downloads work through the proxy bridge
-- **Dark Theme Dashboard** — Search UI at `http://localhost:8086/`
+- **Dark Theme Dashboard** — Search UI at `http://localhost:78086/`
 - **SSE Streaming** — Real-time search results as they arrive from each tracker
 - **Hook System** — Configure webhooks triggered on search/download events
 - **119 Tests Passing** — HTML parsers, API endpoints, quality detection, deduplication, hooks, validator, enricher
@@ -27,8 +27,8 @@ cp .env.example .env
 ./setup.sh
 ./start.sh -p
 # Access:
-#   qBittorrent WebUI:   http://localhost:8085
-#   Merge Search + UI:   http://localhost:8086/
+#   qBittorrent WebUI:   http://localhost:78085
+#   Merge Search + UI:   http://localhost:78086/
 #   webui-bridge (host): python3 webui-bridge.py
 # Login: admin / admin
 ```
@@ -39,11 +39,11 @@ cp .env.example .env
                          ┌─────────────────────────┐
                          │      qbittorrent-proxy   │
                          │    (python:3.12-alpine)   │
-  http://localhost:8085  │                           │
-  ──────────────────────►│  Download Proxy (:8085)   │────► qBittorrent (:18085)
+  http://localhost:78085  │                           │
+  ──────────────────────►│  Download Proxy (:78085)   │────► qBittorrent (:79085)
                          │                           │
-  http://localhost:8086  │  Merge Search Service     │
-  ──────────────────────►│  (FastAPI :8086)          │────► RuTracker / Kinozal / NNMClub
+  http://localhost:78086  │  Merge Search Service     │
+  ──────────────────────►│  (FastAPI :78086)          │────► RuTracker / Kinozal / NNMClub
                          │                           │
                          │  ┌─ download-proxy/src/ ─┐│
                          │  │  api/    merge_service/ ││
@@ -52,21 +52,21 @@ cp .env.example .env
                          └─────────────────────────┘
 
   Host process:
-  python3 webui-bridge.py  (:8666)  — private tracker WebUI download support
+  python3 webui-bridge.py  (:78666)  — private tracker WebUI download support
 ```
 
 Two containers via `docker-compose.yml` (both use `network_mode: host`):
 
 | Service | Image | Ports | Purpose |
 |---------|-------|-------|---------|
-| **qbittorrent** | `lscr.io/linuxserver/qbittorrent:latest` | 18085 | The qBittorrent app |
-| **download-proxy** | `python:3.12-alpine` | 8085, 8086 | Download proxy + Merge Search API |
+| **qbittorrent** | `lscr.io/linuxserver/qbittorrent:latest` | 79085 | The qBittorrent app |
+| **download-proxy** | `python:3.12-alpine` | 78085, 78086 | Download proxy + Merge Search API |
 
 Container runtime is auto-detected (podman preferred over docker).
 
 ## Merge Search API
 
-The merge service runs inside `qbittorrent-proxy` on port **8086**.
+The merge service runs inside `qbittorrent-proxy` on port **78086**.
 
 ### Key Endpoints
 

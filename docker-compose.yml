@@ -7,7 +7,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Moscow
-      - WEBUI_PORT=18085
+      - WEBUI_PORT=79085
       - WEBUI_USERNAME=admin
       - WEBUI_PASSWORD=admin
       - RUTRACKER_USERNAME=${RUTRACKER_USERNAME}
@@ -25,12 +25,12 @@ services:
     container_name: qbittorrent-proxy
     environment:
       - QBITTORRENT_HOST=localhost
-      - QBITTORRENT_PORT=18085
-      - QBITTORRENT_URL=http://localhost:18085
+      - QBITTORRENT_PORT=79085
+      - QBITTORRENT_URL=http://localhost:79085
       - QBITTORRENT_USER=admin
       - QBITTORRENT_PASS=admin
-      - PROXY_PORT=8085
-      - MERGE_SERVICE_PORT=8086
+      - PROXY_PORT=78085
+      - MERGE_SERVICE_PORT=78086
       - TMPDIR=/shared-tmp
       - RUTRACKER_USERNAME=${RUTRACKER_USERNAME}
       - RUTRACKER_PASSWORD=${RUTRACKER_PASSWORD}

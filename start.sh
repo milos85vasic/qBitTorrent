@@ -193,7 +193,7 @@ General\UseRandomPort=true
 General\ExitCheckDownloads=true
 
 WebUI\Enabled=true
-WebUI\Port=${WEBUI_PORT:-18085}
+WebUI\Port=${WEBUI_PORT:-79085}
 WebUI\Address=*
 WebUI\Username=admin
 WebUI\Password_PBKDF2="@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)"
@@ -342,7 +342,7 @@ show_status() {
     print_info "Container Status:"
     $COMPOSE_CMD ps
     echo ""
-    print_success "qBitTorrent Web UI: http://localhost:${WEBUI_PORT:-18085}"
+    print_success "qBitTorrent Web UI: http://localhost:${WEBUI_PORT:-79085}"
     print_info "Default credentials: admin / admin"
     print_warning "Remember to change the default password!"
     echo ""

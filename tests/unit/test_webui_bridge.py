@@ -62,7 +62,7 @@ class TestIdentifyPlugin:
 
 class TestDefaultPorts:
     def test_bridge_port(self):
-        assert BRIDGE_PORT == 8666
+        assert BRIDGE_PORT == 78666
 
     def test_qbittorrent_port(self):
-        assert QBITTORRENT_PORT == 18085
+        assert QBITTORRENT_PORT == 79085

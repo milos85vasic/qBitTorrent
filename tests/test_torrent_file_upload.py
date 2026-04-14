@@ -3,7 +3,7 @@
 Comprehensive test suite for .torrent file upload fix.
 
 Verifies that .torrent files can be uploaded through the download proxy
-(port 8085) to qBittorrent (port 18085).
+(port 78085) to qBittorrent (port 79085).
 
 Root cause: download_proxy.py tried to decode multipart/form-data body
 (containing binary torrent data) as UTF-8, causing UnicodeDecodeError.
@@ -38,8 +38,8 @@ try:
 except ImportError:
     HAS_REQUESTS = False
 
-PROXY_URL = "http://localhost:8085"
-QBIT_URL = "http://localhost:18085"
+PROXY_URL = "http://localhost:78085"
+QBIT_URL = "http://localhost:79085"
 USERNAME = "admin"
 PASSWORD = "admin"
 
