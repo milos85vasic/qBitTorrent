@@ -114,18 +114,45 @@ cleanup_stale_config() {
     fi
 }
 
+_ensure_webui_credentials() {
+    local config_file="$1"
+
+    if [[ ! -f "$config_file" ]]; then
+        return 1
+    fi
+
+    if ! grep -q "^WebUI\\\\Username=admin$" "$config_file" 2>/dev/null; then
+        print_info "Ensuring WebUI credentials in: $config_file"
+        if grep -q "^WebUI\\\\Username=" "$config_file" 2>/dev/null; then
+            sed -i 's/^WebUI\\Username=.*/WebUI\\Username=admin/' "$config_file"
+        else
+            echo "WebUI\\Username=admin" >> "$config_file"
+        fi
+    fi
+
+    local pbkdf2_hash='@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)'
+    if ! grep -q "XGCniD5hOQPEcE510BED2Q" "$config_file" 2>/dev/null; then
+        if grep -q "^WebUI\\\\Password_PBKDF2=" "$config_file" 2>/dev/null; then
+            sed -i "s|^WebUI\\\\Password_PBKDF2=.*|WebUI\\\\Password_PBKDF2=${pbkdf2_hash}|" "$config_file"
+        else
+            echo "WebUI\\Password_PBKDF2=${pbkdf2_hash}" >> "$config_file"
+        fi
+    fi
+}
+
 update_qbittorrent_config() {
-    local config_file="$SCRIPT_DIR/config/qBittorrent/config/qBittorrent.conf"
+    local template_config="$SCRIPT_DIR/config/qBittorrent/config/qBittorrent.conf"
+    local active_config="$SCRIPT_DIR/config/qBittorrent/qBittorrent.conf"
     local config_dir
-    config_dir=$(dirname "$config_file")
-    
+    config_dir=$(dirname "$template_config")
+
     if [[ ! -d "$config_dir" ]]; then
         mkdir -p "$config_dir"
     fi
-    
-    if [[ ! -f "$config_file" ]]; then
+
+    if [[ ! -f "$template_config" ]]; then
         print_info "Creating default qBittorrent configuration..."
-        cat > "$config_file" << 'EOF'
+        cat > "$template_config" << 'EOF'
 [LegalNotice]
 Accepted=true
 
@@ -186,7 +213,10 @@ Search\PluginManager\Enabled=true
 EOF
         print_success "Default configuration created"
     fi
-    
+
+    _ensure_webui_credentials "$template_config"
+    _ensure_webui_credentials "$active_config"
+
     print_success "qBittorrent configuration ready"
 }
 
