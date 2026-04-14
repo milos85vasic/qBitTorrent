@@ -26,16 +26,28 @@ async def lifespan(app: FastAPI):
 
     from merge_service.search import SearchOrchestrator
     from merge_service.validator import TrackerValidator
+    from merge_service.enricher import MetadataEnricher
+    from merge_service.scheduler import Scheduler
 
     app.state.search_orchestrator = SearchOrchestrator()
     app.state.validator = TrackerValidator()
+    app.state.enricher = MetadataEnricher()
     orchestrator_instance = app.state.search_orchestrator
+
+    app.state.scheduler = Scheduler()
+    await app.state.scheduler.load()
+    app.state.scheduler.set_search_callback(
+        lambda q, c: app.state.search_orchestrator.search(query=q, category=c)
+    )
+    await app.state.scheduler.start()
 
     logger.info("Merge Service API started")
 
     yield
 
-    logger.info("Shutting down Merge Service API...")
+    await app.state.scheduler.stop()
+    if hasattr(app.state, "validator") and app.state.validator:
+        await app.state.validator.close()
     logger.info("Merge Service API stopped")
 
 
@@ -117,7 +129,9 @@ async def stats():
 from .routes import router as api_router
 from .hooks import router as hooks_router
 from .auth import router as auth_router
+from .scheduler import router as scheduler_router
 
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(hooks_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(scheduler_router, prefix="/api/v1/schedules")

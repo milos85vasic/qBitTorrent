@@ -54,27 +54,38 @@ class iptorrents(object):
     def _load_env_file(self):
         if self.username and self.password:
             return
-        for env_path in [
-            os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"),
-            os.path.expanduser("~/.qbit.env"),
-        ]:
-            env_path = os.path.normpath(env_path)
-            if not os.path.isfile(env_path):
-                continue
-            try:
-                with open(env_path) as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line or line.startswith("#") or "=" not in line:
-                            continue
-                        k, v = line.split("=", 1)
-                        k, v = k.strip(), v.strip().strip('"').strip("'")
-                        if k == "IPTORRENTS_USERNAME" and not self.username:
-                            self.username = v
-                        elif k == "IPTORRENTS_PASSWORD" and not self.password:
-                            self.password = v
-            except Exception:
-                pass
+        try:
+            from env_loader import load_env_files
+
+            load_env_files()
+            self.username = os.environ.get("IPTORRENTS_USERNAME", "") or os.environ.get(
+                "IPTORRENTS_USER", ""
+            )
+            self.password = os.environ.get("IPTORRENTS_PASSWORD", "") or os.environ.get(
+                "IPTORRENTS_PASS", ""
+            )
+        except ImportError:
+            for env_path in [
+                os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"),
+                os.path.expanduser("~/.qbit.env"),
+            ]:
+                env_path = os.path.normpath(env_path)
+                if not os.path.isfile(env_path):
+                    continue
+                try:
+                    with open(env_path) as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line or line.startswith("#") or "=" not in line:
+                                continue
+                            k, v = line.split("=", 1)
+                            k, v = k.strip(), v.strip().strip('"').strip("'")
+                            if k == "IPTORRENTS_USERNAME" and not self.username:
+                                self.username = v
+                            elif k == "IPTORRENTS_PASSWORD" and not self.password:
+                                self.password = v
+                except Exception:
+                    pass
 
     def _login(self):
         if not self.username or not self.password:

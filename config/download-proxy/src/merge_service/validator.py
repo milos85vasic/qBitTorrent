@@ -54,7 +54,7 @@ class TrackerValidator:
 
     def __init__(self):
         self._session: Optional[aiohttp.ClientSession] = None
-        self._cache: Dict[str, ScrapeResult] = {}
+        self._cache: Dict[str, tuple] = {}
         self._cache_ttl = 300  # 5 minutes
 
     async def _get_session(self) -> Optional[aiohttp.ClientSession]:
@@ -92,8 +92,7 @@ class TrackerValidator:
 
         result.scrape_time_ms = int((time.time() - start_time) * 1000)
 
-        # Cache the result
-        self._cache[tracker_url] = result
+        self._cache[tracker_url] = (time.time(), result)
 
         return result
 
@@ -161,14 +160,145 @@ class TrackerValidator:
             )
 
     async def _udp_scrape(self, tracker_url: str) -> ScrapeResult:
-        """Perform UDP scrape (BEP 15) - placeholder for UDP implementation."""
-        # UDP scrape requires socket operations
-        # For now, return offline as fallback already tried HTTP
-        return ScrapeResult(
-            tracker=tracker_url,
-            status=TrackerStatus.OFFLINE,
-            error="UDP scrape not implemented",
-        )
+        """Perform UDP scrape (BEP 15)."""
+        import struct
+        import random
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(tracker_url)
+            host = parsed.hostname
+            port = parsed.port or 80
+
+            if not host:
+                return ScrapeResult(
+                    tracker=tracker_url,
+                    status=TrackerStatus.OFFLINE,
+                    error="Invalid tracker URL",
+                )
+
+            loop = asyncio.get_event_loop()
+
+            class UDPProtocol(asyncio.DatagramProtocol):
+                def __init__(self):
+                    self.response_future = loop.create_future()
+                    self.transport = None
+
+                def connection_made(self, transport):
+                    self.transport = transport
+
+                def datagram_received(self, data, addr):
+                    if not self.response_future.done():
+                        self.response_future.set_result(data)
+
+                def error_received(self, exc):
+                    if not self.response_future.done():
+                        self.response_future.set_exception(exc)
+
+                def connection_lost(self, exc):
+                    if not self.response_future.done():
+                        self.response_future.set_exception(
+                            exc or asyncio.TimeoutError()
+                        )
+
+            transport, protocol = await asyncio.wait_for(
+                loop.create_datagram_endpoint(UDPProtocol, remote_addr=(host, port)),
+                timeout=self.UDP_TIMEOUT,
+            )
+
+            try:
+                connect_id = 0x41727101980
+                action = 0
+                transaction_id = random.randint(0, 0x7FFFFFFF)
+
+                connect_req = struct.pack("!qii", connect_id, action, transaction_id)
+                transport.sendto(connect_req)
+
+                connect_resp = await asyncio.wait_for(
+                    protocol.response_future, timeout=self.UDP_TIMEOUT
+                )
+
+                if len(connect_resp) < 16:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.OFFLINE,
+                        error="UDP connect response too short",
+                    )
+
+                resp_action, resp_tid, conn_id = struct.unpack(
+                    "!iiq", connect_resp[:16]
+                )
+
+                if resp_action != 0 or resp_tid != transaction_id:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.OFFLINE,
+                        error="UDP connect handshake failed",
+                    )
+
+                info_hash = parsed.query
+                if not info_hash:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.HEALTHY,
+                        seeds=0,
+                        leechers=0,
+                    )
+
+                scrape_action = 2
+                scrape_tid = random.randint(0, 0x7FFFFFFF)
+
+                try:
+                    ih_bytes = bytes.fromhex(info_hash[:40])
+                except ValueError:
+                    ih_bytes = info_hash.encode()[:20]
+
+                scrape_req = struct.pack("!qii", conn_id, scrape_action, scrape_tid)
+                scrape_req += ih_bytes
+
+                protocol.response_future = loop.create_future()
+                transport.sendto(scrape_req)
+
+                scrape_resp = await asyncio.wait_for(
+                    protocol.response_future, timeout=self.UDP_TIMEOUT
+                )
+
+                if len(scrape_resp) < 20:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.OFFLINE,
+                        error="UDP scrape response too short",
+                    )
+
+                s_action, s_tid = struct.unpack("!ii", scrape_resp[:8])
+                if s_action == 3:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.OFFLINE,
+                        error="UDP scrape error from tracker",
+                    )
+
+                seeders, completed, leechers = struct.unpack("!iii", scrape_resp[8:20])
+
+                return ScrapeResult(
+                    tracker=tracker_url,
+                    status=TrackerStatus.HEALTHY,
+                    seeds=seeders,
+                    leechers=leechers,
+                    complete=completed,
+                )
+
+            finally:
+                transport.close()
+
+        except asyncio.TimeoutError:
+            return ScrapeResult(
+                tracker=tracker_url, status=TrackerStatus.OFFLINE, error="UDP timeout"
+            )
+        except Exception as e:
+            return ScrapeResult(
+                tracker=tracker_url, status=TrackerStatus.OFFLINE, error=str(e)
+            )
 
     def _announce_to_scrape(self, announce_url: str) -> Optional[str]:
         """Convert announce URL to scrape URL."""
@@ -188,18 +318,55 @@ class TrackerValidator:
         return None
 
     def _parse_bencoded(self, data: bytes) -> dict:
-        """Simple bencode parser for scrape responses."""
-        # This is a simplified parser - in production use proper bencode library
-        # For now, return empty dict if parsing fails
+        """Parse bencoded data (BEP 03) for scrape responses."""
         try:
-            import bencode  # If available
+            result, _ = self._decode_benc(data, 0)
+            return result if isinstance(result, dict) else {}
+        except Exception:
+            return {}
 
-            return bencode.decode(data)
-        except:
-            pass
+    def _decode_benc(self, data: bytes, pos: int):
+        """Recursively decode bencoded bytes starting at pos."""
+        if pos >= len(data):
+            raise ValueError("Unexpected end of data")
+        ch = data[pos : pos + 1]
+        if ch == b"d":
+            return self._decode_dict(data, pos)
+        elif ch == b"l":
+            return self._decode_list(data, pos)
+        elif ch == b"i":
+            return self._decode_int(data, pos)
+        elif ch.isdigit():
+            return self._decode_string(data, pos)
+        raise ValueError(f"Invalid bencode char at {pos}: {ch}")
 
-        # Fallback: return empty dict
-        return {}
+    def _decode_dict(self, data: bytes, pos: int):
+        pos += 1
+        result = {}
+        while data[pos : pos + 1] != b"e":
+            key, pos = self._decode_string(data, pos)
+            val, pos = self._decode_benc(data, pos)
+            result[key] = val
+        return result, pos + 1
+
+    def _decode_list(self, data: bytes, pos: int):
+        pos += 1
+        result = []
+        while data[pos : pos + 1] != b"e":
+            val, pos = self._decode_benc(data, pos)
+            result.append(val)
+        return result, pos + 1
+
+    def _decode_int(self, data: bytes, pos: int):
+        pos += 1
+        end = data.index(b"e", pos)
+        return int(data[pos:end]), end + 1
+
+    def _decode_string(self, data: bytes, pos: int):
+        colon = data.index(b":", pos)
+        length = int(data[pos:colon])
+        start = colon + 1
+        return data[start : start + length], start + length
 
     async def validate_multiple(self, tracker_urls: List[str]) -> List[ScrapeResult]:
         """Validate multiple trackers concurrently."""
@@ -207,9 +374,13 @@ class TrackerValidator:
         return await asyncio.gather(*tasks)
 
     def get_cached_result(self, tracker_url: str) -> Optional[ScrapeResult]:
-        """Get cached scrape result if still valid."""
-        result = self._cache.get(tracker_url)
-        if result:
-            # For now, always return cached (could add TTL checking)
-            return result
+        """Get cached scrape result if still within TTL."""
+        import time
+
+        entry = self._cache.get(tracker_url)
+        if entry:
+            cached_time, result = entry
+            if time.time() - cached_time < self._cache_ttl:
+                return result
+            del self._cache[tracker_url]
         return None

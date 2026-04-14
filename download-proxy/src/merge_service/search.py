@@ -188,25 +188,30 @@ class SearchOrchestrator:
         self._last_merged_results: Dict[str, tuple] = {}
 
     def _load_env(self):
-        import os
+        from config import load_env
 
-        for path in [
-            "/config/.env",
-            os.path.expanduser("~/.qbit.env"),
-            "/root/.qbit.env",
-        ]:
-            if os.path.isfile(path):
-                try:
-                    with open(path) as f:
-                        for line in f:
-                            line = line.strip()
-                            if line and not line.startswith("#") and "=" in line:
-                                k, v = line.split("=", 1)
-                                k, v = k.strip(), v.strip().strip('"').strip("'")
-                                if k and k not in os.environ:
-                                    os.environ[k] = v
-                except Exception:
-                    pass
+        try:
+            load_env()
+        except Exception:
+            import os
+
+            for path in [
+                "/config/.env",
+                os.path.expanduser("~/.qbit.env"),
+                "/root/.qbit.env",
+            ]:
+                if os.path.isfile(path):
+                    try:
+                        with open(path) as f:
+                            for line in f:
+                                line = line.strip()
+                                if line and not line.startswith("#") and "=" in line:
+                                    k, v = line.split("=", 1)
+                                    k, v = k.strip(), v.strip().strip('"').strip("'")
+                                    if k and k not in os.environ:
+                                        os.environ[k] = v
+                    except Exception:
+                        pass
 
     async def search(
         self,

@@ -10,30 +10,16 @@ import sys
 
 
 def _load_env_file():
-    """Load environment variables from .env files."""
-    env_paths = [
-        os.path.join(os.path.dirname(__file__), ".env"),
-        os.path.join(os.path.dirname(__file__), "..", ".env"),
-        os.path.join(os.path.dirname(__file__), "..", "..", ".env"),
-        "/config/.env",
-        os.path.expanduser("~/.qbit.env"),
-        os.path.expanduser("~/.config/qbittorrent/.env"),
-    ]
+    try:
+        from env_loader import load_env_files
 
-    for env_path in env_paths:
-        try:
-            if os.path.isfile(env_path):
-                with open(env_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith("#") and "=" in line:
-                            key, value = line.split("=", 1)
-                            key = key.strip()
-                            value = value.strip().strip('"').strip("'")
-                            if key and key not in os.environ:
-                                os.environ[key] = value
-        except Exception:
-            pass
+        load_env_files(
+            os.path.join(os.path.dirname(__file__), ".env"),
+            os.path.join(os.path.dirname(__file__), "..", ".env"),
+            os.path.expanduser("~/.config/qbittorrent/.env"),
+        )
+    except ImportError:
+        pass
 
 
 _load_env_file()
@@ -96,8 +82,7 @@ except ImportError:
 
 # Configure logging
 logging.basicConfig(
-    level=logging.WARNING,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -119,8 +104,18 @@ def rng(t: int) -> range:
 
 def date_normalize(date_str: str) -> int:
     months = (
-        "Янв", "Фев", "Мар", "Апр", "Май", "Июн",
-        "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек",
+        "Янв",
+        "Фев",
+        "Мар",
+        "Апр",
+        "Май",
+        "Июн",
+        "Июл",
+        "Авг",
+        "Сен",
+        "Окт",
+        "Ноя",
+        "Дек",
     )
     try:
         date_str = [
@@ -139,7 +134,7 @@ class EngineError(Exception):
 
 class Rutor:
     """Rutor.org search engine plugin for qBittorrent."""
-    
+
     name = "Rutor"
     url = "https://rutor.info/"
     url_dl = url.replace("//", "//d.") + "download/"
@@ -164,12 +159,12 @@ class Rutor:
 
     def download_torrent(self, url: str) -> None:
         """Download torrent file using authenticated session.
-        
+
         This method is called by nova2dl.py when downloading torrents.
-        
+
         Args:
             url: The torrent download URL or magnet link
-            
+
         Output format (required by qBittorrent):
             <filepath> <url>
         """
@@ -182,7 +177,7 @@ class Rutor:
         except Exception as e:
             logger.error(f"Request failed: {e}")
             return 0
-            
+
         torrents_found = -1
 
         if first:
@@ -202,13 +197,13 @@ class Rutor:
         for tor in RE_TORRENTS.finditer(html):
             mag_link = tor.group("mag_link")
             tor_id = tor.group("tor_id")
-            
+
             # Use magnet link if configured, otherwise use .torrent URL
             if CONFIG.use_magnet:
                 link = mag_link
             else:
                 link = self.url_dl + tor_id
-            
+
             novaprinter.prettyPrinter(
                 {
                     "link": link,
@@ -236,7 +231,7 @@ class Rutor:
     def _init(self) -> None:
         """Initialize session with proxy if configured."""
         self.session = build_opener()
-        
+
         if CONFIG.proxy_enabled:
             if not any(CONFIG.proxies.values()):
                 raise EngineError("Proxy enabled, but not set!")
@@ -290,7 +285,7 @@ class Rutor:
     def _download_torrent(self, url: str) -> None:
         """Download torrent file from URL."""
         logger.info(f"Downloading from: {url}")
-        
+
         # Handle magnet links
         if url.startswith("magnet:"):
             # For magnet links, we just output the magnet URL directly
@@ -298,7 +293,7 @@ class Rutor:
             print(url + " " + url)
             sys.stdout.flush()
             return
-        
+
         # Download .torrent file
         response = self._request(url)
 
@@ -306,10 +301,10 @@ class Rutor:
             raise ValueError("No data received from URL")
 
         # Verify this looks like a torrent file
-        if not response.startswith(b'd'):
+        if not response.startswith(b"d"):
             try:
-                decoded = response.decode('utf-8', errors='ignore')
-                if '<html' in decoded.lower():
+                decoded = response.decode("utf-8", errors="ignore")
+                if "<html" in decoded.lower():
                     raise ValueError("Received HTML page instead of torrent file")
             except:
                 pass
@@ -376,18 +371,19 @@ rutor = Rutor
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    
+
     try:
         logging.info("Testing Rutor plugin...")
         engine = Rutor()
-        
+
         # Test search
         logging.info("\n[Test] Search for 'ubuntu':")
         engine.search("ubuntu")
-        
+
         logging.info("\nTest completed successfully!")
-        
+
     except Exception as e:
         logging.error(f"Test failed: {e}")
         import traceback
+
         traceback.print_exc()

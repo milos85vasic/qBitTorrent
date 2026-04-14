@@ -1,55 +1,49 @@
 """
 API endpoints for hook management.
 
-Provides:
-- GET /hooks - List all registered hooks
-- POST /hooks - Register a new hook
-- DELETE /hooks/{hook_id} - Remove a hook
-- GET /hooks/logs - Get hook execution logs
+Single source of truth for hook CRUD + event dispatch.
+Uses JSON file persistence at /config/download-proxy/hooks.json.
 """
 
+import os
+import json
 import uuid
 import logging
 from typing import List, Optional
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional as PyOptional
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["hooks"])
 
+HOOKS_FILE = "/config/download-proxy/hooks.json"
+LOGS_MAX = 200
 
-# Request/Response models
-class HookEventType(str):
-    """Hook event types."""
-
-    SEARCH_START = "search_start"
-    SEARCH_PROGRESS = "search_progress"
-    SEARCH_COMPLETE = "search_complete"
-    DOWNLOAD_START = "download_start"
-    DOWNLOAD_PROGRESS = "download_progress"
-    DOWNLOAD_COMPLETE = "download_complete"
-    MERGE_COMPLETE = "merge_complete"
-    VALIDATION_COMPLETE = "validation_complete"
+VALID_EVENTS = [
+    "search_start",
+    "search_progress",
+    "search_complete",
+    "download_start",
+    "download_progress",
+    "download_complete",
+    "merge_complete",
+    "validation_complete",
+]
 
 
 class HookCreateRequest(BaseModel):
-    """Request to create a new hook."""
-
-    name: str = Field(..., description="Hook name", min_length=1)
-    event: str = Field(..., description="Event type to trigger on")
-    script_path: str = Field(..., description="Path to executable script")
-    enabled: bool = Field(default=True, description="Whether hook is enabled")
-    timeout: int = Field(default=30, ge=1, le=300, description="Timeout in seconds")
-    environment: dict = Field(default_factory=dict, description="Environment variables")
+    name: str = Field(..., min_length=1)
+    event: str = Field(...)
+    script_path: str = Field(...)
+    enabled: bool = True
+    timeout: int = Field(default=30, ge=1, le=300)
+    environment: dict = Field(default_factory=dict)
 
 
 class HookResponse(BaseModel):
-    """Hook configuration response."""
-
     hook_id: str
     name: str
     event: str
@@ -59,70 +53,42 @@ class HookResponse(BaseModel):
     created_at: str
 
 
-class HookExecutionLog(BaseModel):
-    """Hook execution log entry."""
-
-    hook_name: str
-    event_type: str
-    timestamp: str
-    duration_seconds: float
-    return_code: int
-    success: bool
-    stdout: Optional[str] = None
-    stderr: Optional[str] = None
-    error: Optional[str] = None
-
-
-# In-memory storage (would use database in production)
-_hooks: dict[str, dict] = {}
 _execution_logs: list[dict] = []
 
 
-@router.get("", response_model=dict)
+def _load_hooks() -> list[dict]:
+    try:
+        if os.path.isfile(HOOKS_FILE):
+            with open(HOOKS_FILE) as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load hooks: {e}")
+    return []
+
+
+def _save_hooks(hooks: list[dict]):
+    try:
+        os.makedirs(os.path.dirname(HOOKS_FILE), exist_ok=True)
+        with open(HOOKS_FILE, "w") as f:
+            json.dump(hooks, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save hooks: {e}")
+
+
+@router.get("")
 async def list_hooks():
-    """List all registered hooks."""
-    return {
-        "hooks": [
-            {
-                "hook_id": h["hook_id"],
-                "name": h["name"],
-                "event": h["event"],
-                "enabled": h["enabled"],
-                "script_path": h["script_path"],
-                "timeout": h["timeout"],
-                "created_at": h["created_at"],
-            }
-            for h in _hooks.values()
-        ],
-        "count": len(_hooks),
-    }
+    hooks = _load_hooks()
+    return {"hooks": hooks, "count": len(hooks)}
 
 
 @router.post("", response_model=HookResponse)
 async def create_hook(request: HookCreateRequest):
-    """Register a new hook."""
-    # Validate event type
-    valid_events = [
-        e.value
-        for e in [
-            HookEventType.SEARCH_START,
-            HookEventType.SEARCH_PROGRESS,
-            HookEventType.SEARCH_COMPLETE,
-            HookEventType.DOWNLOAD_START,
-            HookEventType.DOWNLOAD_PROGRESS,
-            HookEventType.DOWNLOAD_COMPLETE,
-            HookEventType.MERGE_COMPLETE,
-            HookEventType.VALIDATION_COMPLETE,
-        ]
-    ]
-
-    if request.event not in valid_events:
+    if request.event not in VALID_EVENTS:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid event type. Must be one of: {', '.join(valid_events)}",
+            detail=f"Invalid event type. Must be one of: {', '.join(VALID_EVENTS)}",
         )
 
-    # Create hook
     hook_id = str(uuid.uuid4())
     hook = {
         "hook_id": hook_id,
@@ -135,7 +101,9 @@ async def create_hook(request: HookCreateRequest):
         "created_at": datetime.utcnow().isoformat(),
     }
 
-    _hooks[hook_id] = hook
+    hooks = _load_hooks()
+    hooks.append(hook)
+    _save_hooks(hooks)
 
     logger.info(f"Created hook: {request.name} ({hook_id})")
 
@@ -146,41 +114,30 @@ async def create_hook(request: HookCreateRequest):
         script_path=hook["script_path"],
         enabled=hook["enabled"],
         timeout=hook["timeout"],
+        created_at=hook["created_at"],
     )
 
 
 @router.delete("/{hook_id}")
 async def delete_hook(hook_id: str):
-    """Delete a hook."""
-    if hook_id not in _hooks:
+    hooks = _load_hooks()
+    original_len = len(hooks)
+    hooks = [h for h in hooks if h["hook_id"] != hook_id]
+    if len(hooks) == original_len:
         raise HTTPException(status_code=404, detail="Hook not found")
-
-    hook_name = _hooks[hook_id]["name"]
-    del _hooks[hook_id]
-
-    logger.info(f"Deleted hook: {hook_name} ({hook_id})")
-
+    _save_hooks(hooks)
+    logger.info(f"Deleted hook: {hook_id}")
     return {"message": "Hook deleted", "hook_id": hook_id}
 
 
 @router.get("/logs")
-async def get_execution_logs(
-    limit: int = 50,
-    hook_name: Optional[str] = None,
-):
-    """Get hook execution logs."""
+async def get_execution_logs(limit: int = 50, hook_name: Optional[str] = None):
     logs = _execution_logs[-limit:]
-
     if hook_name:
         logs = [l for l in logs if l.get("hook_name") == hook_name]
-
-    return {
-        "logs": logs,
-        "count": len(logs),
-    }
+    return {"logs": logs, "count": len(logs)}
 
 
-# Helper functions for dispatching hooks
 async def dispatch_event(event_type: str, event_data: dict):
     """Dispatch an event to all registered hooks."""
     from merge_service.hooks import HookEvent, HookEventType, get_dispatcher
@@ -193,6 +150,21 @@ async def dispatch_event(event_type: str, event_data: dict):
 
     dispatcher = get_dispatcher()
 
+    hooks = _load_hooks()
+    for h in hooks:
+        if h.get("event") == event_type and h.get("enabled", True):
+            from merge_service.hooks import HookConfig
+
+            cfg = HookConfig(
+                name=h["name"],
+                event=event_enum,
+                script_path=h["script_path"],
+                enabled=True,
+                timeout=h.get("timeout", 30),
+                environment=h.get("environment", {}),
+            )
+            dispatcher.register_hook(cfg)
+
     hook_event = HookEvent(
         event_type=event_enum,
         search_id=event_data.get("search_id"),
@@ -202,9 +174,11 @@ async def dispatch_event(event_type: str, event_data: dict):
 
     await dispatcher.dispatch(hook_event)
 
-    # Update logs
     global _execution_logs
-    _execution_logs.extend(dispatcher.get_execution_log()[-10:])
+    new_logs = dispatcher.get_execution_log()
+    _execution_logs.extend(new_logs)
+    if len(_execution_logs) > LOGS_MAX:
+        _execution_logs[:] = _execution_logs[-LOGS_MAX:]
 
 
-__all__ = ["router"]
+__all__ = ["router", "dispatch_event"]

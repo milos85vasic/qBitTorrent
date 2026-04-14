@@ -121,9 +121,13 @@ class Deduplicator:
     def _check_match(self, seed: SearchResult, candidate: SearchResult) -> MatchResult:
         """Check if candidate matches the seed result."""
 
-        # Tier 1: Metadata match (highest priority)
-        # This would use canonical_identity from external APIs
-        # For now, skip to lower tiers
+        # Tier 1: Metadata match (canonical identity comparison)
+        id_a = self._extract_identity_from_result(seed)
+        id_b = self._extract_identity_from_result(candidate)
+        if self._compare_identities(id_a, id_b):
+            return MatchResult(
+                is_match=True, confidence=0.99, tier=1, reason="metadata identity match"
+            )
 
         # Tier 2: Hash match (infohash)
         # Compare infohashes if available
@@ -242,6 +246,33 @@ class Deduplicator:
 
         # Use Levenshtein ratio
         return Levenshtein.ratio(name1.lower(), name2.lower())
+
+    def _compare_identities(self, a: CanonicalIdentity, b: CanonicalIdentity) -> bool:
+        """Compare two canonical identities for Tier 1 match."""
+        if a.title and b.title:
+            norm_a = self._normalize_name(a.title)
+            norm_b = self._normalize_name(b.title)
+            if not norm_a or not norm_b:
+                return False
+            sim = self._calculate_similarity(norm_a, norm_b)
+            if sim < 0.80:
+                return False
+        else:
+            return False
+
+        if a.year and b.year and a.year != b.year:
+            return False
+
+        if a.content_type and b.content_type and a.content_type != b.content_type:
+            return False
+
+        if a.season is not None and b.season is not None and a.season != b.season:
+            return False
+
+        if a.episode is not None and b.episode is not None and a.episode != b.episode:
+            return False
+
+        return True
 
     def set_canonical_identity(self, merged: MergedResult, identity: CanonicalIdentity):
         """Update the canonical identity for a merged result (after metadata enrichment)."""

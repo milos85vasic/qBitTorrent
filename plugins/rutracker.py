@@ -10,30 +10,16 @@ import sys
 
 
 def _load_env_file():
-    """Load environment variables from .env files."""
-    env_paths = [
-        os.path.join(os.path.dirname(__file__), ".env"),
-        os.path.join(os.path.dirname(__file__), "..", ".env"),
-        os.path.join(os.path.dirname(__file__), "..", "..", ".env"),
-        "/config/.env",
-        os.path.expanduser("~/.qbit.env"),
-        os.path.expanduser("~/.config/qbittorrent/.env"),
-    ]
+    try:
+        from env_loader import load_env_files
 
-    for env_path in env_paths:
-        try:
-            if os.path.isfile(env_path):
-                with open(env_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith("#") and "=" in line:
-                            key, value = line.split("=", 1)
-                            key = key.strip()
-                            value = value.strip().strip('"').strip("'")
-                            if key and key not in os.environ:
-                                os.environ[key] = value
-        except Exception:
-            pass
+        load_env_files(
+            os.path.join(os.path.dirname(__file__), ".env"),
+            os.path.join(os.path.dirname(__file__), "..", ".env"),
+            os.path.expanduser("~/.config/qbittorrent/.env"),
+        )
+    except ImportError:
+        pass
 
 
 _load_env_file()
@@ -106,8 +92,7 @@ except ImportError:
 
 
 logging.basicConfig(
-    level=logging.WARNING,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -157,7 +142,7 @@ class RuTracker(object):
         r'data-ts_text="(?P<pub_date>\d+?)"',
         re.S,
     )
-    re_magnet = re.compile(r'magnet:\?xt=urn:btih:([a-fA-F0-9]{40})', re.I)
+    re_magnet = re.compile(r"magnet:\?xt=urn:btih:([a-fA-F0-9]{40})", re.I)
 
     @property
     def forum_url(self) -> str:
@@ -219,7 +204,7 @@ class RuTracker(object):
         """Fetch magnet link from topic page."""
         try:
             url = self.topic_url(f"t={topic_id}")
-            data = self._open_url(url).decode(self.encoding, errors='ignore')
+            data = self._open_url(url).decode(self.encoding, errors="ignore")
             match = self.re_magnet.search(data)
             if match:
                 return match.group(1)
@@ -231,13 +216,13 @@ class RuTracker(object):
         """Search for what on the search engine."""
         self.results = {}
         what = unquote(what)
-        
+
         cat_id = self.supported_categories.get(cat, "-1")
         if cat != "all":
             query = urlencode({"nm": what, "f": cat_id})
         else:
             query = urlencode({"nm": what})
-        
+
         logger.info("Searching for {}...".format(what))
 
         url = self.search_url(query)
@@ -247,7 +232,7 @@ class RuTracker(object):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             urls = [self.search_url(html.unescape(page)) for page in other_pages]
             executor.map(self.__execute_search, urls)
-        
+
         logger.info("{} torrents found.".format(len(self.results)))
 
     def __execute_search(self, url: str, is_first: bool = False) -> list:
@@ -279,15 +264,15 @@ class RuTracker(object):
         """Map torrent data to result dict with magnet link."""
         topic_id = torrent_data["id"]
         name = html.unescape(torrent_data["title"])
-        
+
         magnet_hash = self._fetch_magnet_from_topic(topic_id)
-        
+
         if magnet_hash:
             link = self._build_magnet_link(magnet_hash, name)
         else:
             query = urlencode({"t": topic_id})
             link = self.download_url(query)
-        
+
         result = {}
         result["id"] = topic_id
         result["link"] = link
@@ -357,16 +342,18 @@ class RuTracker(object):
             if not data:
                 raise ValueError("No data received from URL: {}".format(url))
 
-            if not data.startswith(b'd'):
+            if not data.startswith(b"d"):
                 try:
-                    decoded = data.decode('utf-8', errors='ignore')
-                    if '<html' in decoded.lower() or '<!doctype' in decoded.lower():
+                    decoded = data.decode("utf-8", errors="ignore")
+                    if "<html" in decoded.lower() or "<!doctype" in decoded.lower():
                         raise ValueError("Received HTML page instead of torrent file")
                 except:
                     pass
                 raise ValueError("Downloaded data is not a valid torrent file")
 
-            file_handle, temp_path = tempfile.mkstemp(suffix=".torrent", prefix="rutracker_")
+            file_handle, temp_path = tempfile.mkstemp(
+                suffix=".torrent", prefix="rutracker_"
+            )
 
             try:
                 with os.fdopen(file_handle, "wb") as f:
@@ -400,30 +387,31 @@ if __name__ == "__main__":
     import time
 
     logging.basicConfig(level=logging.INFO)
-    
+
     try:
         logging.info("Testing RuTracker plugin (v3.0 - magnet links)...")
         engine = RuTracker()
-        
+
         logging.info("\n[Test] Search for 'ubuntu':")
         engine.results = {}
         engine.search("ubuntu")
         logging.info("Found {} results".format(len(engine.results)))
-        
+
         if engine.results:
             first_result = list(engine.results.values())[0]
             logging.info("\n[Test] First result:")
             logging.info(f"  Name: {first_result['name']}")
             logging.info(f"  Link: {first_result['link'][:80]}...")
-            
-            if first_result['link'].startswith('magnet:'):
+
+            if first_result["link"].startswith("magnet:"):
                 logging.info("  ✓ MAGNET LINK!")
             else:
                 logging.info("  ✗ NOT a magnet link")
         else:
             logging.warning("No search results")
-            
+
     except Exception as e:
         logging.error("Test failed: {}".format(e))
         import traceback
+
         traceback.print_exc()

@@ -43,10 +43,11 @@ def start_fastapi_server():
         from api import app
 
         # Configure uvicorn
+        merge_port = int(os.environ.get("MERGE_SERVICE_PORT", "8086"))
         config = uvicorn.Config(
             app,
             host="0.0.0.0",
-            port=8086,  # Different port from proxy (8085)
+            port=merge_port,
             log_level="info",
         )
         server = uvicorn.Server(config)

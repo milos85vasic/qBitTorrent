@@ -21,27 +21,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["search"])
 
-HOOKS_FILE = "/config/download-proxy/hooks.json"
-
-
-def _load_hooks():
-    try:
-        if os.path.isfile(HOOKS_FILE):
-            with open(HOOKS_FILE) as f:
-                return json.load(f)
-    except Exception:
-        pass
-    return []
-
-
-def _save_hooks(hooks):
-    try:
-        os.makedirs(os.path.dirname(HOOKS_FILE), exist_ok=True)
-        with open(HOOKS_FILE, "w") as f:
-            json.dump(hooks, f, indent=2)
-    except Exception:
-        pass
-
 
 def _get_orchestrator(request: Request):
     from api import orchestrator_instance
@@ -73,6 +52,7 @@ class SearchResultResponse(BaseModel):
     desc_link: Optional[str] = None
     tracker: Optional[str] = None
     sources: List[dict] = Field(default_factory=list)
+    metadata: Optional[dict] = None
 
 
 class SearchResponse(BaseModel):
@@ -90,13 +70,6 @@ class SearchResponse(BaseModel):
 class DownloadRequest(BaseModel):
     result_id: str = Field(..., description="Merged result ID")
     download_urls: List[str] = Field(..., description="URLs to download")
-
-
-class HookConfig(BaseModel):
-    name: str
-    event: str
-    script_path: str
-    enabled: bool = True
 
 
 def _parse_size_to_bytes(size_str: str) -> float:
@@ -153,7 +126,11 @@ def _to_response(r) -> SearchResultResponse:
 
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest, req: Request):
+    from .hooks import dispatch_event
+
     orch = _get_orchestrator(req)
+
+    await dispatch_event("search_start", {"query": request.query})
 
     metadata = await orch.search(
         query=request.query,
@@ -182,6 +159,26 @@ async def search(request: SearchRequest, req: Request):
     results.sort(key=lambda x: x.seeds, reverse=True)
     results = results[: request.limit]
 
+    if request.enable_metadata and hasattr(req.app.state, "enricher"):
+        from merge_service.enricher import MetadataEnricher
+
+        enricher: MetadataEnricher = req.app.state.enricher
+        for r in results[:10]:
+            try:
+                meta = await enricher.resolve(r.name)
+                if meta:
+                    r.metadata = {
+                        "source": meta.source,
+                        "title": meta.title,
+                        "year": meta.year,
+                        "content_type": meta.content_type,
+                        "poster_url": meta.poster_url,
+                        "overview": meta.overview,
+                        "genres": meta.genres,
+                    }
+            except Exception as e:
+                logger.debug(f"Metadata enrichment failed for {r.name}: {e}")
+
     captcha_errors = [e for e in metadata.errors if "captcha" in e.lower()]
     if captcha_errors and not results:
         return JSONResponse(
@@ -203,7 +200,7 @@ async def search(request: SearchRequest, req: Request):
             },
         )
 
-    return SearchResponse(
+    response = SearchResponse(
         search_id=metadata.search_id,
         query=metadata.query,
         status="completed" if metadata.total_results > 0 else "no_results",
@@ -216,6 +213,19 @@ async def search(request: SearchRequest, req: Request):
         if metadata.completed_at
         else None,
     )
+
+    await dispatch_event(
+        "search_complete",
+        {
+            "search_id": metadata.search_id,
+            "query": metadata.query,
+            "total_results": metadata.total_results,
+            "merged_results": len(merged),
+            "trackers_searched": metadata.trackers_searched,
+        },
+    )
+
+    return response
 
 
 @router.get("/search/stream/{search_id}")
@@ -331,8 +341,18 @@ def _is_tracker_url(url: str) -> Optional[str]:
 async def initiate_download(request: DownloadRequest, req: Request):
     import aiohttp
     import tempfile
+    from .hooks import dispatch_event
 
     download_id = str(uuid.uuid4())
+
+    await dispatch_event(
+        "download_start",
+        {
+            "download_id": download_id,
+            "result_id": request.result_id,
+            "url_count": len(request.download_urls),
+        },
+    )
     qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:18085")
     qbit_user = os.getenv("QBITTORRENT_USER", "admin")
     qbit_pass = os.getenv("QBITTORRENT_PASS", "admin")
@@ -433,6 +453,17 @@ async def initiate_download(request: DownloadRequest, req: Request):
         }
 
     added_count = sum(1 for r in results if r.get("status") == "added")
+
+    await dispatch_event(
+        "download_complete",
+        {
+            "download_id": download_id,
+            "result_id": request.result_id,
+            "added_count": added_count,
+            "total_urls": len(request.download_urls),
+        },
+    )
+
     return {
         "download_id": download_id,
         "status": "initiated" if added_count > 0 else "failed",
@@ -440,36 +471,6 @@ async def initiate_download(request: DownloadRequest, req: Request):
         "added_count": added_count,
         "results": results,
     }
-
-
-@router.get("/hooks")
-async def list_hooks():
-    hooks = _load_hooks()
-    return {"hooks": hooks, "count": len(hooks)}
-
-
-@router.post("/hooks")
-async def register_hook(hook: HookConfig):
-    hooks = _load_hooks()
-    new_hook = {
-        "hook_id": str(uuid.uuid4()),
-        "name": hook.name,
-        "event": hook.event,
-        "script_path": hook.script_path,
-        "enabled": hook.enabled,
-        "created_at": datetime.utcnow().isoformat(),
-    }
-    hooks.append(new_hook)
-    _save_hooks(hooks)
-    return new_hook
-
-
-@router.delete("/hooks/{hook_id}")
-async def delete_hook(hook_id: str):
-    hooks = _load_hooks()
-    hooks = [h for h in hooks if h["hook_id"] != hook_id]
-    _save_hooks(hooks)
-    return {"deleted": True, "hook_id": hook_id}
 
 
 __all__ = ["router"]

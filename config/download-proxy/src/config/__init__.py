@@ -50,8 +50,12 @@ def load_env() -> EnvConfig:
     # qBittorrent settings
     qbittorrent_host = os.environ.get("QBITTORRENT_HOST", "localhost")
     qbittorrent_port = int(os.environ.get("QBITTORRENT_PORT", "18085"))
-    qbittorrent_username = os.environ.get("QBITTORRENT_USERNAME", "admin")
-    qbittorrent_password = os.environ.get("QBITTORRENT_PASSWORD", "admin")
+    qbittorrent_username = os.environ.get(
+        "QBITTORRENT_USER", os.environ.get("QBITTORRENT_USERNAME", "admin")
+    )
+    qbittorrent_password = os.environ.get(
+        "QBITTORRENT_PASS", os.environ.get("QBITTORRENT_PASSWORD", "admin")
+    )
 
     # Service settings
     proxy_port = int(os.environ.get("PROXY_PORT", "8085"))

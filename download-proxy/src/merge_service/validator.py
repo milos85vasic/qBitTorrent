@@ -54,7 +54,7 @@ class TrackerValidator:
 
     def __init__(self):
         self._session: Optional[aiohttp.ClientSession] = None
-        self._cache: Dict[str, ScrapeResult] = {}
+        self._cache: Dict[str, tuple] = {}
         self._cache_ttl = 300  # 5 minutes
 
     async def _get_session(self) -> Optional[aiohttp.ClientSession]:
@@ -92,8 +92,7 @@ class TrackerValidator:
 
         result.scrape_time_ms = int((time.time() - start_time) * 1000)
 
-        # Cache the result
-        self._cache[tracker_url] = result
+        self._cache[tracker_url] = (time.time(), result)
 
         return result
 
@@ -319,18 +318,55 @@ class TrackerValidator:
         return None
 
     def _parse_bencoded(self, data: bytes) -> dict:
-        """Simple bencode parser for scrape responses."""
-        # This is a simplified parser - in production use proper bencode library
-        # For now, return empty dict if parsing fails
+        """Parse bencoded data (BEP 03) for scrape responses."""
         try:
-            import bencode  # If available
+            result, _ = self._decode_benc(data, 0)
+            return result if isinstance(result, dict) else {}
+        except Exception:
+            return {}
 
-            return bencode.decode(data)
-        except:
-            pass
+    def _decode_benc(self, data: bytes, pos: int):
+        """Recursively decode bencoded bytes starting at pos."""
+        if pos >= len(data):
+            raise ValueError("Unexpected end of data")
+        ch = data[pos : pos + 1]
+        if ch == b"d":
+            return self._decode_dict(data, pos)
+        elif ch == b"l":
+            return self._decode_list(data, pos)
+        elif ch == b"i":
+            return self._decode_int(data, pos)
+        elif ch.isdigit():
+            return self._decode_string(data, pos)
+        raise ValueError(f"Invalid bencode char at {pos}: {ch}")
 
-        # Fallback: return empty dict
-        return {}
+    def _decode_dict(self, data: bytes, pos: int):
+        pos += 1
+        result = {}
+        while data[pos : pos + 1] != b"e":
+            key, pos = self._decode_string(data, pos)
+            val, pos = self._decode_benc(data, pos)
+            result[key] = val
+        return result, pos + 1
+
+    def _decode_list(self, data: bytes, pos: int):
+        pos += 1
+        result = []
+        while data[pos : pos + 1] != b"e":
+            val, pos = self._decode_benc(data, pos)
+            result.append(val)
+        return result, pos + 1
+
+    def _decode_int(self, data: bytes, pos: int):
+        pos += 1
+        end = data.index(b"e", pos)
+        return int(data[pos:end]), end + 1
+
+    def _decode_string(self, data: bytes, pos: int):
+        colon = data.index(b":", pos)
+        length = int(data[pos:colon])
+        start = colon + 1
+        return data[start : start + length], start + length
 
     async def validate_multiple(self, tracker_urls: List[str]) -> List[ScrapeResult]:
         """Validate multiple trackers concurrently."""
@@ -338,9 +374,13 @@ class TrackerValidator:
         return await asyncio.gather(*tasks)
 
     def get_cached_result(self, tracker_url: str) -> Optional[ScrapeResult]:
-        """Get cached scrape result if still valid."""
-        result = self._cache.get(tracker_url)
-        if result:
-            # For now, always return cached (could add TTL checking)
-            return result
+        """Get cached scrape result if still within TTL."""
+        import time
+
+        entry = self._cache.get(tracker_url)
+        if entry:
+            cached_time, result = entry
+            if time.time() - cached_time < self._cache_ttl:
+                return result
+            del self._cache[tracker_url]
         return None
