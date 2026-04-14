@@ -175,6 +175,7 @@ class SearchOrchestrator:
         self.deduplicator = Deduplicator()
         self.validator = TrackerValidator()
         self._active_searches: Dict[str, SearchMetadata] = {}
+        self._tracker_sessions: Dict[str, Any] = {}
 
     def _load_env(self):
         import os
@@ -318,6 +319,12 @@ class SearchOrchestrator:
                 ) as resp:
                     cookies = resp.cookies
 
+                cookie_dict = {c.key: c.value for c in cookies.values()}
+                self._tracker_sessions["rutracker"] = {
+                    "cookies": cookie_dict,
+                    "base_url": base_url,
+                }
+
                 async with session.get(search_url, cookies=cookies) as resp:
                     html_content = await resp.text()
 
@@ -400,6 +407,7 @@ class SearchOrchestrator:
         return f"{bytes_size:.1f} PB"
 
     async def _search_kinozal(self, query: str, category: str) -> List[SearchResult]:
+        import gzip
         import os
         import aiohttp
         from urllib.parse import urlencode
@@ -416,10 +424,28 @@ class SearchOrchestrator:
                 os.getenv("KINOZAL_MIRRORS", "https://kinozal.tv").split(",")[0].strip()
             )
             async with aiohttp.ClientSession() as session:
+                login_data = urlencode(
+                    {"username": username, "password": password}, encoding="cp1251"
+                )
                 async with session.post(
-                    f"{base_url}/browse.php", data={"s": query}
+                    f"{base_url}/takelogin.php",
+                    data=login_data,
+                    allow_redirects=False,
+                ) as login_resp:
+                    login_resp.raise_for_status()
+
+                async with session.get(
+                    f"{base_url}/browse.php", params={"s": query}
                 ) as resp:
-                    html = await resp.text()
+                    raw = await resp.read()
+                    if raw.startswith(b"\x1f\x8b\x08"):
+                        raw = gzip.decompress(raw)
+                    html = raw.decode("cp1251")
+                    cookie_dict = {c.key: c.value for c in resp.cookies.values()}
+                self._tracker_sessions["kinozal"] = {
+                    "cookies": cookie_dict,
+                    "base_url": base_url,
+                }
             results = self._parse_kinozal_html(html, base_url)
         except Exception:
             pass
@@ -430,41 +456,31 @@ class SearchOrchestrator:
         self, html_content: str, base_url: str
     ) -> List[SearchResult]:
         import re
-        import html
+        from html import unescape
 
         results = []
-        row_pattern = re.compile(
-            r'<tr[^>]*class="tRow"[^>]*id="tr_\d+"[^>]*>(.*?)</tr>', re.S
+        torrent_re = re.compile(
+            r'nam"><a\s+?href="/(?P<desc_link>.+?)"\s+?class="r\d">(?P<name>.+?)'
+            r"</a>.+?s\'>.+?s\'>(?P<size>.+?)<.+?sl_s\'>(?P<seeds>\d+?)<.+?sl_p\'"
+            r">(?P<leech>\d+?)<.+?s\'>(?P<pub_date>.+?)</td>",
+            re.S,
         )
+        cyrillic_table = str.maketrans(
+            {"Т": "T", "Г": "G", "М": "M", "К": "K", "Б": "B"}
+        )
+        url_dl = base_url.replace("//", "//dl.")
 
-        for row_match in row_pattern.finditer(html_content):
+        for tor in torrent_re.finditer(html_content):
             try:
-                row_html = row_match.group(1)
-                title_match = re.search(
-                    r'<a[^>]*href="[^"]*?t=(\d+)[^"]*"[^>]*>([^<]+)</a>', row_html
-                )
-                if not title_match:
-                    continue
-
-                topic_id = title_match.group(1)
-                title = html.unescape(title_match.group(2).strip())
-
-                size_match = re.search(r"<td[^>]*>([\d.]+\s*[KMGT]B?)</td>", row_html)
-                size = size_match.group(1) if size_match else "0 B"
-
-                seeds = 0
-                seeds_match = re.search(r"<td[^>]*>(\d+)</td>.*?seed", row_html, re.S)
-                if seeds_match:
-                    seeds = int(seeds_match.group(1))
-
+                topic_id = tor.group("desc_link").split("=")[-1]
                 results.append(
                     SearchResult(
-                        name=title,
-                        size=size,
-                        seeds=seeds,
-                        leechers=0,
-                        link=f"{base_url}/get/torrent/{topic_id}.torrent",
-                        desc_link=f"{base_url}/description.php?p={topic_id}",
+                        name=unescape(tor.group("name")),
+                        size=tor.group("size").translate(cyrillic_table),
+                        seeds=int(tor.group("seeds")),
+                        leechers=int(tor.group("leech")),
+                        link=f"{url_dl}download.php?id={topic_id}",
+                        desc_link=f"{base_url}{tor.group('desc_link')}",
                         tracker="kinozal",
                         engine_url=base_url,
                     )
@@ -480,9 +496,19 @@ class SearchOrchestrator:
         from urllib.parse import urlencode
 
         results = []
-        cookies = os.getenv("NNMCLUB_COOKIES")
+        cookies_raw = os.getenv("NNMCLUB_COOKIES")
 
-        if not cookies:
+        if not cookies_raw:
+            return []
+
+        cookie_jar = {}
+        for pair in cookies_raw.split(";"):
+            pair = pair.strip()
+            if "=" in pair:
+                name, value = pair.split("=", 1)
+                cookie_jar[name.strip()] = value.strip()
+
+        if "phpbb2mysql_4_sid" not in cookie_jar:
             return []
 
         try:
@@ -491,10 +517,15 @@ class SearchOrchestrator:
             )
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    f"{base_url}/forum/tracker.php?{urlencode({'nm': query})}",
-                    cookies={"cookies": cookies},
+                    f"{base_url}/forum/tracker.php?{urlencode({'nm': query, 'f': '-1'})}",
+                    cookies=cookie_jar,
                 ) as resp:
-                    html = await resp.text()
+                    raw_bytes = await resp.read()
+                    html = raw_bytes.decode("cp1251", "ignore")
+                self._tracker_sessions["nnmclub"] = {
+                    "cookies": cookie_jar,
+                    "base_url": base_url,
+                }
             results = self._parse_nnmclub_html(html, base_url)
         except Exception:
             pass
@@ -505,40 +536,26 @@ class SearchOrchestrator:
         self, html_content: str, base_url: str
     ) -> List[SearchResult]:
         import re
-        import html
+        from html import unescape
 
         results = []
-        row_pattern = re.compile(r'<tr[^>]*id="tr_\d+"[^>]*>(.*?)</tr>', re.S)
+        torrent_re = re.compile(
+            r'topictitle"\shref="(?P<desc_link>.+?)"><b>(?P<name>.+?)</b>.+?'
+            r'href="(?P<link>d.+?)".+?<u>(?P<size>\d+?)</u>.+?<b>(?P<seeds>\d+?)'
+            r"</b>.+?<b>(?P<leech>\d+?)</b>.+?<u>(?P<pub_date>\d+?)</u>",
+            re.S,
+        )
 
-        for row_match in row_pattern.finditer(html_content):
+        for match in torrent_re.finditer(html_content):
             try:
-                row_html = row_match.group(1)
-                title_match = re.search(
-                    r'<a[^>]*href="[^"]*viewtopic\.php\?t=(\d+)[^"]*"[^>]*>([^<]+)</a>',
-                    row_html,
-                )
-                if not title_match:
-                    continue
-
-                topic_id = title_match.group(1)
-                title = html.unescape(title_match.group(2).strip())
-
-                size_match = re.search(r"<td[^>]*>([\d.]+\s*[KMGT]?B?)</td>", row_html)
-                size = size_match.group(1) if size_match else "0 B"
-
-                seeds = 0
-                seeds_match = re.search(r"seed.*?>(\d+)", row_html)
-                if seeds_match:
-                    seeds = int(seeds_match.group(1))
-
                 results.append(
                     SearchResult(
-                        name=title,
-                        size=size,
-                        seeds=seeds,
-                        leechers=0,
-                        link=f"{base_url}/forum/dl.php?t={topic_id}",
-                        desc_link=f"{base_url}/forum/viewtopic.php?t={topic_id}",
+                        name=unescape(match.group("name")),
+                        size=match.group("size"),
+                        seeds=int(match.group("seeds")),
+                        leechers=int(match.group("leech")),
+                        link=f"{base_url}/forum/{match.group('link')}",
+                        desc_link=f"{base_url}/forum/{match.group('desc_link')}",
                         tracker="nnmclub",
                         engine_url=base_url,
                     )
@@ -547,6 +564,112 @@ class SearchOrchestrator:
                 continue
 
         return results
+
+    async def fetch_torrent(self, tracker: str, url: str) -> Optional[bytes]:
+        import os
+        import aiohttp
+        import logging
+        import re
+
+        logger = logging.getLogger(__name__)
+        session_data = self._tracker_sessions.get(tracker)
+        if not session_data:
+            self._load_env()
+            try:
+                if tracker == "rutracker":
+                    await self._search_rutracker("__probe__", "all")
+                elif tracker == "kinozal":
+                    await self._search_kinozal("__probe__", "all")
+                elif tracker == "nnmclub":
+                    await self._search_nnmclub("__probe__", "all")
+            except Exception:
+                pass
+            session_data = self._tracker_sessions.get(tracker)
+
+        if not session_data:
+            logger.error(f"No stored session for tracker: {tracker}")
+            return None
+
+        cookies = session_data["cookies"]
+        base_url = session_data["base_url"]
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {"Referer": base_url}
+                async with session.get(
+                    url, cookies=cookies, headers=headers, allow_redirects=True
+                ) as resp:
+                    if resp.status != 200:
+                        logger.error(
+                            f"fetch_torrent {tracker}: HTTP {resp.status} for {url}"
+                        )
+                        return None
+                    content_type = resp.headers.get("Content-Type", "")
+                    data = await resp.read()
+                    if (
+                        "application/x-bittorrent" in content_type
+                        or data[:11] == b"d8:announce"
+                        or data[:14] == b"d10:created by"
+                        or data[:7] == b"d8:files"
+                    ):
+                        return data
+                    if tracker == "rutracker":
+                        return await self._fetch_rutracker_redirect(
+                            session, url, cookies, base_url
+                        )
+                    if tracker == "kinozal":
+                        return await self._fetch_kinozal_torrent(
+                            session, url, cookies, base_url
+                        )
+                    logger.error(
+                        f"fetch_torrent {tracker}: response not a torrent file ({content_type})"
+                    )
+                    return None
+        except Exception as e:
+            logger.error(f"fetch_torrent {tracker}: {e}")
+            return None
+
+    async def _fetch_rutracker_redirect(
+        self, session, url: str, cookies: dict, base_url: str
+    ) -> Optional[bytes]:
+        import re
+        import logging
+
+        logger = logging.getLogger(__name__)
+        try:
+            match = re.search(r"[?&]t=(\d+)", url)
+            if not match:
+                return None
+            topic_id = match.group(1)
+            dl_url = f"{base_url}/forum/dl.rss.php?{topic_id}"
+            headers = {"Referer": f"{base_url}/forum/viewtopic.php?t={topic_id}"}
+            async with session.get(dl_url, cookies=cookies, headers=headers) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.read()
+                if data[:11] == b"d8:announce" or data[:14] == b"d10:created by":
+                    return data
+        except Exception as e:
+            logger.error(f"_fetch_rutracker_redirect: {e}")
+        return None
+
+    async def _fetch_kinozal_torrent(
+        self, session, url: str, cookies: dict, base_url: str
+    ) -> Optional[bytes]:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        try:
+            headers = {"Referer": base_url}
+            async with session.get(url, cookies=cookies, headers=headers) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.read()
+                if data[:11] == b"d8:announce" or data[:14] == b"d10:created by":
+                    return data
+        except Exception as e:
+            logger.error(f"_fetch_kinozal_torrent: {e}")
+        return None
 
     def get_search_status(self, search_id: str) -> Optional[SearchMetadata]:
         return self._active_searches.get(search_id)

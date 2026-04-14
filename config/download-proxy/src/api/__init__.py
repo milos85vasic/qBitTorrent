@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 sys.path.insert(0, "/config/download-proxy/src")
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger(__name__)
@@ -69,17 +69,48 @@ async def health_check():
 
 
 @app.get("/")
-async def root():
+@app.get("/dashboard")
+async def dashboard():
+    dashboard_path = os.path.join(
+        os.path.dirname(__file__), "..", "ui", "templates", "dashboard.html"
+    )
+    dashboard_path = os.path.normpath(dashboard_path)
+    if os.path.isfile(dashboard_path):
+        return FileResponse(dashboard_path)
     return {
-        "service": "qBittorrent Merge Search Service",
+        "message": "Merge Search API",
         "version": "1.0.0",
-        "endpoints": {
-            "search": "/api/v1/search",
-            "search_stream": "/api/v1/search/stream/{search_id}",
-            "downloads": "/api/v1/downloads/active",
-            "hooks": "/api/v1/hooks",
-            "health": "/health",
-        },
+        "dashboard": "not found",
+    }
+
+
+@app.get("/api/v1/stats")
+async def stats():
+    orch = (
+        app.state.search_orchestrator
+        if hasattr(app.state, "search_orchestrator")
+        else None
+    )
+    active = 0
+    completed = 0
+    trackers = []
+    if orch is not None:
+        for sid, meta in orch._active_searches.items():
+            if meta.status == "completed":
+                completed += 1
+            elif meta.status in ("pending", "running"):
+                active += 1
+        enabled_trackers = orch._get_enabled_trackers()
+        trackers = [
+            {"name": t.name, "url": t.url, "enabled": t.enabled}
+            for t in enabled_trackers
+        ]
+    return {
+        "active_searches": active,
+        "completed_searches": completed,
+        "total_searches": active + completed,
+        "trackers": trackers,
+        "trackers_count": len(trackers),
     }
 
 

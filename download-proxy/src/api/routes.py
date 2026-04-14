@@ -283,9 +283,38 @@ async def get_active_downloads():
     return {"downloads": [], "count": 0, "error": "unavailable"}
 
 
+TRACKER_DOMAINS = (
+    "rutracker.org",
+    "rutracker.nl",
+    "kinozal.tv",
+    "kinozal.guru",
+    "nnmclub.to",
+    "nnmclub.ro",
+)
+
+
+def _is_tracker_url(url: str) -> Optional[str]:
+    from urllib.parse import urlparse
+
+    try:
+        host = urlparse(url).hostname or ""
+        for domain in TRACKER_DOMAINS:
+            if host == domain or host.endswith("." + domain):
+                if "rutracker" in domain:
+                    return "rutracker"
+                if "kinozal" in domain:
+                    return "kinozal"
+                if "nnmclub" in domain:
+                    return "nnmclub"
+    except Exception:
+        pass
+    return None
+
+
 @router.post("/download")
 async def initiate_download(request: DownloadRequest, req: Request):
     import aiohttp
+    import tempfile
 
     download_id = str(uuid.uuid4())
     qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:18085")
@@ -306,26 +335,78 @@ async def initiate_download(request: DownloadRequest, req: Request):
                         "status": "auth_failed",
                         "results": [],
                     }
-                cookies = resp.cookies
+                qbit_cookies = resp.cookies
 
             for url in request.download_urls[:5]:
                 try:
-                    async with session.post(
-                        f"{qbit_url}/api/v2/torrents/add",
-                        data={"urls": url},
-                        cookies=cookies,
-                    ) as resp:
-                        if resp.status in (200, 201):
-                            results.append({"url": url, "status": "added"})
-                        else:
-                            text = await resp.text()
+                    tracker = _is_tracker_url(url)
+                    if tracker:
+                        orch = _get_orchestrator(req)
+                        torrent_data = await orch.fetch_torrent(tracker, url)
+                        if torrent_data is None:
                             results.append(
                                 {
                                     "url": url,
                                     "status": "failed",
-                                    "detail": text[:200],
+                                    "detail": "could not fetch torrent file from tracker",
                                 }
                             )
+                            continue
+                        with tempfile.NamedTemporaryFile(
+                            suffix=".torrent", delete=False
+                        ) as tmp:
+                            tmp.write(torrent_data)
+                            tmp_path = tmp.name
+                        try:
+                            with open(tmp_path, "rb") as f:
+                                form = aiohttp.FormData()
+                                form.add_field(
+                                    "torrents",
+                                    f,
+                                    filename=f"{tracker}_{download_id[:8]}.torrent",
+                                    content_type="application/x-bittorrent",
+                                )
+                                async with session.post(
+                                    f"{qbit_url}/api/v2/torrents/add",
+                                    data=form,
+                                    cookies=qbit_cookies,
+                                ) as add_resp:
+                                    if add_resp.status in (200, 201):
+                                        results.append(
+                                            {
+                                                "url": url,
+                                                "status": "added",
+                                                "method": "proxy",
+                                            }
+                                        )
+                                    else:
+                                        text = await add_resp.text()
+                                        results.append(
+                                            {
+                                                "url": url,
+                                                "status": "failed",
+                                                "detail": text[:200],
+                                            }
+                                        )
+                        finally:
+                            os.unlink(tmp_path)
+                    else:
+                        async with session.post(
+                            f"{qbit_url}/api/v2/torrents/add",
+                            data={"urls": url},
+                            cookies=qbit_cookies,
+                        ) as resp:
+                            if resp.status in (200, 201):
+                                results.append({"url": url, "status": "added"})
+                            else:
+                                text = await resp.text()
+                                results.append(
+                                    {
+                                        "url": url,
+                                        "status": "failed",
+                                        "detail": text[:200],
+                                    }
+                                )
                 except Exception as e:
                     results.append({"url": url, "status": "error", "message": str(e)})
     except Exception as e:
