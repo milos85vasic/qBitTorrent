@@ -7,7 +7,7 @@ from helpers import retrieve_url
 from novaprinter import prettyPrinter
 
 
-class kickasstorrents(object):
+class kickass(object):
     url = "https://katcr.to/"
     name = "Kickasstorrents"
 
@@ -68,11 +68,7 @@ class kickasstorrents(object):
 
     def search(self, what, cat="all"):
         parser = self.HTMLParser(self.url)
-        category = (
-            ""
-            if cat == "all"
-            else "category/{0}/".format(self.supported_categories[cat])
-        )
+        category = "" if cat == "all" else "category/{0}/".format(self.supported_categories[cat])
         counter: int = 0
         while True:
             url = "{0}search/{1}/{2}{3}/".format(self.url, what, category, counter)

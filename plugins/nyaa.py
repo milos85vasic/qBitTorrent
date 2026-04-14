@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-#VERSION: 1.3
-#AUTHORS: Joost Bremmer (toost.b@gmail.com)
+# VERSION: 1.3
+# AUTHORS: Joost Bremmer (toost.b@gmail.com)
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,9 +17,9 @@
 
 
 try:
-    from HTMLParser import HTMLParser
-except ModuleNotFoundError:
     from html.parser import HTMLParser
+except ModuleNotFoundError:
+    from HTMLParser import HTMLParser
 
 # import qBT modules
 try:
@@ -29,11 +29,11 @@ except ModuleNotFoundError:
     pass
 
 
-class nyaasi(object):
+class nyaa(object):
     """Class used by qBittorrent to search for torrents."""
 
-    url = 'https://nyaa.si'
-    name = 'Nyaa.si'
+    url = "https://nyaa.si"
+    name = "Nyaa.si"
 
     # Whether to use magnet links or download torrent files ###################
     #
@@ -47,14 +47,15 @@ class nyaasi(object):
     # 'all', 'movies', 'tv', 'music', 'games', 'anime', 'software', 'pictures',
     # 'books'
     supported_categories = {
-            'all': '0_0',
-            'anime': '1_0',
-            'books': '3_0',
-            'music': '2_0',
-            'pictures': '5_0',
-            'software': '6_0',
-            'tv': '4_0',
-            'movies': '4_0'}
+        "all": "0_0",
+        "anime": "1_0",
+        "books": "3_0",
+        "music": "2_0",
+        "pictures": "5_0",
+        "software": "6_0",
+        "tv": "4_0",
+        "movies": "4_0",
+    }
 
     class NyaasiParser(HTMLParser):
         """Parses Nyaa.si browse page for search results and stores them."""
@@ -82,48 +83,42 @@ class nyaasi(object):
 
         def handle_starttag(self, tag, attr):
             """Tell the parser what to do with which tags."""
-            if tag == 'a':
+            if tag == "a":
                 self.start_a(attr)
-            elif tag == 'td' and self.td_counter == 2:
+            elif tag == "td" and self.td_counter == 2:
                 try:
                     attr_dict = dict(attr)
-                    self.curr['pub_date'] = attr_dict.get('data-timestamp')
+                    self.curr["pub_date"] = attr_dict.get("data-timestamp")
                 except KeyError:
-                    self.curr['pub_date'] = -1
+                    self.curr["pub_date"] = -1
 
         def handle_endtag(self, tag):
             """Handle the closing of table cells."""
-            if tag == 'td':
+            if tag == "td":
                 self.start_td()
 
         def start_a(self, attr):
             """Handle the opening of anchor tags."""
             params = dict(attr)
             # get torrent name
-            if 'title' in params and 'class' not in params \
-                    and params['href'].startswith('/view/'):
-                hit = {
-                        'name': params['title'],
-                        'desc_link': self.engine_url + params['href']}
+            if "title" in params and "class" not in params and params["href"].startswith("/view/"):
+                hit = {"name": params["title"], "desc_link": self.engine_url + params["href"]}
                 if not self.curr:
-                    hit['engine_url'] = self.engine_url
+                    hit["engine_url"] = self.engine_url
                     self.curr = hit
-            elif 'href' in params and self.curr:
+            elif "href" in params and self.curr:
                 # skip unrelated links
-                if not params['href'].startswith("magnet:?") and \
-                        not params['href'].endswith(".torrent"):
+                if not params["href"].startswith("magnet:?") and not params["href"].endswith(".torrent"):
                     return
 
                 # check whether to use torrent files or magnet links,
                 # then search for a matching download link, and move on
-                if not self.use_magnet_links and \
-                        params['href'].endswith(".torrent"):
-                    self.curr['link'] = self.engine_url + params['href']
+                if not self.use_magnet_links and params["href"].endswith(".torrent"):
+                    self.curr["link"] = self.engine_url + params["href"]
                     self.td_counter += 1
 
-                elif params['href'].startswith("magnet:?") \
-                        and self.use_magnet_links:
-                    self.curr['link'] = params['href']
+                elif params["href"].startswith("magnet:?") and self.use_magnet_links:
+                    self.curr["link"] = params["href"]
                     self.td_counter += 1
 
         def start_td(self):
@@ -145,26 +140,26 @@ class nyaasi(object):
             if self.td_counter > 0 and self.td_counter <= 5:
                 # Catch the size
                 if self.td_counter == 1:
-                    self.curr['size'] = data.strip()
+                    self.curr["size"] = data.strip()
                 # Catch the seeds
                 elif self.td_counter == 3:
                     try:
-                        self.curr['seeds'] = int(data.strip())
+                        self.curr["seeds"] = int(data.strip())
                     except ValueError:
-                        self.curr['seeds'] = -1
+                        self.curr["seeds"] = -1
                 # Catch the leechers
                 elif self.td_counter == 4:
                     try:
-                        self.curr['leech'] = int(data.strip())
+                        self.curr["leech"] = int(data.strip())
                     except ValueError:
-                        self.curr['leech'] = -1
+                        self.curr["leech"] = -1
                 # The rest is not supported by prettyPrinter
                 else:
                     pass
 
     # DO NOT CHANGE the name and parameters of this function
     # This function will be the one called by nova2.py
-    def search(self, what, cat='all'):
+    def search(self, what, cat="all"):
         """
         Retreive and parse engine search results by category and query.
 
@@ -173,10 +168,7 @@ class nyaasi(object):
                      (e.g. "Ubuntu+Linux")
         :param cat:  the name of a search category, see supported_categories.
         """
-        url = str("{0}/?f=0&s=seeders&o=desc&c={1}&q={2}"
-                  .format(self.url,
-                          self.supported_categories.get(cat),
-                          what))
+        url = str("{0}/?f=0&s=seeders&o=desc&c={1}&q={2}".format(self.url, self.supported_categories.get(cat), what))
 
         hits = []
         page = 1

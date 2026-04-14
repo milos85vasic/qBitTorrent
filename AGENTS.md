@@ -132,7 +132,7 @@ There is **no CI pipeline, no linter config, no type checking**. `ruff` is used 
 
 ### Plugin Management
 ```bash
-./install-plugin.sh --all              # Install the 12 managed plugins
+./install-plugin.sh --all              # Install all 42 managed plugins
 ./install-plugin.sh rutracker rutor    # Install specific ones
 ./install-plugin.sh --verify           # Verify installation
 ./install-plugin.sh --local --all      # Install to local qBittorrent (~/.local/share/...)
@@ -140,12 +140,10 @@ There is **no CI pipeline, no linter config, no type checking**. `ruff` is used 
 
 ## Plugin System
 
-**`plugins/` contains 35+ tracker plugins**, but `install-plugin.sh` only manages these 12:
-`eztv jackett limetorrents piratebay solidtorrents torlock torrentproject torrentscsv rutracker rutor kinozal nnmclub`
+**`plugins/` contains 42 tracker plugins**, all managed by `install-plugin.sh`:
+`academictorrents ali213 anilibra audiobookbay bitru bt4g btsow extratorrent eztv gamestorrents glotorrents iptorrents jackett kickass kinozal limetorrents linuxtracker megapeer nnmclub nyaa one337x pctorrent piratebay pirateiro rockbox rutor rutracker snowfl solidtorrents therarbg tokyotoshokan torlock torrentdownload torrentfunk torrentgalaxy torrentkitty torrentproject torrentscsv xfsub yihua yourbittorrent yts`
 
-The remaining plugins (nyaa, yts, torrentgalaxy, etc.) exist in `plugins/` but are not in the install script's array.
-
-Plugin support files live alongside plugins: `helpers.py`, `nova2.py`, `novaprinter.py`, `socks.py`, `download_proxy.py`.
+Plugin support files live alongside plugins: `helpers.py`, `nova2.py`, `novaprinter.py`, `socks.py`, `download_proxy.py`, `env_loader.py`.
 
 WebUI-compatible private tracker plugins are also in `plugins/webui_compatible/` (rutracker, kinozal, nnmclub variants).
 
