@@ -25,20 +25,6 @@ TrackerValidator = _validator_mod.TrackerValidator
 ScrapeResult = _validator_mod.ScrapeResult
 TrackerStatus = _validator_mod.TrackerStatus
 
-import pytest
-from merge_service.validator import (
-    TrackerValidator,
-    ScrapeResult,
-    TrackerStatus,
-)
-
-import pytest
-from merge_service.validator import (
-    TrackerValidator,
-    ScrapeResult,
-    TrackerStatus,
-)
-
 
 class TestTrackerValidator:
     """Tests for TrackerValidator class."""

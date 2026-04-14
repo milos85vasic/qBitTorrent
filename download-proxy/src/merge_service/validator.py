@@ -161,14 +161,145 @@ class TrackerValidator:
             )
 
     async def _udp_scrape(self, tracker_url: str) -> ScrapeResult:
-        """Perform UDP scrape (BEP 15) - placeholder for UDP implementation."""
-        # UDP scrape requires socket operations
-        # For now, return offline as fallback already tried HTTP
-        return ScrapeResult(
-            tracker=tracker_url,
-            status=TrackerStatus.OFFLINE,
-            error="UDP scrape not implemented",
-        )
+        """Perform UDP scrape (BEP 15)."""
+        import struct
+        import random
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(tracker_url)
+            host = parsed.hostname
+            port = parsed.port or 80
+
+            if not host:
+                return ScrapeResult(
+                    tracker=tracker_url,
+                    status=TrackerStatus.OFFLINE,
+                    error="Invalid tracker URL",
+                )
+
+            loop = asyncio.get_event_loop()
+
+            class UDPProtocol(asyncio.DatagramProtocol):
+                def __init__(self):
+                    self.response_future = loop.create_future()
+                    self.transport = None
+
+                def connection_made(self, transport):
+                    self.transport = transport
+
+                def datagram_received(self, data, addr):
+                    if not self.response_future.done():
+                        self.response_future.set_result(data)
+
+                def error_received(self, exc):
+                    if not self.response_future.done():
+                        self.response_future.set_exception(exc)
+
+                def connection_lost(self, exc):
+                    if not self.response_future.done():
+                        self.response_future.set_exception(
+                            exc or asyncio.TimeoutError()
+                        )
+
+            transport, protocol = await asyncio.wait_for(
+                loop.create_datagram_endpoint(UDPProtocol, remote_addr=(host, port)),
+                timeout=self.UDP_TIMEOUT,
+            )
+
+            try:
+                connect_id = 0x41727101980
+                action = 0
+                transaction_id = random.randint(0, 0x7FFFFFFF)
+
+                connect_req = struct.pack("!qii", connect_id, action, transaction_id)
+                transport.sendto(connect_req)
+
+                connect_resp = await asyncio.wait_for(
+                    protocol.response_future, timeout=self.UDP_TIMEOUT
+                )
+
+                if len(connect_resp) < 16:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.OFFLINE,
+                        error="UDP connect response too short",
+                    )
+
+                resp_action, resp_tid, conn_id = struct.unpack(
+                    "!iiq", connect_resp[:16]
+                )
+
+                if resp_action != 0 or resp_tid != transaction_id:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.OFFLINE,
+                        error="UDP connect handshake failed",
+                    )
+
+                info_hash = parsed.query
+                if not info_hash:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.HEALTHY,
+                        seeds=0,
+                        leechers=0,
+                    )
+
+                scrape_action = 2
+                scrape_tid = random.randint(0, 0x7FFFFFFF)
+
+                try:
+                    ih_bytes = bytes.fromhex(info_hash[:40])
+                except ValueError:
+                    ih_bytes = info_hash.encode()[:20]
+
+                scrape_req = struct.pack("!qii", conn_id, scrape_action, scrape_tid)
+                scrape_req += ih_bytes
+
+                protocol.response_future = loop.create_future()
+                transport.sendto(scrape_req)
+
+                scrape_resp = await asyncio.wait_for(
+                    protocol.response_future, timeout=self.UDP_TIMEOUT
+                )
+
+                if len(scrape_resp) < 20:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.OFFLINE,
+                        error="UDP scrape response too short",
+                    )
+
+                s_action, s_tid = struct.unpack("!ii", scrape_resp[:8])
+                if s_action == 3:
+                    return ScrapeResult(
+                        tracker=tracker_url,
+                        status=TrackerStatus.OFFLINE,
+                        error="UDP scrape error from tracker",
+                    )
+
+                seeders, completed, leechers = struct.unpack("!iii", scrape_resp[8:20])
+
+                return ScrapeResult(
+                    tracker=tracker_url,
+                    status=TrackerStatus.HEALTHY,
+                    seeds=seeders,
+                    leechers=leechers,
+                    complete=completed,
+                )
+
+            finally:
+                transport.close()
+
+        except asyncio.TimeoutError:
+            return ScrapeResult(
+                tracker=tracker_url, status=TrackerStatus.OFFLINE, error="UDP timeout"
+            )
+        except Exception as e:
+            return ScrapeResult(
+                tracker=tracker_url, status=TrackerStatus.OFFLINE, error=str(e)
+            )
 
     def _announce_to_scrape(self, announce_url: str) -> Optional[str]:
         """Convert announce URL to scrape URL."""
