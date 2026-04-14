@@ -185,6 +185,7 @@ class SearchOrchestrator:
         self.validator = TrackerValidator()
         self._active_searches: Dict[str, SearchMetadata] = {}
         self._tracker_sessions: Dict[str, Any] = {}
+        self._last_merged_results: Dict[str, tuple] = {}
 
     def _load_env(self):
         import os
@@ -215,7 +216,9 @@ class SearchOrchestrator:
         validate_trackers: bool = True,
     ) -> SearchMetadata:
         import uuid
+        import logging
 
+        logger = logging.getLogger(__name__)
         search_id = str(uuid.uuid4())
         metadata = SearchMetadata(search_id=search_id, query=query, category=category)
         self._active_searches[search_id] = metadata
@@ -230,11 +233,16 @@ class SearchOrchestrator:
                     results = await self._search_tracker(tracker, query, category)
                     all_results.extend(results)
                     metadata.total_results += len(results)
+                    logger.info(
+                        f"Tracker {tracker.name}: {len(results)} results for '{query}'"
+                    )
                 except Exception as e:
                     metadata.errors.append(f"{tracker.name}: {str(e)}")
+                    logger.error(f"Tracker {tracker.name} error: {e}")
 
             merged = self.deduplicator.merge_results(all_results)
             metadata.merged_results = len(merged)
+            self._last_merged_results[search_id] = (merged, all_results)
             metadata.status = "completed"
             metadata.completed_at = datetime.utcnow()
         except Exception as e:
@@ -346,8 +354,8 @@ class SearchOrchestrator:
                     html_content = await resp.text()
 
                 results = self._parse_rutracker_html(html_content, base_url)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"RuTracker search error: {e}")
 
         return results
 
@@ -426,14 +434,17 @@ class SearchOrchestrator:
     async def _search_kinozal(self, query: str, category: str) -> List[SearchResult]:
         import gzip
         import os
+        import logging
         import aiohttp
         from urllib.parse import urlencode
 
+        logger = logging.getLogger(__name__)
         results = []
         username = os.getenv("KINOZAL_USERNAME")
         password = os.getenv("KINOZAL_PASSWORD")
 
         if not username or not password:
+            logger.warning("Kinozal credentials not configured")
             return []
 
         try:
@@ -449,23 +460,31 @@ class SearchOrchestrator:
                     data=login_data,
                     allow_redirects=False,
                 ) as login_resp:
-                    login_resp.raise_for_status()
+                    if login_resp.status not in (200, 301, 302):
+                        logger.error(f"Kinozal login failed: HTTP {login_resp.status}")
+                        return []
+                    cookie_dict = {c.key: c.value for c in login_resp.cookies.values()}
 
                 async with session.get(
-                    f"{base_url}/browse.php", params={"s": query}
+                    f"{base_url}/browse.php",
+                    params={"s": query},
+                    cookies=cookie_dict,
                 ) as resp:
                     raw = await resp.read()
                     if raw.startswith(b"\x1f\x8b\x08"):
                         raw = gzip.decompress(raw)
                     html = raw.decode("cp1251")
-                    cookie_dict = {c.key: c.value for c in resp.cookies.values()}
+                    for c in resp.cookies.values():
+                        cookie_dict[c.key] = c.value
+
                 self._tracker_sessions["kinozal"] = {
                     "cookies": cookie_dict,
                     "base_url": base_url,
                 }
             results = self._parse_kinozal_html(html, base_url)
-        except Exception:
-            pass
+            logger.info(f"Kinozal search '{query}': {len(results)} results")
+        except Exception as e:
+            logger.error(f"Kinozal search error: {e}")
 
         return results
 
@@ -509,9 +528,11 @@ class SearchOrchestrator:
 
     async def _search_nnmclub(self, query: str, category: str) -> List[SearchResult]:
         import os
+        import logging
         import aiohttp
         from urllib.parse import urlencode
 
+        logger = logging.getLogger(__name__)
         results = []
         cookies_raw = os.getenv("NNMCLUB_COOKIES")
 
@@ -546,8 +567,8 @@ class SearchOrchestrator:
                     "base_url": base_url,
                 }
             results = self._parse_nnmclub_html(html, base_url)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"NNMClub search error: {e}")
 
         return results
 
@@ -586,11 +607,13 @@ class SearchOrchestrator:
 
     async def _search_iptorrents(self, query: str, category: str) -> List[SearchResult]:
         import os
+        import logging
         import aiohttp
         import re
         import html
         from urllib.parse import urlencode
 
+        logger = logging.getLogger(__name__)
         results = []
         username = os.getenv("IPTORRENTS_USERNAME")
         password = os.getenv("IPTORRENTS_PASSWORD")
@@ -610,11 +633,16 @@ class SearchOrchestrator:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{base_url}/take_login.php",
+                    f"{base_url}/do-login.php",
                     data={"username": username, "password": password},
                     headers={"Referer": f"{base_url}/login.php"},
+                    allow_redirects=False,
                 ) as resp:
                     cookies = {c.key: c.value for c in resp.cookies.values()}
+                    if not cookies:
+                        logger.error(
+                            f"IPTorrents login failed: HTTP {resp.status}, no cookies returned"
+                        )
 
                 self._tracker_sessions["iptorrents"] = {
                     "cookies": cookies,
@@ -634,8 +662,8 @@ class SearchOrchestrator:
                     html_content = await resp.text()
 
                 results = self._parse_iptorrents_html(html_content, base_url)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"IPTorrents search error: {e}")
 
         return results
 
@@ -646,34 +674,51 @@ class SearchOrchestrator:
         import html
 
         results = []
-        tor_match = re.search(
-            r"<form>(<table id=torrents.+?)</form>", html_content, re.S
+        table_match = re.search(
+            r'<table[^>]*id="torrents"[^>]*>(.+?)</table>', html_content, re.S
         )
-        if not tor_match:
+        if not table_match:
             return results
-        tor_table = tor_match.groups()[0]
+        table = table_match.group(1)
 
-        row_re = re.compile(
-            r'<a class=" hv" href="(?P<desc_link>/details.+?)">(?P<name>.+?)</a>'
-            r'.*?href="(?P<link>/download.+?)"'
-            r".*?(?P<size>\d+?\.*?\d*?\s*(?:K|M|G)?B)"
-            r'.*?t_seeders">(?P<seeds>\d+)'
-            r'.*?t_leechers">(?P<leech>\d+?)</t',
-            re.S,
-        )
+        for row in re.finditer(r"<tr>(.+?)</tr>", table, re.S):
+            row_text = row.group(1)
+            if "<th" in row_text:
+                continue
 
-        for m in row_re.finditer(tor_table):
-            row_text = m.group(0)
-            is_free = bool(re.search(r'<span\s+class="free"[^>]*>', row_text, re.I))
+            name_match = re.search(
+                r'<a\s+class=" hv"\s+href="(?P<desc>/t/\d+)">(?P<name>.+?)</a>',
+                row_text,
+                re.S,
+            )
+            if not name_match:
+                continue
+
+            dl_match = re.search(
+                r'href="(?P<link>/download\.php/\d+/[^"]+\.torrent)"', row_text
+            )
+            if not dl_match:
+                continue
+
+            size_match = re.search(
+                r">(?P<size>[\d.]+\s*(?:K|M|G|T)?B)<", row_text, re.I
+            )
+
+            td_values = re.findall(r"<td[^>]*>(?P<val>\d+)</td>", row_text)
+            seeds = int(td_values[0]) if len(td_values) > 0 else 0
+            leechers = int(td_values[1]) if len(td_values) > 1 else 0
+
+            is_free = bool(re.search(r'class="free"', row_text, re.I))
+
             try:
                 results.append(
                     SearchResult(
-                        name=html.unescape(m.group("name")),
-                        size=m.group("size"),
-                        seeds=int(m.group("seeds")),
-                        leechers=int(m.group("leech")),
-                        link=base_url + m.group("link"),
-                        desc_link=base_url + m.group("desc_link"),
+                        name=html.unescape(name_match.group("name")),
+                        size=size_match.group("size") if size_match else "0 B",
+                        seeds=seeds,
+                        leechers=leechers,
+                        link=base_url + dl_match.group("link"),
+                        desc_link=base_url + name_match.group("desc"),
                         tracker="iptorrents",
                         engine_url=base_url,
                         freeleech=is_free,

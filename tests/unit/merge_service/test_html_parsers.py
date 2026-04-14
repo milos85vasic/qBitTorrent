@@ -281,3 +281,77 @@ class TestParseEdgeCases:
         html = '<td class="nam"><a href="/details.php?id=1">Name Only</a></td>'
         results = orchestrator._parse_kinozal_html(html, "https://kinozal.tv")
         assert results == []
+
+
+IPTORRENTS_SAMPLE_HTML = """<form><table id="torrents">
+<thead><tr><th>Type<th>Name<th>DL<th>Size<th>Files<th>S<th>L<th>C</tr></thead>
+<tr><td class="i p72"><a href="?72"><img src="https://example.com/movies.png" alt="Movies"></a></td><td class="al"><a class=" hv" href="/t/12345">Ubuntu Server 24.04 LTS</a><div class="sub">1 day ago</div></td><td><a href="/download.php/12345/Ubuntu.Server.torrent"><i class="fa fa-download"></i></a></td><td>4.5 GB</td><td><a href="/t/12345/files">2</a></td><td>335</td><td>16</td><td>0</td></tr>
+<tr><td class="i p72"><a href="?72"><img src="https://example.com/movies.png" alt="Movies"></a></td><td class="al"><a class=" hv" href="/t/67890">Ubuntu Desktop 22.04</a><div class="sub">3 days ago</div></td><td><a href="/download.php/67890/Ubuntu.Desktop.torrent"><i class="fa fa-download"></i></a></td><td>3.2 GB</td><td><a href="/t/67890/files">1</a></td><td>200</td><td>30</td><td>5</td></tr>
+</table></form>
+"""
+
+IPTORRENTS_FREELEECH_HTML = """<form><table id="torrents">
+<thead><tr><th>Type<th>Name<th>DL<th>Size<th>Files<th>S<th>L<th>C</tr></thead>
+<tr><td class="i p72"><a href="?72"><img src="https://example.com/movies.png" alt="Movies"></a></td><td class="al"><a class=" hv" href="/t/11111">Free Movie 2024 4K</a><div class="sub">2 hours ago</div><span class="free">FreeLeech</span></td><td><a href="/download.php/11111/Free.Movie.torrent"><i class="fa fa-download"></i></a></td><td>88.9 MB</td><td>3</td><td>100</td><td>50</td><td>10</td></tr>
+</table></form>
+"""
+
+
+class TestParseIptorrentsHtml:
+    def test_single_result(self, orchestrator):
+        results = orchestrator._parse_iptorrents_html(
+            IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com"
+        )
+        assert len(results) == 2
+        r = results[0]
+        assert "Ubuntu Server" in r.name
+        assert r.seeds == 335
+        assert r.leechers == 16
+        assert r.tracker == "iptorrents"
+        assert r.freeleech is False
+
+    def test_multiple_results(self, orchestrator):
+        results = orchestrator._parse_iptorrents_html(
+            IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com"
+        )
+        assert len(results) == 2
+        assert "Ubuntu Server" in results[0].name
+        assert results[0].seeds == 335
+        assert "Ubuntu Desktop" in results[1].name
+        assert results[1].seeds == 200
+
+    def test_freeleech_detected(self, orchestrator):
+        results = orchestrator._parse_iptorrents_html(
+            IPTORRENTS_FREELEECH_HTML, "https://iptorrents.com"
+        )
+        assert len(results) == 1
+        assert results[0].freeleech is True
+        assert "Free Movie" in results[0].name
+
+    def test_empty_html_returns_empty(self, orchestrator):
+        results = orchestrator._parse_iptorrents_html("", "https://iptorrents.com")
+        assert results == []
+
+    def test_malformed_html_returns_empty(self, orchestrator):
+        results = orchestrator._parse_iptorrents_html(
+            "<html><body>nothing</body></html>", "https://iptorrents.com"
+        )
+        assert results == []
+
+    def test_link_contains_base_url(self, orchestrator):
+        results = orchestrator._parse_iptorrents_html(
+            IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com"
+        )
+        assert results[0].link.startswith("https://iptorrents.com/download.php/")
+        assert results[0].desc_link.startswith("https://iptorrents.com/t/")
+
+    def test_size_parsed(self, orchestrator):
+        results = orchestrator._parse_iptorrents_html(
+            IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com"
+        )
+        assert "GB" in results[0].size or "4.5" in results[0].size
+
+    def test_header_row_skipped(self, orchestrator):
+        html = '<table id="torrents"><tr><th>Type<th>Name</tr></table>'
+        results = orchestrator._parse_iptorrents_html(html, "https://iptorrents.com")
+        assert results == []

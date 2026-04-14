@@ -87,9 +87,7 @@ class iptorrents(object):
         session.addheaders.append(("User-Agent", self.ua))
         session.addheaders.append(("Referrer", self.url + "/login.php"))
         try:
-            session.open(
-                self.url + "/take_login.php", urlencode(params).encode("utf-8")
-            )
+            session.open(self.url + "/do-login.php", urlencode(params).encode("utf-8"))
             self.session = session
         except URLError as e:
             logger.error(f"IPTorrents login failed: {e}")

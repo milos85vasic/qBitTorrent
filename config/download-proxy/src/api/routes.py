@@ -153,8 +153,6 @@ def _to_response(r) -> SearchResultResponse:
 
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest, req: Request):
-    from merge_service.search import TrackerSource
-
     orch = _get_orchestrator(req)
 
     metadata = await orch.search(
@@ -164,17 +162,8 @@ async def search(request: SearchRequest, req: Request):
         validate_trackers=request.validate_trackers,
     )
 
-    all_raw = []
-    for tn in metadata.trackers_searched:
-        try:
-            tracker = TrackerSource(name=tn, url=f"https://{tn}.org", enabled=True)
-            all_raw.extend(
-                await orch._search_tracker(tracker, request.query, request.category)
-            )
-        except Exception:
-            pass
-
-    merged = orch.deduplicator.merge_results(all_raw)
+    stored = orch._last_merged_results.get(metadata.search_id)
+    merged = stored[0] if stored else []
     results = []
     for m in merged:
         best = m.original_results[0] if m.original_results else None
