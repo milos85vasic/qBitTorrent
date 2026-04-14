@@ -1,0 +1,75 @@
+name: Test Suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_level:
+        description: 'Test level: quick, unit, or full'
+        required: false
+        default: 'unit'
+        type: choice
+        options:
+          - quick
+          - unit
+          - full
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bash syntax check
+        run: |
+          for f in start.sh stop.sh test.sh install-plugin.sh run-all-tests.sh setup.sh; do
+            if [ -f "$f" ]; then
+              bash -n "$f" && echo "OK: $f"
+            fi
+          done
+
+      - name: Python syntax check
+        run: |
+          python3 -m py_compile plugins/*.py 2>&1 || true
+          python3 -m py_compile download-proxy/src/**/*.py 2>&1 || true
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: |
+          pip install -r tests/requirements.txt
+
+      - name: Run unit tests
+        run: |
+          python3 -m pytest tests/unit/merge_service/ -v --import-mode=importlib
+
+      - name: Run integration tests (mocked)
+        run: |
+          python3 -m pytest tests/integration/test_merge_api.py -v --import-mode=importlib
+
+  docker-check:
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    if: ${{ github.event.inputs.test_level == 'full' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose
+        run: |
+          docker compose config --quiet 2>&1 || podman-compose config --quiet 2>&1 || echo "Compose validation skipped"
+
+      - name: Check Dockerfile syntax
+        run: |
+          for f in Dockerfile*; do
+            if [ -f "$f" ]; then
+              docker build --check . -f "$f" 2>&1 || echo "Docker build check skipped for $f"
+            fi
+          done

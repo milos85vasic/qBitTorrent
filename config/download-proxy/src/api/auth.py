@@ -1,0 +1,360 @@
+"""
+Tracker authentication endpoints — CAPTCHA proxy for RuTracker.
+"""
+
+import os
+import sys
+import re
+import base64
+import logging
+import secrets
+from typing import Optional
+
+sys.path.insert(0, "/config/download-proxy/src")
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+_pending_captchas: dict = {}
+
+
+def _get_orchestrator():
+    from api import orchestrator_instance
+
+    if orchestrator_instance is not None:
+        return orchestrator_instance
+    from merge_service.search import SearchOrchestrator
+
+    return SearchOrchestrator()
+
+
+class CaptchaLoginRequest(BaseModel):
+    cap_sid: str = Field(..., description="CAPTCHA session ID")
+    cap_code_field: str = Field(..., description="CAPTCHA code field name")
+    captcha_text: str = Field(..., description="User-entered CAPTCHA text")
+    captcha_token: str = Field(..., description="Token from /captcha endpoint")
+
+
+class CookieLoginRequest(BaseModel):
+    cookie_string: str = Field(..., description="Full cookie string from browser")
+
+
+@router.get("/rutracker/status")
+async def rutracker_auth_status():
+    orch = _get_orchestrator()
+    session = orch._tracker_sessions.get("rutracker")
+
+    if not session:
+        return {
+            "authenticated": False,
+            "status": "no_session",
+            "message": "No RuTracker session found. Login required.",
+        }
+
+    cookies = session.get("cookies", {})
+    if "bb_session" not in cookies:
+        return {
+            "authenticated": False,
+            "status": "no_cookie",
+            "message": "Session exists but no valid cookie. Re-login required.",
+        }
+
+    import aiohttp
+
+    base_url = session.get("base_url", "https://rutracker.org")
+    try:
+        async with aiohttp.ClientSession() as client:
+            async with client.get(
+                f"{base_url}/forum/index.php",
+                cookies=cookies,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                text = await resp.text()
+                if 'id="logged-in-username"' in text:
+                    return {
+                        "authenticated": True,
+                        "status": "active",
+                        "message": "RuTracker session is active.",
+                    }
+                return {
+                    "authenticated": False,
+                    "status": "expired",
+                    "message": "Session expired. Re-login required.",
+                }
+    except Exception as e:
+        return {
+            "authenticated": False,
+            "status": "error",
+            "message": f"Could not verify session: {e}",
+        }
+
+
+@router.get("/rutracker/captcha")
+async def rutracker_fetch_captcha():
+    import aiohttp
+
+    orch = _get_orchestrator()
+    orch._load_env()
+
+    username = os.getenv("RUTRACKER_USERNAME")
+    password = os.getenv("RUTRACKER_PASSWORD")
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=400,
+            detail="RUTRACKER_USERNAME and RUTRACKER_PASSWORD not configured",
+        )
+
+    base_url = (
+        os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org").split(",")[0].strip()
+    )
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{base_url}/forum/login.php",
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                login_html = await resp.text()
+
+            captcha_img = re.search(
+                r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"',
+                login_html,
+            )
+
+            if not captcha_img:
+                try:
+                    async with session.post(
+                        f"{base_url}/forum/login.php",
+                        data={
+                            "login_username": username,
+                            "login_password": password,
+                            "login": "\u0412\u0445\u043e\u0434",
+                        },
+                    ) as login_resp:
+                        login_text = await login_resp.text()
+                        cookies = {c.key: c.value for c in login_resp.cookies.values()}
+
+                    if (
+                        'id="logged-in-username"' in login_text
+                        or "bb_session" in cookies
+                    ):
+                        orch._tracker_sessions["rutracker"] = {
+                            "cookies": cookies,
+                            "base_url": base_url,
+                        }
+                        return {
+                            "captcha_required": False,
+                            "authenticated": True,
+                            "message": "Logged in successfully without CAPTCHA.",
+                        }
+
+                    captcha_img = re.search(
+                        r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"',
+                        login_text,
+                    )
+                    if not captcha_img:
+                        login_html = login_text
+                except Exception:
+                    pass
+
+            if not captcha_img:
+                return {
+                    "captcha_required": False,
+                    "authenticated": False,
+                    "message": "No CAPTCHA found on login page. Try logging in directly.",
+                }
+
+            cap_sid_match = re.search(r'name="cap_sid"\s+value="([^"]+)"', login_html)
+            cap_code_match = re.search(r'name="(cap_code_[^"]+)"', login_html)
+
+            if not cap_sid_match or not cap_code_match:
+                raise HTTPException(
+                    status_code=502,
+                    detail="Could not parse CAPTCHA form fields from login page",
+                )
+
+            captcha_image_url = captcha_img.group(1)
+            async with session.get(captcha_image_url) as img_resp:
+                img_bytes = await img_resp.read()
+                img_b64 = base64.b64encode(img_bytes).decode()
+
+            captcha_token = secrets.token_urlsafe(32)
+            _pending_captchas[captcha_token] = {
+                "cap_sid": cap_sid_match.group(1),
+                "cap_code_field": cap_code_match.group(1),
+                "base_url": base_url,
+            }
+
+            return {
+                "captcha_required": True,
+                "authenticated": False,
+                "captcha_image": f"data:image/png;base64,{img_b64}",
+                "captcha_token": captcha_token,
+                "message": "CAPTCHA detected. Submit the text via /auth/rutracker/login.",
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching RuTracker CAPTCHA: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to fetch login page: {e}")
+
+
+@router.post("/rutracker/login")
+async def rutracker_login_with_captcha(request: CaptchaLoginRequest):
+    import aiohttp
+
+    orch = _get_orchestrator()
+    orch._load_env()
+
+    username = os.getenv("RUTRACKER_USERNAME")
+    password = os.getenv("RUTRACKER_PASSWORD")
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=400,
+            detail="RUTRACKER_USERNAME and RUTRACKER_PASSWORD not configured",
+        )
+
+    pending = _pending_captchas.pop(request.captcha_token, None)
+    if not pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired captcha_token. Fetch a new one from /auth/rutracker/captcha.",
+        )
+
+    base_url = pending["base_url"]
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{base_url}/forum/login.php",
+                data={
+                    "login_username": username,
+                    "login_password": password,
+                    "login": "\u0412\u0445\u043e\u0434",
+                    "cap_sid": request.cap_sid,
+                    request.cap_code_field: request.captcha_text,
+                },
+            ) as resp:
+                text = await resp.text()
+                cookies = {c.key: c.value for c in resp.cookies.values()}
+
+            if 'id="logged-in-username"' in text or "bb_session" in cookies:
+                orch._tracker_sessions["rutracker"] = {
+                    "cookies": cookies,
+                    "base_url": base_url,
+                }
+                return {
+                    "authenticated": True,
+                    "message": "Successfully authenticated with RuTracker.",
+                }
+
+            captcha_img = re.search(
+                r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"', text
+            )
+            if captcha_img:
+                cap_sid_match = re.search(r'name="cap_sid"\s+value="([^"]+)"', text)
+                cap_code_match = re.search(r'name="(cap_code_[^"]+)"', text)
+                if cap_sid_match and cap_code_match:
+                    async with session.get(captcha_img.group(1)) as img_resp:
+                        img_bytes = await img_resp.read()
+                        img_b64 = base64.b64encode(img_bytes).decode()
+
+                    new_token = secrets.token_urlsafe(32)
+                    _pending_captchas[new_token] = {
+                        "cap_sid": cap_sid_match.group(1),
+                        "cap_code_field": cap_code_match.group(1),
+                        "base_url": base_url,
+                    }
+                    return {
+                        "authenticated": False,
+                        "captcha_required": True,
+                        "captcha_image": f"data:image/png;base64,{img_b64}",
+                        "captcha_token": new_token,
+                        "message": "Wrong CAPTCHA. A new one has been generated.",
+                    }
+
+            return {
+                "authenticated": False,
+                "message": "Login failed. Check credentials.",
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during RuTracker login: {e}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {e}")
+
+
+@router.post("/rutracker/cookie-login")
+async def rutracker_cookie_login(request: CookieLoginRequest):
+    orch = _get_orchestrator()
+
+    cookie_jar = {}
+    for pair in request.cookie_string.split(";"):
+        pair = pair.strip()
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            cookie_jar[k.strip()] = v.strip()
+
+    if "bb_session" not in cookie_jar:
+        raise HTTPException(
+            status_code=400,
+            detail="Cookie string must contain bb_session cookie.",
+        )
+
+    base_url = (
+        os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org").split(",")[0].strip()
+    )
+
+    import aiohttp
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{base_url}/forum/index.php",
+                cookies=cookie_jar,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                text = await resp.text()
+                if 'id="logged-in-username"' not in text:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Cookie is invalid or expired.",
+                    )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not verify cookie: {e}")
+
+    orch._tracker_sessions["rutracker"] = {
+        "cookies": cookie_jar,
+        "base_url": base_url,
+    }
+
+    return {
+        "authenticated": True,
+        "message": "Successfully authenticated with RuTracker via cookie.",
+    }
+
+
+@router.get("/status")
+async def all_trackers_auth_status():
+    orch = _get_orchestrator()
+    trackers = {}
+
+    for name in ["rutracker", "kinozal", "nnmclub", "iptorrents"]:
+        session = orch._tracker_sessions.get(name)
+        trackers[name] = {
+            "has_session": session is not None,
+            "base_url": session.get("base_url", "") if session else "",
+        }
+
+    return {"trackers": trackers}
+
+
+__all__ = ["router"]

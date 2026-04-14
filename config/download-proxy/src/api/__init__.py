@@ -116,6 +116,8 @@ async def stats():
 
 from .routes import router as api_router
 from .hooks import router as hooks_router
+from .auth import router as auth_router
 
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(hooks_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")

@@ -14,6 +14,7 @@ from datetime import datetime
 sys.path.insert(0, "/config/download-proxy/src")
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -192,6 +193,27 @@ async def search(request: SearchRequest, req: Request):
     results.sort(key=lambda x: x.seeds, reverse=True)
     results = results[: request.limit]
 
+    captcha_errors = [e for e in metadata.errors if "captcha" in e.lower()]
+    if captcha_errors and not results:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "search_id": metadata.search_id,
+                "query": metadata.query,
+                "status": "captcha_required",
+                "results": [],
+                "total_results": 0,
+                "merged_results": 0,
+                "trackers_searched": metadata.trackers_searched,
+                "errors": metadata.errors,
+                "message": "RuTracker requires CAPTCHA. Use /api/v1/auth/rutracker/captcha to solve it.",
+                "started_at": metadata.started_at.isoformat(),
+                "completed_at": metadata.completed_at.isoformat()
+                if metadata.completed_at
+                else None,
+            },
+        )
+
     return SearchResponse(
         search_id=metadata.search_id,
         query=metadata.query,
@@ -290,6 +312,8 @@ TRACKER_DOMAINS = (
     "kinozal.guru",
     "nnmclub.to",
     "nnmclub.ro",
+    "iptorrents.com",
+    "iptorrents.me",
 )
 
 
@@ -306,6 +330,8 @@ def _is_tracker_url(url: str) -> Optional[str]:
                     return "kinozal"
                 if "nnmclub" in domain:
                     return "nnmclub"
+                if "iptorrents" in domain:
+                    return "iptorrents"
     except Exception:
         pass
     return None
