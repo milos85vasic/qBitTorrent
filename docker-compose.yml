@@ -37,6 +37,8 @@ services:
       - KINOZAL_USERNAME=${KINOZAL_USERNAME}
       - KINOZAL_PASSWORD=${KINOZAL_PASSWORD}
       - NNMCLUB_COOKIES=${NNMCLUB_COOKIES}
+      - IPTORRENTS_USERNAME=${IPTORRENTS_USERNAME}
+      - IPTORRENTS_PASSWORD=${IPTORRENTS_PASSWORD}
     volumes:
       - ./config:/config
       - ./download-proxy:/config/download-proxy

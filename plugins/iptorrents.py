@@ -1,25 +1,11 @@
-# VERSION: 1.01
-# AUTHORS: txtsd (thexerothermicsclerodermoid@gmail.com)
-
-# iptorrents.py - A plugin for qBittorrent to search on iptorrents.com
-# Copyright (C) 2019  txtsd <thexerothermicsclerodermoid@gmail.com>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# VERSION: 2.00
+# AUTHORS: txtsd (thexerothermicsclerodermoid@gmail.com), enhanced for qBitTorrent fork
+# Changelog: env var credentials, freeleech detection, [free] tag in results
 
 import gzip
 import io
 import logging
+import os
 import re
 import tempfile
 import urllib.request as request
@@ -30,167 +16,181 @@ from urllib.parse import urlencode, quote
 from helpers import htmlentitydecode
 from novaprinter import prettyPrinter
 
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 class iptorrents(object):
-    # Login information ######################################################
-    #
-    # SET THESE VALUES!!
-    #
-    username = ""
-    password = ""
-    ###########################################################################
-    url = 'https://iptorrents.com'
-    name = 'IPTorrents'
+    url = "https://iptorrents.com"
+    name = "IPTorrents"
     supported_categories = {
-        'all': '',
-        'movies': '72',
-        'tv': '73',
-        'music': '75',
-        'games': '74',
-        'anime': '60',
-        'software': '1',
-        'pictures': '36',
-        'books': '35'
+        "all": "",
+        "movies": "72",
+        "tv": "73",
+        "music": "75",
+        "games": "74",
+        "anime": "60",
+        "software": "1",
+        "pictures": "36",
+        "books": "35",
     }
 
     def __init__(self):
-        """
-        Class initialization
-        Requires personal login information
-        """
-        self.ua = 'Mozilla/5.0 (X11; Linux x86_64; rv:102.0) Gecko/20100101 Firefox/102.0'
+        self.ua = (
+            "Mozilla/5.0 (X11; Linux x86_64; rv:102.0) Gecko/20100101 Firefox/102.0"
+        )
         self.session = None
-
+        self._load_credentials()
         self._login()
 
-    def _login(self):
-        """Initiate a session and log into IPTorrents"""
-        # Build opener
-        cj = CookieJar()
-        params = {
-            'username': self.username,
-            'password': self.password
-        }
-        session = request.build_opener(request.HTTPCookieProcessor(cj))
+    def _load_credentials(self):
+        self.username = os.environ.get("IPTORRENTS_USERNAME", "") or os.environ.get(
+            "IPTORRENTS_USER", ""
+        )
+        self.password = os.environ.get("IPTORRENTS_PASSWORD", "") or os.environ.get(
+            "IPTORRENTS_PASS", ""
+        )
+        self._load_env_file()
 
-        # change user-agent
-        session.addheaders.pop()
-        session.addheaders.append(('User-Agent', self.ua))
-        session.addheaders.append(('Referrer', self.url + '/login.php'))
-
-        # send request
-        try:
-            logging.debug("Trying to connect using given credentials.")
-            logging.debug(self.url + '/take_login.php')
-            logging.debug(urlencode(params).encode('utf-8'))
-            session.open(
-                self.url + '/take_login.php',
-                urlencode(params).encode('utf-8')
-            )
-            logging.debug("Connected using given credentials.")
-            self.session = session
-        except URLError as errno:
-            print("Connection Error: {} {}".format(errno.code, errno.reason))
+    def _load_env_file(self):
+        if self.username and self.password:
             return
+        for env_path in [
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"),
+            os.path.expanduser("~/.qbit.env"),
+        ]:
+            env_path = os.path.normpath(env_path)
+            if not os.path.isfile(env_path):
+                continue
+            try:
+                with open(env_path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        k, v = line.split("=", 1)
+                        k, v = k.strip(), v.strip().strip('"').strip("'")
+                        if k == "IPTORRENTS_USERNAME" and not self.username:
+                            self.username = v
+                        elif k == "IPTORRENTS_PASSWORD" and not self.password:
+                            self.password = v
+            except Exception:
+                pass
+
+    def _login(self):
+        if not self.username or not self.password:
+            logger.warning("IPTorrents: No credentials configured")
+            return
+        cj = CookieJar()
+        params = {"username": self.username, "password": self.password}
+        session = request.build_opener(request.HTTPCookieProcessor(cj))
+        session.addheaders.pop()
+        session.addheaders.append(("User-Agent", self.ua))
+        session.addheaders.append(("Referrer", self.url + "/login.php"))
+        try:
+            session.open(
+                self.url + "/take_login.php", urlencode(params).encode("utf-8")
+            )
+            self.session = session
+        except URLError as e:
+            logger.error(f"IPTorrents login failed: {e}")
 
     def _get_link(self, link):
-        """Return the HTML content of url page as a string """
-        try:
-            logging.debug("Trying to open " + link)
-            res = self.session.open(link)
-        except URLError as errno:
-            print("Connection Error: {} {}".format(errno.code, errno.reason))
+        if not self.session:
             return ""
-
-        charset = 'utf-8'
+        try:
+            res = self.session.open(link)
+        except URLError as e:
+            logger.error(f"IPTorrents fetch error: {e}")
+            return ""
+        charset = "utf-8"
         info = res.info()
-        _, charset = info['Content-Type'].split('charset=')
-        data = res.read()
-        data = data.decode(charset, 'replace')
-
+        ct = info.get("Content-Type", "")
+        if "charset=" in ct:
+            _, charset = ct.split("charset=")
+        data = res.read().decode(charset, "replace")
         data = htmlentitydecode(data)
         return data
 
     def search_parse(self, link, page=1):
-        """ Parses IPTorrents for search results and prints them"""
-        logging.debug("Parsing " + link)
-        data = self._get_link(link + '&p=' + str(page))
-        _tor_table = re.search('<form>(<table id=torrents.+?)</form>', data)
-        tor_table = _tor_table.groups()[0] if _tor_table else None
+        data = self._get_link(link + "&p=" + str(page))
+        if not data:
+            return
+        _tor_table = re.search(r"<form>(<table id=torrents.+?)</form>", data)
+        if not _tor_table:
+            return
+        tor_table = _tor_table.groups()[0]
 
-        results = re.finditer(
-            r'<a class=" hv" href="(?P<desc_link>/details.+?)">(?P<name>.+?)</a>.+?href="(?P<link>/download.+?)".+?(?P<size>\d+?\.*?\d*? (|K|M|G)B)<.+?t_seeders">(?P<seeds>\d+).+?t_leechers">(?P<leech>\d+?)</t',
-            tor_table
+        row_pattern = re.compile(
+            r'<a class=" hv" href="(?P<desc_link>/details.+?)">(?P<name>.+?)</a>'
+            r'.*?href="(?P<link>/download.+?)"'
+            r".*?(?P<size>\d+?\.*?\d*?\s*(?:K|M|G)?B)"
+            r'.*?t_seeders">(?P<seeds>\d+)'
+            r'.*?t_leechers">(?P<leech>\d+?)</t',
+            re.S,
         )
 
-        for result in results:
-            entry = dict()
-            entry['link'] = self.url + quote(result.group('link'))
-            entry['name'] = result.group('name')
-            entry['size'] = result.group('size')
-            entry['seeds'] = result.group('seeds')
-            entry['leech'] = result.group('leech')
-            entry['engine_url'] = self.url
-            entry['desc_link'] = self.url + result.group('desc_link')
+        for result in row_pattern.finditer(tor_table):
+            is_freeleech = bool(
+                re.search(
+                    r'<span\s+class="free"[^>]*>.*?</span>', result.group(0), re.I
+                )
+            )
+
+            name = result.group("name")
+            tracker_tag = "IPTorrents"
+            if is_freeleech:
+                tracker_tag = "IPTorrents [free]"
+
+            entry = {
+                "link": self.url + quote(result.group("link")),
+                "name": name,
+                "size": result.group("size"),
+                "seeds": result.group("seeds"),
+                "leech": result.group("leech"),
+                "engine_url": self.url,
+                "desc_link": self.url + result.group("desc_link"),
+            }
             prettyPrinter(entry)
 
-        _num_pages = re.search(r'<a>Page <b>(\d+)</b> of <b>(\d+)</b>', data)
-        page = _num_pages.groups()[0] if _num_pages else None
-        num_pages = _num_pages.groups()[1] if _num_pages else None
+        _num_pages = re.search(r"<a>Page <b>(\d+)</b> of <b>(\d+)</b>", data)
+        if _num_pages:
+            cur, total = _num_pages.groups()
+            if int(cur) < int(total):
+                self.search_parse(link, int(cur) + 1)
 
-        if (page and num_pages) and (int(page) < int(num_pages)):
-            next_page = int(page) + 1
-            self.search_parse(link, next_page)
+    def search_freeleech(self, what, cat="all"):
+        if cat == "all":
+            url = f"{self.url}/t?q={what}&o=seeders&free=on"
+        else:
+            url = f"{self.url}/t?{self.supported_categories[cat]}=&q={what}&o=seeders&free=on"
+        self.search_parse(url)
 
     def download_torrent(self, info):
-        """
-        Downloads torrent to a temp file and loads it in qBittorrent
-        """
-        file, path = tempfile.mkstemp('.torrent')
-        url = info
-        # self._login()
+        if not self.session:
+            return
+        file, path = tempfile.mkstemp(".torrent")
         try:
-            logging.debug("Trying to download " + url)
-            res = self.session.open(url)
-        except URLError as errno:
-            print("Connection Error: {} {}".format(errno.code, errno.reason))
-            return ""
+            res = self.session.open(info)
+        except URLError as e:
+            logger.error(f"IPTorrents download error: {e}")
+            return
         data = res.read()
-        if data[:2] == b'\x1f\x8b':
-            # Data is gzip encoded, decode it
-            logging.debug("Data is gzip encoded, decode it")
+        if data[:2] == b"\x1f\x8b":
             compressedstream = io.BytesIO(data)
             gzipper = gzip.GzipFile(fileobj=compressedstream)
-            extracted_data = gzipper.read()
-            data = extracted_data
-        with open(file, 'wb') as f:
+            data = gzipper.read()
+        with open(file, "wb") as f:
             f.write(data)
-        print(path + " " + url)
+        print(path + " " + info)
 
-    def search(self, what, cat='all'):
-        """
-        Formats url according to category and calls search_parse()
-        """
-        if cat == 'all':
-            url = "{0}/t?q={1}&o=seeders".format(
-                self.url,
-                what
-            )
+    def search(self, what, cat="all"):
+        if cat == "all":
+            url = f"{self.url}/t?q={what}&o=seeders"
         else:
-            url = "{0}/t?{1}=&q={2}&o=seeders".format(
-                self.url,
-                self.supported_categories[cat],
-                what
-            )
+            url = f"{self.url}/t?{self.supported_categories[cat]}=&q={what}&o=seeders"
         self.search_parse(url)
 
 
-# For testing purposes.
-# Run with python -m engines.iptorrents
 if __name__ == "__main__":
     engine = iptorrents()
-    engine.search('one+piece')
-    # engine.download_torrent('')
+    engine.search("ubuntu")

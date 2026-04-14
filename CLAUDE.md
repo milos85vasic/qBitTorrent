@@ -5,6 +5,7 @@
 - **WebUI credentials `admin`/`admin` are hardcoded** — do not change.
 - **Never commit `.env`** — it contains tracker credentials.
 - **Never commit `.ruff_cache/`** — add to `.gitignore`.
+- **Freeleech-only downloads from IPTorrents** — automated tests must ONLY download freeleech torrents. Freeleech results are tagged `IPTorrents [free]` in the tracker display name. Non-freeleech downloads cost ratio and must never be automated.
 
 ## Architecture
 

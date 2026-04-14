@@ -89,9 +89,10 @@ class SearchResult:
     pub_date: Optional[str] = None
     tracker: Optional[str] = None
     category: Optional[str] = None
+    freeleech: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "name": self.name,
             "link": self.link,
             "size": self.size,
@@ -102,7 +103,15 @@ class SearchResult:
             "pub_date": self.pub_date,
             "tracker": self.tracker,
             "category": self.category,
+            "freeleech": self.freeleech,
         }
+        if self.freeleech and self.tracker:
+            d["tracker_display"] = f"{self.tracker} [free]"
+        elif self.tracker:
+            d["tracker_display"] = self.tracker
+        else:
+            d["tracker_display"] = None
+        return d
 
 
 @dataclass
@@ -253,6 +262,12 @@ class SearchOrchestrator:
             trackers.append(
                 TrackerSource(name="nnmclub", url="https://nnmclub.to", enabled=True)
             )
+        if os.getenv("IPTORRENTS_USERNAME") and os.getenv("IPTORRENTS_PASSWORD"):
+            trackers.append(
+                TrackerSource(
+                    name="iptorrents", url="https://iptorrents.com", enabled=True
+                )
+            )
         if not trackers:
             trackers = [
                 TrackerSource(
@@ -279,6 +294,8 @@ class SearchOrchestrator:
                 results = await self._search_kinozal(query, category)
             elif tracker.name == "nnmclub":
                 results = await self._search_nnmclub(query, category)
+            elif tracker.name == "iptorrents":
+                results = await self._search_iptorrents(query, category)
         except Exception as e:
             logger.error(f"Error searching {tracker.name}: {e}")
 
@@ -565,6 +582,106 @@ class SearchOrchestrator:
 
         return results
 
+    async def _search_iptorrents(self, query: str, category: str) -> List[SearchResult]:
+        import os
+        import aiohttp
+        import re
+        import html
+        from urllib.parse import urlencode
+
+        results = []
+        username = os.getenv("IPTORRENTS_USERNAME")
+        password = os.getenv("IPTORRENTS_PASSWORD")
+        if not username or not password:
+            return []
+
+        base_url = "https://iptorrents.com"
+        cat_map = {
+            "movies": "72",
+            "tv": "73",
+            "music": "75",
+            "games": "74",
+            "anime": "60",
+            "software": "1",
+            "books": "35",
+        }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{base_url}/take_login.php",
+                    data={"username": username, "password": password},
+                    headers={"Referer": f"{base_url}/login.php"},
+                ) as resp:
+                    cookies = {c.key: c.value for c in resp.cookies.values()}
+
+                self._tracker_sessions["iptorrents"] = {
+                    "cookies": cookies,
+                    "base_url": base_url,
+                }
+
+                params = {"q": query, "o": "seeders"}
+                if category != "all" and category in cat_map:
+                    params[cat_map[category]] = ""
+
+                search_url = f"{base_url}/t?{urlencode(params)}"
+                async with session.get(
+                    search_url,
+                    cookies=cookies,
+                    headers={"Referer": f"{base_url}/t"},
+                ) as resp:
+                    html_content = await resp.text()
+
+                results = self._parse_iptorrents_html(html_content, base_url)
+        except Exception:
+            pass
+
+        return results
+
+    def _parse_iptorrents_html(
+        self, html_content: str, base_url: str
+    ) -> List[SearchResult]:
+        import re
+        import html
+
+        results = []
+        tor_match = re.search(
+            r"<form>(<table id=torrents.+?)</form>", html_content, re.S
+        )
+        if not tor_match:
+            return results
+        tor_table = tor_match.groups()[0]
+
+        row_re = re.compile(
+            r'<a class=" hv" href="(?P<desc_link>/details.+?)">(?P<name>.+?)</a>'
+            r'.*?href="(?P<link>/download.+?)"'
+            r".*?(?P<size>\d+?\.*?\d*?\s*(?:K|M|G)?B)"
+            r'.*?t_seeders">(?P<seeds>\d+)'
+            r'.*?t_leechers">(?P<leech>\d+?)</t',
+            re.S,
+        )
+
+        for m in row_re.finditer(tor_table):
+            row_text = m.group(0)
+            is_free = bool(re.search(r'<span\s+class="free"[^>]*>', row_text, re.I))
+            try:
+                results.append(
+                    SearchResult(
+                        name=html.unescape(m.group("name")),
+                        size=m.group("size"),
+                        seeds=int(m.group("seeds")),
+                        leechers=int(m.group("leech")),
+                        link=base_url + m.group("link"),
+                        desc_link=base_url + m.group("desc_link"),
+                        tracker="iptorrents",
+                        engine_url=base_url,
+                        freeleech=is_free,
+                    )
+                )
+            except Exception:
+                continue
+
+        return results
+
     async def fetch_torrent(self, tracker: str, url: str) -> Optional[bytes]:
         import os
         import aiohttp
@@ -582,6 +699,8 @@ class SearchOrchestrator:
                     await self._search_kinozal("__probe__", "all")
                 elif tracker == "nnmclub":
                     await self._search_nnmclub("__probe__", "all")
+                elif tracker == "iptorrents":
+                    await self._search_iptorrents("__probe__", "all")
             except Exception:
                 pass
             session_data = self._tracker_sessions.get(tracker)

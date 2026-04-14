@@ -4,6 +4,7 @@
 
 - **WebUI credentials `admin`/`admin` are hardcoded** in `start.sh` config generation, `docker-compose.yml`, and multiple scripts. Do not change them.
 - **Never commit `.env`** — it contains tracker credentials. `.env.example` is the template.
+- **Freeleech-only downloads from IPTorrents** — all automated testing must ONLY download freeleech torrents. Freeleech results are tagged `IPTorrents [free]` in tracker display name. Non-freeleech IPTorrents downloads cost ratio and must NEVER be triggered by automation or tests.
 
 ## Architecture
 

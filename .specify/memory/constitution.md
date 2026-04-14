@@ -178,6 +178,27 @@ stop, and testing each have dedicated scripts with consistent UX.
 platform, not Kubernetes operators. One-command operations reduce
 support burden and onboarding friction.
 
+### VIII. IPTorrents Freeleech Policy
+
+IPTorrents is a ratio-sensitive private tracker. Automated downloads
+MUST be freeleech-only to protect the user's ratio.
+
+- All automated tests and download automation MUST ONLY download
+  freeleech torrents from IPTorrents.
+- Freeleech detection is performed by checking the `<span class="free">`
+  HTML element in search results, and via the `&free=on` URL parameter
+  for freeleech-only filtering.
+- Freeleech results MUST be tagged with `IPTorrents [free]` in the
+  `tracker_display` field of search results.
+- Non-freeleech IPTorrents downloads cost upload ratio and MUST NEVER
+  be triggered by automation, tests, or scheduled tasks.
+- The `freeleech` boolean field on `SearchResult` MUST be present and
+  accurate for all IPTorrents results.
+
+**Rationale**: Downloading non-freeleech torrents from IPTorrents
+without seeding back degrades the user's ratio and risks account
+suspension. Automation must be ratio-safe by default.
+
 ## Security Requirements
 
 - `.env` file MUST have `600` permissions: `chmod 600 .env`.
@@ -241,4 +262,4 @@ ad-hoc decisions.
 - The `CONTRIBUTING.md` file governs external contribution workflow and
   MUST remain consistent with the principles herein.
 
-**Version**: 1.0.0 | **Ratified**: 2026-04-13 | **Last Amended**: 2026-04-13
+**Version**: 1.1.0 | **Ratified**: 2026-04-13 | **Last Amended**: 2026-04-14
