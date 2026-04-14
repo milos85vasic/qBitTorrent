@@ -10,7 +10,7 @@ import json
 import uuid
 import logging
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -104,7 +104,7 @@ async def create_hook(request: HookCreateRequest):
         "enabled": request.enabled,
         "timeout": request.timeout,
         "environment": request.environment,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     hooks = _load_hooks()

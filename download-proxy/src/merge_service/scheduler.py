@@ -13,7 +13,7 @@ import os
 import json
 from typing import List, Optional, Dict, Any, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -143,7 +143,7 @@ class Scheduler:
             query=query,
             category=category,
             interval_minutes=interval_minutes,
-            next_run=datetime.utcnow(),
+            next_run=datetime.now(timezone.utc),
         )
 
         self._scheduled_searches[search.id] = search
@@ -202,7 +202,7 @@ class Scheduler:
         """Main scheduler loop."""
         while self._running:
             try:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
 
                 # Check each active scheduled search
                 for search in self.get_active_scheduled_searches():

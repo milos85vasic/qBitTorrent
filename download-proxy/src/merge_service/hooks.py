@@ -14,7 +14,7 @@ import logging
 import json
 from typing import List, Optional, Callable, Dict, Any
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
@@ -39,7 +39,7 @@ class HookEvent:
     """Event payload for hook execution."""
 
     event_type: HookEventType
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     search_id: Optional[str] = None
     download_id: Optional[str] = None
     data: Dict[str, Any] = field(default_factory=dict)
@@ -136,7 +136,7 @@ class HookDispatcher:
             env["DOWNLOAD_ID"] = event.download_id
 
         # Execute script
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         try:
             result = subprocess.run(
@@ -147,7 +147,7 @@ class HookDispatcher:
                 env=env,
             )
 
-            duration = (datetime.utcnow() - start_time).total_seconds()
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
 
             log_entry = {
                 "hook_name": hook.name,

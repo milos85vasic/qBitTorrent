@@ -334,8 +334,8 @@ def _is_tracker_url(url: str) -> Optional[str]:
                     return "nnmclub"
                 if "iptorrents" in domain:
                     return "iptorrents"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Could not identify tracker from URL: {e}")
     return None
 
 

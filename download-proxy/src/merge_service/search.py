@@ -4,7 +4,7 @@ Core data models for the merge service.
 
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -122,7 +122,7 @@ class MergedResult:
     total_leechers: int = 0
     best_quality: Optional[QualityTier] = None
     download_urls: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def add_source(self, result: SearchResult):
         self.original_results.append(result)
@@ -151,7 +151,7 @@ class SearchMetadata:
     search_id: str
     query: str
     category: str = "all"
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
     total_results: int = 0
     merged_results: int = 0
@@ -195,7 +195,10 @@ class SearchOrchestrator:
 
         try:
             load_env()
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                f"config.load_env() failed, falling back to manual parsing: {e}"
+            )
             import os
 
             for path in [
@@ -252,11 +255,11 @@ class SearchOrchestrator:
             metadata.merged_results = len(merged)
             self._last_merged_results[search_id] = (merged, all_results)
             metadata.status = "completed"
-            metadata.completed_at = datetime.utcnow()
+            metadata.completed_at = datetime.now(timezone.utc)
         except Exception as e:
             metadata.status = "failed"
             metadata.errors.append(str(e))
-            metadata.completed_at = datetime.utcnow()
+            metadata.completed_at = datetime.now(timezone.utc)
 
         return metadata
 
@@ -414,7 +417,8 @@ class SearchOrchestrator:
                             engine_url=base_url,
                         )
                     )
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Skipping malformed RuTracker result: {e}")
                     continue
 
         return results
@@ -529,7 +533,8 @@ class SearchOrchestrator:
                         engine_url=base_url,
                     )
                 )
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Skipping malformed Kinozal result: {e}")
                 continue
 
         return results
@@ -608,7 +613,8 @@ class SearchOrchestrator:
                         engine_url=base_url,
                     )
                 )
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Skipping malformed NNMClub result: {e}")
                 continue
 
         return results
@@ -732,7 +738,8 @@ class SearchOrchestrator:
                         freeleech=is_free,
                     )
                 )
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Skipping malformed IPTorrents result: {e}")
                 continue
 
         return results
