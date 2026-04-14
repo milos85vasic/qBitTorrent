@@ -45,9 +45,7 @@ def _fetch(
 
 
 def _has_iptorrents_creds():
-    return bool(
-        os.environ.get("IPTORRENTS_USERNAME") and os.environ.get("IPTORRENTS_PASSWORD")
-    )
+    return bool(os.environ.get("IPTORRENTS_USERNAME") and os.environ.get("IPTORRENTS_PASSWORD"))
 
 
 @pytest.fixture(scope="module")
@@ -73,18 +71,14 @@ no_creds = pytest.mark.skipif(
 
 class TestIPTorrentsPluginUnit:
     def test_plugin_imports(self):
-        sys.path.insert(
-            0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins")
-        )
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins"))
         from iptorrents import iptorrents
 
         assert iptorrents.url == "https://iptorrents.com"
         assert iptorrents.name == "IPTorrents"
 
     def test_plugin_categories(self):
-        sys.path.insert(
-            0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins")
-        )
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins"))
         from iptorrents import iptorrents
 
         cats = iptorrents.supported_categories
@@ -94,17 +88,13 @@ class TestIPTorrentsPluginUnit:
         assert cats["tv"] == "73"
 
     def test_plugin_has_search_freeleech_method(self):
-        sys.path.insert(
-            0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins")
-        )
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins"))
         from iptorrents import iptorrents
 
         assert hasattr(iptorrents, "search_freeleech")
 
     def test_plugin_has_download_method(self):
-        sys.path.insert(
-            0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins")
-        )
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins"))
         from iptorrents import iptorrents
 
         assert hasattr(iptorrents, "download_torrent")
@@ -118,9 +108,7 @@ class TestIPTorrentsMergeService:
         tracker_names = [t["name"] for t in data.get("trackers", [])]
         if not _has_iptorrents_creds():
             pytest.skip("IPTorrents creds not set")
-        assert "iptorrents" in tracker_names, (
-            f"iptorrents not in enabled trackers: {tracker_names}"
-        )
+        assert "iptorrents" in tracker_names, f"iptorrents not in enabled trackers: {tracker_names}"
 
     @no_creds
     def test_search_returns_results(self):
@@ -158,26 +146,24 @@ class TestIPTorrentsFreeleechDetection:
     def test_parse_iptorrents_html_freeleech(self):
         sys.path.insert(
             0,
-            os.path.join(
-                os.path.dirname(__file__), "..", "..", "download-proxy", "src"
-            ),
+            os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"),
         )
         from merge_service.search import SearchOrchestrator
 
         orch = SearchOrchestrator()
-        html = """<form><table id=torrents><tr>
-<td><a class=" hv" href="/details.php?id=123">Ubuntu 22.04 LTS</a>
+        html = """<form><table id="torrents"><tr>
+<td><a class=" hv" href="/t/123">Ubuntu 22.04 LTS</a>
 <span class="free">Free!</span></td>
-<td><a href="/download.php/123.torrent?torrent_key=abc">DL</a></td>
+<td><a href="/download.php/123/ubuntu.torrent?torrent_key=abc">DL</a></td>
 <td>4.5 GB</td>
-<td class="t_seeders">50</td>
-<td class="t_leechers">10</td></t</tr>
+<td>50</td>
+<td>10</td></tr>
 <tr>
-<td><a class=" hv" href="/details.php?id=456">Ubuntu 20.04 LTS</a></td>
-<td><a href="/download.php/456.torrent?torrent_key=def">DL</a></td>
+<td><a class=" hv" href="/t/456">Ubuntu 20.04 LTS</a></td>
+<td><a href="/download.php/456/ubuntu20.torrent?torrent_key=def">DL</a></td>
 <td>3.2 GB</td>
-<td class="t_seeders">30</td>
-<td class="t_leechers">5</td></t</tr>
+<td>30</td>
+<td>5</td></tr>
 </table></form>"""
         results = orch._parse_iptorrents_html(html, "https://iptorrents.com")
         assert len(results) == 2, f"Expected 2 results, got {len(results)}"
@@ -192,9 +178,7 @@ class TestIPTorrentsFreeleechDetection:
     def test_freeleech_tracker_display_tag(self):
         sys.path.insert(
             0,
-            os.path.join(
-                os.path.dirname(__file__), "..", "..", "download-proxy", "src"
-            ),
+            os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"),
         )
         from merge_service.search import SearchResult
 
@@ -240,9 +224,7 @@ class TestIPTorrentsDownloadFreeleechOnly:
 
         result = json.loads(body)
         ip_results = [
-            r
-            for r in result.get("results", [])
-            if r.get("tracker") == "iptorrents" and r.get("freeleech") is True
+            r for r in result.get("results", []) if r.get("tracker") == "iptorrents" and r.get("freeleech") is True
         ]
         for r in ip_results:
             assert r.get("freeleech") is True, f"Non-freeleech in results: {r}"
@@ -250,9 +232,7 @@ class TestIPTorrentsDownloadFreeleechOnly:
 
     @no_creds
     def test_plugin_search_freeleech_method(self):
-        sys.path.insert(
-            0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins")
-        )
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins"))
         from iptorrents import iptorrents
 
         engine = iptorrents()

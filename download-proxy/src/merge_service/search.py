@@ -790,7 +790,7 @@ class SearchOrchestrator:
             if not name_match:
                 continue
 
-            dl_match = re.search(r'href="(?P<link>/download\.php/\d+/[^"]+\.torrent)"', row_text)
+            dl_match = re.search(r'href="(?P<link>/download\.php/\d+/[^"]+\.torrent[^"]*)"', row_text)
             if not dl_match:
                 continue
 
