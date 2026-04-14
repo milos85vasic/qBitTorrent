@@ -14,9 +14,7 @@ import subprocess
 import logging
 import re
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 QBITTORRENT_HOST = os.environ.get("QBITTORRENT_HOST", "localhost")
@@ -27,10 +25,7 @@ PLUGIN_PATTERNS = {
     "rutracker": [r"rutracker\.org", r"rutracker\.net", r"rutracker\.nl"],
 }
 
-COMPILED_PATTERNS = {
-    plugin: [re.compile(p, re.I) for p in patterns]
-    for plugin, patterns in PLUGIN_PATTERNS.items()
-}
+COMPILED_PATTERNS = {plugin: [re.compile(p, re.I) for p in patterns] for plugin, patterns in PLUGIN_PATTERNS.items()}
 
 
 def identify_plugin(url):
@@ -106,9 +101,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
             if path == "/api/v2/torrents/add" and self.command == "POST" and body:
                 if self._is_multipart_file_upload():
-                    logger.info(
-                        "Multipart file upload detected, passing through directly"
-                    )
+                    logger.info("Multipart file upload detected, passing through directly")
                     self.proxy_to_qbittorrent(body)
                     return
 
@@ -131,9 +124,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
                         if torrent_file:
                             params["urls"] = [f"file://{torrent_file}"]
-                            new_body = urllib.parse.urlencode(
-                                params, doseq=True
-                            ).encode("utf-8")
+                            new_body = urllib.parse.urlencode(params, doseq=True).encode("utf-8")
 
                             self.proxy_to_qbittorrent(new_body)
 
@@ -165,9 +156,9 @@ class DownloadHandler(BaseHTTPRequestHandler):
                 header_lower = header.lower()
                 if header_lower not in ["host", "content-length"]:
                     if header_lower == "referer":
-                        value = value.replace(f":{PROXY_PORT}", f":{QBITTORRENT_PORT}")
+                        value = f"http://localhost:{QBITTORRENT_PORT}"
                     elif header_lower == "origin":
-                        value = value.replace(f":{PROXY_PORT}", f":{QBITTORRENT_PORT}")
+                        value = f"http://localhost:{QBITTORRENT_PORT}"
                     req.add_header(header, value)
 
             with urllib.request.urlopen(req, timeout=30) as response:
