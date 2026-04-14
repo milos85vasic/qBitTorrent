@@ -11,9 +11,10 @@
 3. [Configuration](#configuration)
 4. [Using the WebUI](#using-the-webui)
 5. [Using Private Trackers](#using-private-trackers)
-6. [Troubleshooting](#troubleshooting)
-7. [Testing](#testing)
-8. [FAQ](#faq)
+6. [Merge Search Service](#merge-search-service)
+7. [Troubleshooting](#troubleshooting)
+8. [Testing](#testing)
+9. [FAQ](#faq)
 
 ---
 
@@ -236,6 +237,84 @@ NNMCLUB_COOKIES="uid=your_uid; pass=your_pass_hash"
 3. Go to Application/Storage → Cookies
 4. Find `uid` and `pass` cookies
 5. Copy values to .env
+
+---
+
+## Merge Search Service
+
+The Merge Search Service is a unified search interface that queries multiple private trackers simultaneously, deduplicates results, and presents them in a single dashboard.
+
+### What It Does
+
+- Searches **RuTracker**, **Kinozal**, and **NNMClub** in parallel
+- Deduplicates results that appear on multiple trackers
+- Detects quality tags (e.g., 1080p, 4K, WEB-DL, Blu-ray) automatically
+- Proxied downloads handle authentication cookies transparently
+
+### Accessing the Dashboard
+
+Open your browser to:
+
+```
+http://localhost:8086/
+```
+
+The dashboard runs inside the `qbittorrent-proxy` container and is available whenever containers are running.
+
+### Dashboard Usage
+
+1. **Search** — Enter a query and press Search. Results from all configured trackers appear in a single list.
+2. **Download** — Click the download button on any result. The proxy intercepts the tracker URL and fetches the .torrent file using stored credentials.
+3. **Active Torrents** — The dashboard shows currently active downloads from the qBittorrent instance.
+
+### API Endpoints (Power Users)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/search?q=<query>` | GET | Search all configured trackers |
+| `/api/search?q=<query>&tracker=rutracker` | GET | Search a specific tracker |
+| `/api/download` | POST | Download a torrent by URL |
+| `/api/torrents/active` | GET | List active downloads |
+| `/api/health` | GET | Service health check |
+
+Example:
+```bash
+curl "http://localhost:8086/api/search?q=ubuntu&tracker=rutracker"
+```
+
+### Configuration
+
+The merge service uses the same environment variables as the plugins. Set these in `.env`:
+
+```bash
+RUTRACKER_USERNAME=your_username
+RUTRACKER_PASSWORD=your_password
+
+KINOZAL_USERNAME=your_username
+KINOZAL_PASSWORD=your_password
+
+NNMCLUB_COOKIES="uid=123456; pass=abcdef1234567890"
+```
+
+Restart containers after changing credentials: `./stop.sh -r && ./start.sh`
+
+### Quality Detection
+
+The service automatically detects quality tags from torrent names:
+
+- **Resolution**: 4K, 2160p, 1080p, 720p, 480p
+- **Source**: Blu-ray, WEB-DL, WEBRip, HDTV, CAM, TS
+- **Codec**: HEVC, H.265, H.264, x265, x264
+- **Audio**: Atmos, DTS-HD, DTS, AAC, FLAC
+
+Results are tagged and can be filtered by quality in the dashboard.
+
+### Known Limitations
+
+- **Credentials required** — RuTracker and Kinozal need valid username/password. NNMClub needs browser cookies. Trackers without configured credentials are skipped.
+- **RuTracker CAPTCHA** — If RuTracker presents a CAPTCHA, login will fail. Solve it in a browser first, then retry.
+- **Rate limiting** — Tracker websites may rate-limit frequent requests. The service includes basic throttling.
+- **No public trackers** — The merge service only covers private trackers. Use the qBittorrent search tab for public tracker plugins.
 
 ---
 

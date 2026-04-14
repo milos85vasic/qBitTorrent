@@ -4,7 +4,90 @@
 
 **Container**: Running at http://localhost:8085  
 **Total Plugins**: 35 plugins installed  
-**Last Updated**: April 12, 2025
+**Last Updated**: April 14, 2026
+
+---
+
+## Merge Search Service
+
+The Merge Search Service provides a unified REST API for searching multiple private trackers simultaneously, with deduplication, quality detection, and authenticated download proxying.
+
+**Dashboard**: http://localhost:8086/
+**API Base**: http://localhost:8086/api/v1/
+
+### Supported Trackers
+
+| Tracker | Status | Results | Notes |
+|---------|--------|---------|-------|
+| **RuTracker** | ✅ Verified | 50 results | Fully working with credentials |
+| **Kinozal** | 🔧 Parsing Fixed | — | Needs `KINOZAL_USERNAME`/`KINOZAL_PASSWORD` |
+| **NNMClub** | 🔧 Parsing Fixed | — | Needs `NNMCLUB_COOKIES` |
+
+### Download Proxy
+
+The download proxy intercepts tracker URLs (rutracker.org, kinozal.tv, nnmclub.to) and fetches `.torrent` files using stored auth cookies before forwarding them to qBittorrent. Non-tracker URLs (magnet links) pass through directly.
+
+### Quality Detection
+
+Results are automatically tagged with quality levels based on filename and size:
+
+| Quality | Detection Pattern | Size Threshold |
+|---------|-------------------|----------------|
+| `uhd_4k` | 2160p, 4K, UHD | ≥ 40 GB |
+| `full_hd` | 1080p, BluRay | ≥ 8 GB |
+| `hd` | 720p, WEB-DL | ≥ 2 GB |
+| `sd` | 480p, DVDRip | ≥ 300 MB |
+
+### Merge Service API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/search` | Search all trackers, returns deduplicated results sorted by seeds |
+| `GET` | `/api/v1/search/{search_id}` | Get status of a previous search |
+| `GET` | `/api/v1/search/stream/{search_id}` | SSE stream of search results |
+| `POST` | `/api/v1/download` | Download via proxy (auto-authenticates tracker URLs) |
+| `GET` | `/api/v1/downloads/active` | List active qBittorrent downloads |
+| `GET` | `/api/v1/hooks` | List registered hooks |
+| `POST` | `/api/v1/hooks` | Register a new hook |
+| `DELETE` | `/api/v1/hooks/{hook_id}` | Delete a hook |
+
+### Search Request
+
+```json
+POST /api/v1/search
+{
+  "query": "ubuntu",
+  "category": "all",
+  "limit": 50,
+  "enable_metadata": true,
+  "validate_trackers": true
+}
+```
+
+### Search Response
+
+```json
+{
+  "search_id": "uuid",
+  "query": "ubuntu",
+  "status": "completed",
+  "results": [
+    {
+      "name": "Ubuntu 24.04 LTS",
+      "size": "5368709120",
+      "seeds": 150,
+      "leechers": 12,
+      "download_urls": ["..."],
+      "quality": "full_hd",
+      "tracker": "rutracker",
+      "sources": [{"tracker": "rutracker", "seeds": 150, "leechers": 12}]
+    }
+  ],
+  "total_results": 50,
+  "merged_results": 45,
+  "trackers_searched": ["rutracker", "kinozal", "nnmclub"]
+}
+```
 
 ---
 
@@ -306,7 +389,8 @@ podman restart qbittorrent
 
 ---
 
-**Last Verified:** April 12, 2025  
+**Last Verified:** April 14, 2026  
 **Container:** qbittorrent (Running)  
 **WebUI:** http://localhost:8085  
+**Merge Service:** http://localhost:8086/  
 **Credentials:** admin / admin
