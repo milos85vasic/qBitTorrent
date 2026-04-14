@@ -26,10 +26,20 @@ services:
     environment:
       - QBITTORRENT_HOST=localhost
       - QBITTORRENT_PORT=18085
+      - QBITTORRENT_URL=http://localhost:18085
+      - QBITTORRENT_USER=admin
+      - QBITTORRENT_PASS=admin
       - PROXY_PORT=8085
+      - MERGE_SERVICE_PORT=8086
       - TMPDIR=/shared-tmp
+      - RUTRACKER_USERNAME=${RUTRACKER_USERNAME}
+      - RUTRACKER_PASSWORD=${RUTRACKER_PASSWORD}
+      - KINOZAL_USERNAME=${KINOZAL_USERNAME}
+      - KINOZAL_PASSWORD=${KINOZAL_PASSWORD}
+      - NNMCLUB_COOKIES=${NNMCLUB_COOKIES}
     volumes:
       - ./config:/config
+      - ./download-proxy:/config/download-proxy
       - ./.env:/config/.env:ro
       - ./tmp:/shared-tmp  # Shared temp for torrent files
       - ./start-proxy.sh:/start-proxy.sh:ro

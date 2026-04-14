@@ -6,16 +6,50 @@ import uuid
 import logging
 import sys
 import re
+import os
+import json
 from typing import Optional, List
+from datetime import datetime
 
 sys.path.insert(0, "/config/download-proxy/src")
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["search"])
+
+HOOKS_FILE = "/config/download-proxy/hooks.json"
+
+
+def _load_hooks():
+    try:
+        if os.path.isfile(HOOKS_FILE):
+            with open(HOOKS_FILE) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return []
+
+
+def _save_hooks(hooks):
+    try:
+        os.makedirs(os.path.dirname(HOOKS_FILE), exist_ok=True)
+        with open(HOOKS_FILE, "w") as f:
+            json.dump(hooks, f, indent=2)
+    except Exception:
+        pass
+
+
+def _get_orchestrator(request: Request):
+    from api import orchestrator_instance
+
+    if orchestrator_instance is not None:
+        return orchestrator_instance
+    from merge_service.search import SearchOrchestrator
+
+    return SearchOrchestrator()
 
 
 class SearchRequest(BaseModel):
@@ -35,6 +69,8 @@ class SearchResultResponse(BaseModel):
     leechers: int
     download_urls: List[str]
     quality: Optional[str] = None
+    desc_link: Optional[str] = None
+    tracker: Optional[str] = None
     sources: List[dict] = Field(default_factory=list)
 
 
@@ -62,98 +98,98 @@ class HookConfig(BaseModel):
     enabled: bool = True
 
 
-async def get_orchestrator():
-    from merge_service.search import SearchOrchestrator
-
-    return SearchOrchestrator()
-
-
 def _parse_size_to_bytes(size_str: str) -> float:
     if not size_str:
         return 0
     try:
-        val = float(size_str)
-        return val
+        return float(size_str)
     except (ValueError, TypeError):
         pass
-    match = re.search(r"([\d.]+)\s*(TB|GB|MB|KB|B)", size_str, re.I)
+    match = re.search(r"([\d.]+)\s*(TB|GB|MB|KB|B)", str(size_str), re.I)
     if match:
         value = float(match.group(1))
         unit = match.group(2).upper()
-        multipliers = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
-        return value * multipliers.get(unit, 1)
+        mult = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
+        return value * mult.get(unit, 1)
     return 0
 
 
 def _detect_quality(name: str, size: str) -> str:
-    name_lower = (name or "").lower()
-
-    if "2160p" in name_lower or "4k" in name_lower or "uhd" in name_lower:
+    nl = (name or "").lower()
+    if re.search(r"2160p|4k|uhd", nl):
         return "uhd_4k"
-    if "1080p" in name_lower or "fullhd" in name_lower or "fhd" in name_lower:
+    if re.search(r"1080p|fullhd|fhd|bluray", nl):
         return "full_hd"
-    if "720p" in name_lower:
+    if re.search(r"720p|hdrip|web.dl|webdl", nl):
         return "hd"
-    if "480p" in name_lower or "dvdr" in name_lower:
+    if re.search(r"480p|dvdr|dvdrip|camrip", nl):
         return "sd"
-
-    size_bytes = _parse_size_to_bytes(size)
-    if size_bytes >= 40 * 1024**3:
+    sb = _parse_size_to_bytes(size)
+    if sb >= 40 * 1024**3:
         return "uhd_4k"
-    if size_bytes >= 8 * 1024**3:
+    if sb >= 8 * 1024**3:
         return "full_hd"
-    if size_bytes >= 2 * 1024**3:
+    if sb >= 2 * 1024**3:
         return "hd"
-    if size_bytes >= 300 * 1024**2:
+    if sb >= 300 * 1024**2:
         return "sd"
-
     return "unknown"
 
 
+def _to_response(r) -> SearchResultResponse:
+    return SearchResultResponse(
+        name=r.name,
+        size=r.size,
+        seeds=r.seeds,
+        leechers=r.leechers,
+        download_urls=[r.link],
+        quality=_detect_quality(r.name, r.size),
+        desc_link=r.desc_link,
+        tracker=r.tracker,
+        sources=[{"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers}],
+    )
+
+
 @router.post("/search", response_model=SearchResponse)
-async def search(request: SearchRequest, orchestrator=Depends(get_orchestrator)):
+async def search(request: SearchRequest, req: Request):
     from merge_service.search import TrackerSource
 
-    metadata = await orchestrator.search(
+    orch = _get_orchestrator(req)
+
+    metadata = await orch.search(
         query=request.query,
         category=request.category,
         enable_metadata=request.enable_metadata,
         validate_trackers=request.validate_trackers,
     )
 
-    results = []
-    for tracker_name in metadata.trackers_searched:
+    all_raw = []
+    for tn in metadata.trackers_searched:
         try:
-            tracker = TrackerSource(
-                name=tracker_name,
-                url=f"https://{tracker_name}.org",
-                enabled=True,
+            tracker = TrackerSource(name=tn, url=f"https://{tn}.org", enabled=True)
+            all_raw.extend(
+                await orch._search_tracker(tracker, request.query, request.category)
             )
-            search_results = await orchestrator._search_tracker(
-                tracker, request.query, request.category
-            )
-            for r in search_results:
-                results.append(
-                    SearchResultResponse(
-                        name=r.name,
-                        size=r.size,
-                        seeds=r.seeds,
-                        leechers=r.leechers,
-                        download_urls=[r.link],
-                        quality=_detect_quality(r.name, r.size),
-                        sources=[
-                            {
-                                "tracker": r.tracker,
-                                "seeds": r.seeds,
-                                "leechers": r.leechers,
-                            }
-                        ],
-                    )
-                )
         except Exception:
             pass
 
-    results = sorted(results, key=lambda x: x.seeds, reverse=True)
+    merged = orch.deduplicator.merge_results(all_raw)
+    results = []
+    for m in merged:
+        best = m.original_results[0] if m.original_results else None
+        if not best:
+            continue
+        resp = _to_response(best)
+        resp.sources = [
+            {"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers}
+            for r in m.original_results
+        ]
+        resp.download_urls = list(dict.fromkeys(r.link for r in m.original_results))
+        resp.seeds = m.total_seeds
+        resp.leechers = m.total_leechers
+        results.append(resp)
+
+    results.sort(key=lambda x: x.seeds, reverse=True)
     results = results[: request.limit]
 
     return SearchResponse(
@@ -162,7 +198,7 @@ async def search(request: SearchRequest, orchestrator=Depends(get_orchestrator))
         status="completed" if metadata.total_results > 0 else "no_results",
         results=results,
         total_results=metadata.total_results,
-        merged_results=metadata.merged_results,
+        merged_results=len(merged),
         trackers_searched=metadata.trackers_searched,
         started_at=metadata.started_at.isoformat(),
         completed_at=metadata.completed_at.isoformat()
@@ -172,26 +208,22 @@ async def search(request: SearchRequest, orchestrator=Depends(get_orchestrator))
 
 
 @router.get("/search/stream/{search_id}")
-async def search_stream(search_id: str):
+async def search_stream(search_id: str, req: Request):
     from fastapi.responses import StreamingResponse
     from .streaming import SSEHandler
-    from merge_service.search import SearchOrchestrator
 
-    orchestrator = SearchOrchestrator()
+    orch = _get_orchestrator(req)
     return SSEHandler.create_streaming_response(
-        SSEHandler.search_results_stream(search_id, orchestrator)
+        SSEHandler.search_results_stream(search_id, orch)
     )
 
 
 @router.get("/search/{search_id}", response_model=SearchResponse)
-async def get_search(search_id: str):
-    from merge_service.search import SearchOrchestrator
-
-    orchestrator = SearchOrchestrator()
-    metadata = orchestrator.get_search_status(search_id)
+async def get_search(search_id: str, req: Request):
+    orch = _get_orchestrator(req)
+    metadata = orch.get_search_status(search_id)
     if metadata is None:
         raise HTTPException(status_code=404, detail="Search not found")
-
     return SearchResponse(
         search_id=metadata.search_id,
         query=metadata.query,
@@ -209,7 +241,6 @@ async def get_search(search_id: str):
 
 @router.get("/downloads/active")
 async def get_active_downloads():
-    import os
     import aiohttp
 
     qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:18085")
@@ -220,10 +251,7 @@ async def get_active_downloads():
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{qbit_url}/api/v2/auth/login",
-                data={
-                    "username": qbit_user,
-                    "password": qbit_pass,
-                },
+                data={"username": qbit_user, "password": qbit_pass},
             ) as resp:
                 if resp.status != 200:
                     return {"downloads": [], "count": 0, "error": "auth failed"}
@@ -242,8 +270,10 @@ async def get_active_downloads():
                                 "size": t.get("size", 0),
                                 "progress": round(t.get("progress", 0) * 100, 1),
                                 "dlspeed": t.get("dlspeed", 0),
+                                "upspeed": t.get("upspeed", 0),
                                 "state": t.get("state", ""),
                                 "hash": t.get("hash", ""),
+                                "eta": t.get("eta", 8640000),
                             }
                         )
                     return {"downloads": downloads, "count": len(downloads)}
@@ -254,8 +284,7 @@ async def get_active_downloads():
 
 
 @router.post("/download")
-async def initiate_download(request: DownloadRequest):
-    import os
+async def initiate_download(request: DownloadRequest, req: Request):
     import aiohttp
 
     download_id = str(uuid.uuid4())
@@ -269,10 +298,7 @@ async def initiate_download(request: DownloadRequest):
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{qbit_url}/api/v2/auth/login",
-                data={
-                    "username": qbit_user,
-                    "password": qbit_pass,
-                },
+                data={"username": qbit_user, "password": qbit_pass},
             ) as resp:
                 if resp.status != 200:
                     return {
@@ -282,7 +308,7 @@ async def initiate_download(request: DownloadRequest):
                     }
                 cookies = resp.cookies
 
-            for url in request.download_urls[:3]:
+            for url in request.download_urls[:5]:
                 try:
                     async with session.post(
                         f"{qbit_url}/api/v2/torrents/add",
@@ -294,7 +320,11 @@ async def initiate_download(request: DownloadRequest):
                         else:
                             text = await resp.text()
                             results.append(
-                                {"url": url, "status": "failed", "detail": text[:200]}
+                                {
+                                    "url": url,
+                                    "status": "failed",
+                                    "detail": text[:200],
+                                }
                             )
                 except Exception as e:
                     results.append({"url": url, "status": "error", "message": str(e)})
@@ -317,17 +347,32 @@ async def initiate_download(request: DownloadRequest):
 
 @router.get("/hooks")
 async def list_hooks():
-    return {"hooks": [], "count": 0}
+    hooks = _load_hooks()
+    return {"hooks": hooks, "count": len(hooks)}
 
 
 @router.post("/hooks")
 async def register_hook(hook: HookConfig):
-    return {
+    hooks = _load_hooks()
+    new_hook = {
         "hook_id": str(uuid.uuid4()),
         "name": hook.name,
         "event": hook.event,
+        "script_path": hook.script_path,
         "enabled": hook.enabled,
+        "created_at": datetime.utcnow().isoformat(),
     }
+    hooks.append(new_hook)
+    _save_hooks(hooks)
+    return new_hook
+
+
+@router.delete("/hooks/{hook_id}")
+async def delete_hook(hook_id: str):
+    hooks = _load_hooks()
+    hooks = [h for h in hooks if h["hook_id"] != hook_id]
+    _save_hooks(hooks)
+    return {"deleted": True, "hook_id": hook_id}
 
 
 __all__ = ["router"]
