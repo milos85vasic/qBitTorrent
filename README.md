@@ -1,21 +1,24 @@
 # qBitTorrent-Fixed
 
-[![Tests](https://img.shields.io/badge/tests-119%20passing-success)](tests/)
-[![Plugins](https://img.shields.io/badge/plugins-35+-blue)](plugins/)
+[![Tests](https://img.shields.io/badge/tests-331%20passing-success)](tests/)
+[![Plugins](https://img.shields.io/badge/plugins-42-blue)](plugins/)
 [![Merge Service](https://img.shields.io/badge/merge_service-FastAPI%20%3A7187-orange)](download-proxy/src/)
+[![CI](https://img.shields.io/badge/ci-manual%20%28ci.sh%29-blueviolet)](ci.sh)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 
-> **qBittorrent with unified multi-tracker search, 35+ plugins, and a download proxy with authenticated tracker support.**
+> **qBittorrent with unified multi-tracker search, 42 plugins, and a download proxy with authenticated tracker support.**
 
 ## Features
 
 - **Merge Search Service** — FastAPI service (port 7187) that searches multiple trackers simultaneously, deduplicates results, and proxies authenticated downloads
-- **35+ Search Plugins** — Public, private, and specialized tracker plugins
-- **WebUI Download Fix** — Private tracker downloads work through the proxy bridge
+- **42 Search Plugins** — Public, private, and specialized tracker plugins
+- **Freeleech Protection** — IPTorrents freeleech results tagged `[free]`; non-freeleech never merges with other trackers
+- **WebUI Download Fix** — Private tracker downloads work through the proxy bridge (auto-starts via systemd)
 - **Dark Theme Dashboard** — Search UI at `http://localhost:7187/`
 - **SSE Streaming** — Real-time search results as they arrive from each tracker
 - **Hook System** — Configure webhooks triggered on search/download events
-- **119 Tests Passing** — HTML parsers, API endpoints, quality detection, deduplication, hooks, validator, enricher
+- **Manual CI Pipeline** — Secret leak detection, syntax checks, full test suite, container health (`./ci.sh`)
+- **331 Tests Passing** — HTML parsers, API endpoints, quality detection, deduplication, hooks, validator, enricher, freeleech, CI infra
 
 ## Quick Start
 
@@ -26,10 +29,12 @@ cp .env.example .env
 # Edit .env with tracker credentials
 ./setup.sh
 ./start.sh -p
+./setup-webui-bridge-service.sh   # One-time: auto-start webui-bridge on boot
 # Access:
-#   qBittorrent WebUI:   http://localhost:7186
+#   qBittorrent WebUI:   http://localhost:7185
+#   Download proxy:      http://localhost:7186
 #   Merge Search + UI:   http://localhost:7187/
-#   webui-bridge (host): python3 webui-bridge.py
+#   webui-bridge:        auto-started via systemd (port 7188)
 # Login: admin / admin
 ```
 
@@ -40,19 +45,19 @@ cp .env.example .env
                          │      qbittorrent-proxy   │
                          │    (python:3.12-alpine)   │
   http://localhost:7186  │                           │
-  ──────────────────────►│  Download Proxy (:7186)   │────► qBittorrent (:7185)
-                         │                           │
-  http://localhost:7187  │  Merge Search Service     │
-  ──────────────────────►│  (FastAPI :7187)          │────► RuTracker / Kinozal / NNMClub
-                         │                           │
-                         │  ┌─ download-proxy/src/ ─┐│
-                         │  │  api/    merge_service/ ││
-                         │  │  ui/     config/        ││
-                         │  └────────────────────────┘│
-                         └─────────────────────────┘
+   ──────────────────────►│  Download Proxy (:7186)   │────► qBittorrent (:7185)
+                          │                           │
+   http://localhost:7187  │  Merge Search Service     │
+   ──────────────────────►│  (FastAPI :7187)          │────► RuTracker / Kinozal / NNMClub / IPTorrents
+                          │                           │
+                          │  ┌─ download-proxy/src/ ─┐│
+                          │  │  api/    merge_service/ ││
+                          │  │  ui/     config/        ││
+                          │  └────────────────────────┘│
+                          └─────────────────────────┘
 
-  Host process:
-  python3 webui-bridge.py  (:7188)  — private tracker WebUI download support
+   systemd user service:
+   webui-bridge  (:7188)  — auto-started, private tracker WebUI download support
 ```
 
 Two containers via `docker-compose.yml` (both use `network_mode: host`):

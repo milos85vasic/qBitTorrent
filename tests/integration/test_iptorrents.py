@@ -172,7 +172,7 @@ class TestIPTorrentsFreeleechDetection:
         non_free = [r for r in results if not r.freeleech]
         assert len(free_results) == 1, f"Expected 1 freeleech, got {len(free_results)}"
         assert len(non_free) == 1, f"Expected 1 non-free, got {len(non_free)}"
-        assert free_results[0].name == "Ubuntu 22.04 LTS"
+        assert free_results[0].name == "Ubuntu 22.04 LTS [free]"
         assert free_results[0].tracker == "iptorrents"
 
     def test_freeleech_tracker_display_tag(self):

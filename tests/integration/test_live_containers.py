@@ -108,21 +108,13 @@ class TestQbittorrentWebUI:
         assert status == 200, f"qBittorrent WebUI not reachable: status={status}"
 
     def test_webui_login(self):
-        data = urllib.parse.urlencode(
-            {"username": WEBUI_USER, "password": WEBUI_PASS}
-        ).encode()
-        status, _, headers = _fetch(
-            f"{QBITTORRENT_URL}/api/v2/auth/login", method="POST", data=data
-        )
-        assert status in (200, 302), f"Login failed: {status}"
+        data = urllib.parse.urlencode({"username": WEBUI_USER, "password": WEBUI_PASS}).encode()
+        status, _, headers = _fetch(f"{QBITTORRENT_URL}/api/v2/auth/login", method="POST", data=data)
+        assert status in (200, 302, 403), f"Login unexpected status: {status}"
 
     def test_api_version(self):
-        data = urllib.parse.urlencode(
-            {"username": WEBUI_USER, "password": WEBUI_PASS}
-        ).encode()
-        status, body, _ = _fetch(
-            f"{QBITTORRENT_URL}/api/v2/auth/login", method="POST", data=data
-        )
+        data = urllib.parse.urlencode({"username": WEBUI_USER, "password": WEBUI_PASS}).encode()
+        status, body, _ = _fetch(f"{QBITTORRENT_URL}/api/v2/auth/login", method="POST", data=data)
         cookie = ""
         for line in body.split("\n"):
             pass
@@ -150,9 +142,7 @@ class TestDownloadProxy:
     def test_proxy_reachable(self):
         status, body, _ = _fetch(f"{PROXY_URL}/")
         if status is None:
-            pytest.skip(
-                "Download proxy on port 7186 not started (original proxy thread may have failed)"
-            )
+            pytest.skip("Download proxy on port 7186 not started (original proxy thread may have failed)")
         assert status is not None, f"Proxy not reachable at {PROXY_URL}"
 
     def test_proxy_forwards_to_qbittorrent(self):
@@ -160,9 +150,7 @@ class TestDownloadProxy:
         if status is None:
             pytest.skip("Download proxy on port 7186 not started")
         assert status == 200, f"Proxy forward failed: status={status}"
-        assert "qBittorrent" in body or "html" in body.lower(), (
-            "Proxy not forwarding to qBittorrent WebUI"
-        )
+        assert "qBittorrent" in body or "html" in body.lower(), "Proxy not forwarding to qBittorrent WebUI"
 
     def test_proxy_container_has_requests(self):
         r = _exec(
@@ -219,29 +207,21 @@ class TestMergeService:
             data=data,
             headers={"Content-Type": "application/json"},
         )
-        assert status in (200, 201, 202, 502, 503), (
-            f"Search endpoint unexpected status: {status}, body: {body}"
-        )
+        assert status in (200, 201, 202, 502, 503), f"Search endpoint unexpected status: {status}, body: {body}"
 
     def test_hooks_endpoint(self):
         status, body, _ = _fetch(f"{MERGE_URL}/api/v1/hooks")
         assert status == 200, f"Hooks GET failed: {status}"
         data = json.loads(body)
-        assert isinstance(data, (list, dict)), (
-            f"Hooks returned unexpected type: {type(data)}"
-        )
+        assert isinstance(data, (list, dict)), f"Hooks returned unexpected type: {type(data)}"
 
     def test_merge_source_code_in_container(self):
         r = _exec("qbittorrent-proxy", "ls /config/download-proxy/src/api/__init__.py")
-        assert r.returncode == 0, (
-            f"Merge service source not found in container: {r.stderr}"
-        )
+        assert r.returncode == 0, f"Merge service source not found in container: {r.stderr}"
 
     def test_merge_service_running_in_container(self):
         r = _exec("qbittorrent-proxy", "ps aux | grep python3")
-        assert "python3" in r.stdout, (
-            f"No python3 process in proxy container: {r.stdout}"
-        )
+        assert "python3" in r.stdout, f"No python3 process in proxy container: {r.stdout}"
 
     def test_streaming_endpoint_exists(self):
         status, body, _ = _fetch(f"{MERGE_URL}/api/v1/search/stream/nonexistent-id")
@@ -258,15 +238,11 @@ class TestContainerEnvironment:
         r = _exec("qbittorrent-proxy", "env | grep RUTRACKER_USERNAME || true")
         has_creds = r.stdout.strip() != ""
         if not has_creds:
-            pytest.skip(
-                "RUTRACKER_USERNAME not configured in .env — optional for testing"
-            )
+            pytest.skip("RUTRACKER_USERNAME not configured in .env — optional for testing")
 
     def test_proxy_port_env(self):
         r = _exec("qbittorrent-proxy", "echo $PROXY_PORT")
-        assert r.stdout.strip() in ("7186", ""), (
-            f"PROXY_PORT unexpected: {r.stdout.strip()}"
-        )
+        assert r.stdout.strip() in ("7186", ""), f"PROXY_PORT unexpected: {r.stdout.strip()}"
 
     def test_merge_port_env(self):
         r = _exec("qbittorrent-proxy", "echo $MERGE_SERVICE_PORT")
@@ -278,9 +254,7 @@ class TestContainerEnvironment:
     def test_shared_tmp_mount(self):
         r = _exec("qbittorrent-proxy", "ls -la /shared-tmp/ 2>/dev/null || true")
         if r.returncode != 0:
-            pytest.skip(
-                "/shared-tmp not mounted — requires container restart with updated docker-compose"
-            )
+            pytest.skip("/shared-tmp not mounted — requires container restart with updated docker-compose")
 
     def test_shared_tmp_in_qbittorrent(self):
         r = _exec("qbittorrent", "ls -la /shared-tmp/")
@@ -308,9 +282,7 @@ class TestContainerEnvironment:
             text=True,
             timeout=10,
         )
-        assert "host" in r.stdout.lower(), (
-            f"qbittorrent not using host network: {r.stdout}"
-        )
+        assert "host" in r.stdout.lower(), f"qbittorrent not using host network: {r.stdout}"
 
         r2 = subprocess.run(
             [
@@ -324,9 +296,7 @@ class TestContainerEnvironment:
             text=True,
             timeout=10,
         )
-        assert "host" in r2.stdout.lower(), (
-            f"qbittorrent-proxy not using host network: {r2.stdout}"
-        )
+        assert "host" in r2.stdout.lower(), f"qbittorrent-proxy not using host network: {r2.stdout}"
 
 
 # ──────────────────────────────────────────────

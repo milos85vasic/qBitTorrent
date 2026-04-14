@@ -50,12 +50,8 @@ def load_env() -> EnvConfig:
     # qBittorrent settings
     qbittorrent_host = os.environ.get("QBITTORRENT_HOST", "localhost")
     qbittorrent_port = int(os.environ.get("QBITTORRENT_PORT", "7185"))
-    qbittorrent_username = os.environ.get(
-        "QBITTORRENT_USER", os.environ.get("QBITTORRENT_USERNAME", "admin")
-    )
-    qbittorrent_password = os.environ.get(
-        "QBITTORRENT_PASS", os.environ.get("QBITTORRENT_PASSWORD", "admin")
-    )
+    qbittorrent_username = os.environ.get("QBITTORRENT_USER", os.environ.get("QBITTORRENT_USERNAME", "admin"))
+    qbittorrent_password = os.environ.get("QBITTORRENT_PASS", os.environ.get("QBITTORRENT_PASSWORD", "admin"))
 
     # Service settings
     proxy_port = int(os.environ.get("PROXY_PORT", "7186"))
@@ -69,11 +65,11 @@ def load_env() -> EnvConfig:
     # Private tracker credentials
     rutracker_username = os.environ.get("RUTRACKER_USERNAME")
     rutracker_password = os.environ.get("RUTRACKER_PASSWORD")
-    kinozal_username = os.environ.get("KINOZAL_USERNAME")
-    kinozal_password = os.environ.get("KINOZAL_PASSWORD")
-    nnmclub_cookies = os.environ.get("NNMCLUB_COOKIES")
     iptorrents_username = os.environ.get("IPTORRENTS_USERNAME")
     iptorrents_password = os.environ.get("IPTORRENTS_PASSWORD")
+    kinozal_username = os.environ.get("KINOZAL_USERNAME") or iptorrents_username
+    kinozal_password = os.environ.get("KINOZAL_PASSWORD") or iptorrents_password
+    nnmclub_cookies = os.environ.get("NNMCLUB_COOKIES")
 
     config = EnvConfig(
         qbittorrent_host=qbittorrent_host,
@@ -94,9 +90,7 @@ def load_env() -> EnvConfig:
         iptorrents_password=iptorrents_password,
     )
 
-    logger.info(
-        f"Loaded configuration for qBittorrent at {qbittorrent_host}:{qbittorrent_port}"
-    )
+    logger.info(f"Loaded configuration for qBittorrent at {qbittorrent_host}:{qbittorrent_port}")
 
     return config
 

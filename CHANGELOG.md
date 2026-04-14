@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Freeleech & Safety
+- **IPTorrents freeleech `[free]` suffix** — all freeleech results from IPTorrents are automatically tagged with `[free]` in the name
+- **Non-freeleech merge protection** — non-freeleech IPTorrents results are NEVER merged with results from other trackers
+- **`freeleech` field in API responses** — `SearchResultResponse` now includes `freeleech: bool`
+- **Kinozal credential fallback** — if `KINOZAL_USERNAME/PASSWORD` are not set, `IPTORRENTS_USERNAME/PASSWORD` are used automatically
+
+#### Infrastructure
+- **Docker healthchecks** — both containers have healthchecks; proxy waits for qBittorrent `service_healthy`
+- **systemd service for webui-bridge** — auto-starts on boot, install once with `./setup-webui-bridge-service.sh`
+- **Manual CI pipeline** (`ci.sh`) — secret leak detection, syntax validation, full test suite, container health checks
+- **Levenshtein in container** — `start-proxy.sh` now installs all deps from `requirements.txt` including Levenshtein
+
+#### Tests (331 passing)
+- `tests/unit/test_freeleech.py` — 13 tests: freeleech suffix, dedup rules, credential fallback, API field
+- `tests/unit/test_ci_infra.py` — 13 tests: CI script, systemd service, gitignore, start-proxy.sh
+- `tests/e2e/test_full_pipeline.py` — fixed imports, now passing
+
+#### Plugins
+- Added `download_torrent()` to 5 plugins: ali213, audiobookbay, glotorrents, kickass, nyaa
+- Download proxy now intercepts kinozal, nnmclub, iptorrents (not just rutracker)
+
+### Fixed
+- Consolidated duplicate quality detection to single `enricher.detect_quality()` (was in routes.py and enricher.py)
+- Fixed 4 bare `except: pass` in `plugins/download_proxy.py`
+- Fixed scheduler config path (`.yaml` → `.json`, removed string replace hack)
+- Fixed IPTorrents HTML parser to handle query params in download URLs
+- Fixed quality detection to handle `UHD`, `FullHD`, `FHD`, `WEBDL`, `HDRip`, `CamRip` patterns
+
+### Removed
+- Removed 31 orphaned test files from `tests/` root (~11k lines of dead code)
+- Removed 3 false gotchas from AGENTS.md
+
 #### Merge Search Service
 - **FastAPI-based Merge Search Service** running on port 7187 inside the qbittorrent-proxy container
 - **Multi-tracker search** with results from RuTracker, Kinozal, NNMClub — 50 real results from RuTracker

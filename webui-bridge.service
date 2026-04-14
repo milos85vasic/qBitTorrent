@@ -1,0 +1,19 @@
+[Unit]
+Description=qBittorrent WebUI Bridge for Private Tracker Downloads
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/usr/bin/python3
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/qBitTorrent/webui-bridge.py
+Restart=on-failure
+RestartSec=5
+Environment=QBITTORRENT_HOST=localhost
+Environment=QBITTORRENT_PORT=7185
+Environment=BRIDGE_PORT=7188
+EnvironmentFile=-%h/qBitTorrent/.env
+EnvironmentFile=-%h/.qbit.env
+
+[Install]
+WantedBy=default.target

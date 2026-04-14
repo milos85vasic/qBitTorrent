@@ -53,6 +53,7 @@ class SearchResultResponse(BaseModel):
     tracker: Optional[str] = None
     sources: List[dict] = Field(default_factory=list)
     metadata: Optional[dict] = None
+    freeleech: bool = False
 
 
 class SearchResponse(BaseModel):
@@ -128,6 +129,7 @@ def _to_response(r) -> SearchResultResponse:
         desc_link=r.desc_link,
         tracker=r.tracker,
         sources=[{"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers}],
+        freeleech=getattr(r, "freeleech", False),
     )
 
 

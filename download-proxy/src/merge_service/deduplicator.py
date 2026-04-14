@@ -121,26 +121,25 @@ class Deduplicator:
     def _check_match(self, seed: SearchResult, candidate: SearchResult) -> MatchResult:
         """Check if candidate matches the seed result."""
 
+        if self._is_cross_tracker_freeleech_conflict(seed, candidate):
+            return MatchResult(
+                is_match=False, confidence=0.0, tier=4, reason="non-freeleech iptorrents vs other tracker"
+            )
+
         # Tier 1: Metadata match (canonical identity comparison)
         id_a = self._extract_identity_from_result(seed)
         id_b = self._extract_identity_from_result(candidate)
         if self._compare_identities(id_a, id_b):
-            return MatchResult(
-                is_match=True, confidence=0.99, tier=1, reason="metadata identity match"
-            )
+            return MatchResult(is_match=True, confidence=0.99, tier=1, reason="metadata identity match")
 
         # Tier 2: Hash match (infohash)
         # Compare infohashes if available
         if self._compare_hashes(seed, candidate):
-            return MatchResult(
-                is_match=True, confidence=1.0, tier=2, reason="infohash match"
-            )
+            return MatchResult(is_match=True, confidence=1.0, tier=2, reason="infohash match")
 
         # Tier 3: Name + size exact match
         if self._compare_name_and_size(seed, candidate):
-            return MatchResult(
-                is_match=True, confidence=0.95, tier=3, reason="name+size match"
-            )
+            return MatchResult(is_match=True, confidence=0.95, tier=3, reason="name+size match")
 
         # Tier 4: Fuzzy name similarity
         similarity = self._calculate_similarity(seed.name, candidate.name)
@@ -199,12 +198,8 @@ class Deduplicator:
         """Normalize a torrent name for comparison."""
         # Remove year, resolution, codec, group info for cleaner comparison
         normalized = re.sub(r"\s*\d{4}\s*", " ", name)  # Remove year
-        normalized = re.sub(
-            r"\s*(720p|1080p|2160p|4k|8k)\s*", " ", normalized, flags=re.I
-        )  # Remove resolution
-        normalized = re.sub(
-            r"\s*(x264|x265|hevc|h264|h265|xvid|divx)\s*", " ", normalized, flags=re.I
-        )  # Remove codec
+        normalized = re.sub(r"\s*(720p|1080p|2160p|4k|8k)\s*", " ", normalized, flags=re.I)  # Remove resolution
+        normalized = re.sub(r"\s*(x264|x265|hevc|h264|h265|xvid|divx)\s*", " ", normalized, flags=re.I)  # Remove codec
         normalized = re.sub(r"\s*\[.*?\]\s*", " ", normalized)  # Remove group brackets
         normalized = re.sub(r"\s+", " ", normalized).strip().lower()
         return normalized
@@ -277,3 +272,13 @@ class Deduplicator:
     def set_canonical_identity(self, merged: MergedResult, identity: CanonicalIdentity):
         """Update the canonical identity for a merged result (after metadata enrichment)."""
         merged.canonical_identity = identity
+
+    def _is_cross_tracker_freeleech_conflict(self, a: SearchResult, b: SearchResult) -> bool:
+        """Prevent merging non-freeleech IPTorrents results with other trackers."""
+        if a.tracker == "iptorrents" and b.tracker != "iptorrents":
+            if not a.freeleech:
+                return True
+        if b.tracker == "iptorrents" and a.tracker != "iptorrents":
+            if not b.freeleech:
+                return True
+        return False

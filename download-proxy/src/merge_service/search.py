@@ -802,10 +802,14 @@ class SearchOrchestrator:
 
             is_free = bool(re.search(r'class="free"', row_text, re.I))
 
+            name_text = html.unescape(name_match.group("name"))
+            if is_free and "[free]" not in name_text:
+                name_text = name_text.rstrip() + " [free]"
+
             try:
                 results.append(
                     SearchResult(
-                        name=html.unescape(name_match.group("name")),
+                        name=name_text,
                         size=size_match.group("size") if size_match else "0 B",
                         seeds=seeds,
                         leechers=leechers,

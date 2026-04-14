@@ -65,11 +65,11 @@ def load_env() -> EnvConfig:
     # Private tracker credentials
     rutracker_username = os.environ.get("RUTRACKER_USERNAME")
     rutracker_password = os.environ.get("RUTRACKER_PASSWORD")
-    kinozal_username = os.environ.get("KINOZAL_USERNAME")
-    kinozal_password = os.environ.get("KINOZAL_PASSWORD")
-    nnmclub_cookies = os.environ.get("NNMCLUB_COOKIES")
     iptorrents_username = os.environ.get("IPTORRENTS_USERNAME")
     iptorrents_password = os.environ.get("IPTORRENTS_PASSWORD")
+    kinozal_username = os.environ.get("KINOZAL_USERNAME") or iptorrents_username
+    kinozal_password = os.environ.get("KINOZAL_PASSWORD") or iptorrents_password
+    nnmclub_cookies = os.environ.get("NNMCLUB_COOKIES")
 
     config = EnvConfig(
         qbittorrent_host=qbittorrent_host,

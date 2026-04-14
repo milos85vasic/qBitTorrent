@@ -23,6 +23,11 @@ config/qBittorrent/*
 *credentials*
 *secrets*
 *_password*
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
 *_passwd*
 *_username*
 *_user*

@@ -115,12 +115,15 @@ Test files:
 ```bash
 ./setup.sh                    # One-time: creates dirs, config, installs plugins, starts containers
 ./start.sh                    # Start containers (flags: -p pull, -s status, --no-plugins, -v verbose)
-./start.sh -p && python3 webui-bridge.py   # Full start with bridge
+./setup-webui-bridge-service.sh  # One-time: install webui-bridge as systemd user service
+./start.sh -p                 # Everything auto-starts (containers + bridge via systemd)
 ./stop.sh                     # Stop (flags: -r remove containers, --purge also clean images)
 ```
 
 ### Testing
 ```bash
+./ci.sh                       # Full CI pipeline (manual only, never auto-triggered)
+./ci.sh --quick               # Quick check (syntax + unit tests only)
 ./run-all-tests.sh            # Full suite — requires running container, uses podman specifically
 ./test.sh                     # Quick validation (flags: --all, --quick, --plugin, --full, --container)
 python3 -m py_compile plugins/*.py   # Syntax check all plugins
@@ -128,7 +131,7 @@ bash -n start.sh stop.sh test.sh install-plugin.sh  # Bash syntax check
 python3 -m pytest tests/unit/merge_service/ tests/integration/test_merge_api.py -v --import-mode=importlib
 ```
 
-There is **no CI pipeline, no linter config, no type checking**. `ruff` is used informally (`.ruff_cache/` exists) but has no config file. The only validation is `bash -n` and `py_compile`.
+There is **no auto-triggered CI pipeline**. `ci.sh` is the manual CI pipeline — run it yourself before releases. No GitHub Actions, no webhooks. The only validation is `ci.sh` (which runs `bash -n`, `py_compile`, pytest, and container health checks).
 
 ### Plugin Management
 ```bash
@@ -179,9 +182,13 @@ Merge service also uses: `MERGE_SERVICE_PORT` (default 7187), `PROXY_PORT` (defa
 - `run-all-tests.sh` hardcodes **podman** commands — will fail on docker-only systems.
 - Private tracker tests need valid credentials in `.env` and sometimes a browser-solved CAPTCHA (RuTracker).
 - **RuTracker login may fail with CAPTCHA** — cookies expire periodically. Re-authenticate via browser if needed.
-- **Kinozal/NNMClub need credentials in `.env`** — `KINOZAL_USERNAME/PASSWORD` and `NNMCLUB_COOKIES` are required for live testing.
-- `webui-bridge.py` default port is 7188, not 7186 or 7185.
-- The proxy container runs `start-proxy.sh` which installs `requests` at startup.
+- **Kinozal credentials fall back to IPTorrents** — if `KINOZAL_USERNAME/PASSWORD` are not set, `IPTORRENTS_USERNAME/PASSWORD` are used automatically.
+- **NNMClub needs cookies in `.env`** — `NNMCLUB_COOKIES` is required for live testing.
+- **IPTorrents non-freeleech results never merge** with other trackers. Only `[free]` tagged IPTorrents results merge with duplicates from other trackers.
+- **IPTorrents freeleech results get `[ [free]` suffix** in the name — no confusion about which are safe to download.
+- `webui-bridge.py` auto-starts via systemd user service (port 7188). Install once with `./setup-webui-bridge-service.sh`.
+- The proxy container runs `start-proxy.sh` which installs all deps from `requirements.txt` at startup (including Levenshtein).
 - Plugin install destination: `config/qBittorrent/nova3/engines/` (not `plugins/`).
 - The merge service hooks file is at `/config/download-proxy/hooks.json` inside the container.
 - `start-proxy.sh` starts both the download proxy and the merge service (dual-thread via `main.py`).
+- `ci.sh` is **manual only** — never auto-triggered by Git hooks or remote CI. Run it yourself before releases.
