@@ -2,9 +2,43 @@
 Unit tests for the hooks module.
 """
 
+import sys
+import os
+import pytest
+import importlib.util
+from datetime import datetime
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+_SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")
+_MS_PATH = os.path.join(_SRC_PATH, "merge_service")
+
+sys.modules.setdefault("merge_service", type(sys)("merge_service"))
+sys.modules["merge_service"].__path__ = [_MS_PATH]
+
+_hooks_spec = importlib.util.spec_from_file_location(
+    "merge_service.hooks", os.path.join(_MS_PATH, "hooks.py")
+)
+_hooks_mod = importlib.util.module_from_spec(_hooks_spec)
+sys.modules["merge_service.hooks"] = _hooks_mod
+_hooks_spec.loader.exec_module(_hooks_mod)
+
+HookDispatcher = _hooks_mod.HookDispatcher
+HookConfig = _hooks_mod.HookConfig
+HookEvent = _hooks_mod.HookEvent
+HookEventType = _hooks_mod.HookEventType
+
 import pytest
 from datetime import datetime
-from download_proxy.src.merge_service.hooks import (
+from merge_service.hooks import (
+    HookDispatcher,
+    HookConfig,
+    HookEvent,
+    HookEventType,
+)
+
+import pytest
+from datetime import datetime
+from merge_service.hooks import (
     HookDispatcher,
     HookConfig,
     HookEvent,

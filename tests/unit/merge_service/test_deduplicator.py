@@ -2,9 +2,35 @@
 Unit tests for the deduplicator module.
 """
 
+import sys
+import os
 import pytest
-from download_proxy.src.merge_service.deduplicator import Deduplicator, MatchResult
-from download_proxy.src.merge_service.search import SearchResult
+import importlib.util
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+_SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")
+_MS_PATH = os.path.join(_SRC_PATH, "merge_service")
+
+sys.modules.setdefault("merge_service", type(sys)("merge_service"))
+sys.modules["merge_service"].__path__ = [_MS_PATH]
+
+_dedup_spec = importlib.util.spec_from_file_location(
+    "merge_service.deduplicator", os.path.join(_MS_PATH, "deduplicator.py")
+)
+_dedup_mod = importlib.util.module_from_spec(_dedup_spec)
+sys.modules["merge_service.deduplicator"] = _dedup_mod
+_dedup_spec.loader.exec_module(_dedup_mod)
+
+_search_spec = importlib.util.spec_from_file_location(
+    "merge_service.search", os.path.join(_MS_PATH, "search.py")
+)
+_search_mod = importlib.util.module_from_spec(_search_spec)
+sys.modules["merge_service.search"] = _search_mod
+_search_spec.loader.exec_module(_search_mod)
+
+Deduplicator = _dedup_mod.Deduplicator
+MatchResult = _dedup_mod.MatchResult
+SearchResult = _search_mod.SearchResult
 
 
 class TestDeduplicator:
@@ -42,11 +68,16 @@ class TestDeduplicator:
 
     def test_extract_infohash_from_magnet(self, dedup):
         """Test infohash extraction from magnet link."""
-        hash1 = dedup._extract_infohash("magnet:?xt=urn:btih:ABCDEF123456789")
-        assert hash1 == "ABCDEF123456789"
+        hash1 = dedup._extract_infohash(
+            "magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12"
+        )
+        assert hash1 == "ABCDEF1234567890ABCDEF1234567890ABCDEF12"
 
         hash2 = dedup._extract_infohash("https://tracker.com/file.torrent")
         assert hash2 is None
+
+        hash3 = dedup._extract_infohash("magnet:?xt=urn:btih:short")
+        assert hash3 is None
 
     def test_compare_name_and_size_same(self, dedup, sample_result):
         """Test name+size comparison with identical results."""

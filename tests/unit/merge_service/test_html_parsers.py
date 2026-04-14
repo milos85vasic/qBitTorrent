@@ -14,18 +14,19 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
 _SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")
 _MS_PATH = os.path.join(_SRC_PATH, "merge_service")
 
-_search_spec = importlib.util.spec_from_file_location(
-    "merge_service.search",
-    os.path.join(_MS_PATH, "search.py"),
-    submodule_search_locations=[_MS_PATH],
-)
-_search_mod = importlib.util.module_from_spec(_search_spec)
-sys.modules["merge_service"] = type(sys)("merge_service")
-sys.modules["merge_service"].__path__ = [_MS_PATH]
-sys.modules["merge_service.search"] = _search_mod
-_search_spec.loader.exec_module(_search_mod)
+if "merge_service.search" not in sys.modules:
+    _search_spec = importlib.util.spec_from_file_location(
+        "merge_service.search",
+        os.path.join(_MS_PATH, "search.py"),
+        submodule_search_locations=[_MS_PATH],
+    )
+    _search_mod = importlib.util.module_from_spec(_search_spec)
+    sys.modules.setdefault("merge_service", type(sys)("merge_service"))
+    sys.modules["merge_service"].__path__ = [_MS_PATH]
+    sys.modules["merge_service.search"] = _search_mod
+    _search_spec.loader.exec_module(_search_mod)
 
-SearchOrchestrator = _search_mod.SearchOrchestrator
+SearchOrchestrator = sys.modules["merge_service.search"].SearchOrchestrator
 
 
 @pytest.fixture

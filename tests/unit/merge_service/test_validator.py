@@ -2,8 +2,38 @@
 Unit tests for the tracker validator module.
 """
 
+import sys
+import os
 import pytest
-from download_proxy.src.merge_service.validator import (
+import importlib.util
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+_SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")
+_MS_PATH = os.path.join(_SRC_PATH, "merge_service")
+
+sys.modules.setdefault("merge_service", type(sys)("merge_service"))
+sys.modules["merge_service"].__path__ = [_MS_PATH]
+
+_validator_spec = importlib.util.spec_from_file_location(
+    "merge_service.validator", os.path.join(_MS_PATH, "validator.py")
+)
+_validator_mod = importlib.util.module_from_spec(_validator_spec)
+sys.modules["merge_service.validator"] = _validator_mod
+_validator_spec.loader.exec_module(_validator_mod)
+
+TrackerValidator = _validator_mod.TrackerValidator
+ScrapeResult = _validator_mod.ScrapeResult
+TrackerStatus = _validator_mod.TrackerStatus
+
+import pytest
+from merge_service.validator import (
+    TrackerValidator,
+    ScrapeResult,
+    TrackerStatus,
+)
+
+import pytest
+from merge_service.validator import (
     TrackerValidator,
     ScrapeResult,
     TrackerStatus,
@@ -45,12 +75,11 @@ class TestTrackerValidator:
         scrape = validator._announce_to_scrape("")
         assert scrape is None
 
-    @pytest.mark.asyncio
-    async def test_close_session(self, validator):
+    def test_close_session(self, validator):
         """Test session cleanup."""
-        await validator.close()
+        import asyncio
 
-        # Should handle gracefully even without session
+        asyncio.get_event_loop().run_until_complete(validator.close())
         assert True
 
 
