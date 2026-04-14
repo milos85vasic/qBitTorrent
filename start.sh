@@ -234,6 +234,11 @@ create_directories() {
     print_info "Creating necessary directories..."
     mkdir -p config/qBittorrent
     mkdir -p config/qBittorrent/nova3/engines
+
+    if [[ "$CONTAINER_RUNTIME" == "podman" ]]; then
+        podman unshare chmod -R a+rw config/ 2>/dev/null || true
+    fi
+
     print_success "Directories created"
 }
 

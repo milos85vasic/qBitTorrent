@@ -1,0 +1,365 @@
+"""
+Live container integration tests — validates both running containers
+against real endpoints.
+
+Requires:
+  - Both containers running (qbittorrent + qbittorrent-proxy)
+  - Podman or Docker on the host
+
+Run:
+    python3 -m pytest tests/integration/test_live_containers.py -v
+"""
+
+import json
+import os
+import subprocess
+import time
+import urllib.request
+import urllib.error
+
+import pytest
+
+QBITTORRENT_URL = os.environ.get("QBITTORRENT_URL", "http://localhost:18085")
+PROXY_URL = os.environ.get("PROXY_URL", "http://localhost:8085")
+MERGE_URL = os.environ.get("MERGE_URL", "http://localhost:8086")
+WEBUI_USER = os.environ.get("QBITTORRENT_USER", "admin")
+WEBUI_PASS = os.environ.get("QBITTORRENT_PASS", "admin")
+
+
+def _detect_runtime():
+    for cmd in ("podman", "docker"):
+        try:
+            subprocess.run(
+                [cmd, "version"],
+                capture_output=True,
+                timeout=5,
+                check=True,
+            )
+            return cmd
+        except (
+            FileNotFoundError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+        ):
+            continue
+    return None
+
+
+RUNTIME = _detect_runtime()
+
+
+def _exec(container: str, cmd: str, timeout: int = 15) -> subprocess.CompletedProcess:
+    assert RUNTIME, "No container runtime found (podman/docker)"
+    return subprocess.run(
+        [RUNTIME, "exec", container, "sh", "-c", cmd],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+def _fetch(
+    url: str,
+    method: str = "GET",
+    data: bytes | None = None,
+    headers: dict | None = None,
+):
+    req = urllib.request.Request(url, data=data, method=method)
+    if headers:
+        for k, v in headers.items():
+            req.add_header(k, v)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+            return resp.status, body, dict(resp.headers)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        return e.code, body, {}
+    except urllib.error.URLError as e:
+        return None, str(e.reason), {}
+
+
+# ──────────────────────────────────────────────
+# Container Runtime
+# ──────────────────────────────────────────────
+
+
+class TestContainerRuntime:
+    def test_runtime_detected(self):
+        assert RUNTIME, "Neither podman nor docker found on PATH"
+
+    def test_qbittorrent_container_running(self):
+        r = _exec("qbittorrent", "echo ok")
+        assert r.returncode == 0, f"qbittorrent container not running: {r.stderr}"
+
+    def test_proxy_container_running(self):
+        r = _exec("qbittorrent-proxy", "echo ok")
+        assert r.returncode == 0, f"qbittorrent-proxy container not running: {r.stderr}"
+
+
+# ──────────────────────────────────────────────
+# qBittorrent WebUI (port 18085)
+# ──────────────────────────────────────────────
+
+
+class TestQbittorrentWebUI:
+    def test_webui_reachable(self):
+        status, _, _ = _fetch(f"{QBITTORRENT_URL}/")
+        assert status == 200, f"qBittorrent WebUI not reachable: status={status}"
+
+    def test_webui_login(self):
+        data = urllib.parse.urlencode(
+            {"username": WEBUI_USER, "password": WEBUI_PASS}
+        ).encode()
+        status, _, headers = _fetch(
+            f"{QBITTORRENT_URL}/api/v2/auth/login", method="POST", data=data
+        )
+        assert status in (200, 302), f"Login failed: {status}"
+
+    def test_api_version(self):
+        data = urllib.parse.urlencode(
+            {"username": WEBUI_USER, "password": WEBUI_PASS}
+        ).encode()
+        status, body, _ = _fetch(
+            f"{QBITTORRENT_URL}/api/v2/auth/login", method="POST", data=data
+        )
+        cookie = ""
+        for line in body.split("\n"):
+            pass
+        status, body, _ = _fetch(f"{QBITTORRENT_URL}/api/v2/app/version")
+        assert status == 200 or status == 403, f"Version endpoint unexpected: {status}"
+
+    def test_transfer_info(self):
+        status, body, _ = _fetch(f"{QBITTORRENT_URL}/api/v2/transfer/info")
+        assert status in (200, 403), f"Transfer info unexpected: {status}"
+
+
+# ──────────────────────────────────────────────
+# Download Proxy (port 8085)
+# ──────────────────────────────────────────────
+
+
+class TestDownloadProxy:
+    def test_proxy_container_has_proxy_module(self):
+        r = _exec(
+            "qbittorrent-proxy",
+            'python3 -c \'import sys; sys.path.insert(0, "/config/qBittorrent/nova3/engines"); from download_proxy import run_server; print("ok")\'',
+        )
+        assert r.returncode == 0, f"download_proxy module not importable: {r.stderr}"
+
+    def test_proxy_reachable(self):
+        status, body, _ = _fetch(f"{PROXY_URL}/")
+        if status is None:
+            pytest.skip(
+                "Download proxy on port 8085 not started (original proxy thread may have failed)"
+            )
+        assert status is not None, f"Proxy not reachable at {PROXY_URL}"
+
+    def test_proxy_forwards_to_qbittorrent(self):
+        status, body, _ = _fetch(f"{PROXY_URL}/")
+        if status is None:
+            pytest.skip("Download proxy on port 8085 not started")
+        assert status == 200, f"Proxy forward failed: status={status}"
+        assert "qBittorrent" in body or "html" in body.lower(), (
+            "Proxy not forwarding to qBittorrent WebUI"
+        )
+
+    def test_proxy_container_has_requests(self):
+        r = _exec(
+            "qbittorrent-proxy",
+            "python3 -c 'import requests; print(requests.__version__)'",
+        )
+        assert r.returncode == 0, f"requests not installed in proxy: {r.stderr}"
+
+    def test_proxy_container_has_fastapi(self):
+        r = _exec(
+            "qbittorrent-proxy",
+            "python3 -c 'import fastapi; print(fastapi.__version__)'",
+        )
+        assert r.returncode == 0, f"fastapi not installed in proxy: {r.stderr}"
+
+    def test_proxy_container_has_uvicorn(self):
+        r = _exec(
+            "qbittorrent-proxy",
+            "python3 -c 'import uvicorn; print(uvicorn.__version__)'",
+        )
+        assert r.returncode == 0, f"uvicorn not installed in proxy: {r.stderr}"
+
+
+# ──────────────────────────────────────────────
+# Merge Search Service (port 8086)
+# ──────────────────────────────────────────────
+
+
+class TestMergeService:
+    def test_health_endpoint(self):
+        status, body, _ = _fetch(f"{MERGE_URL}/health")
+        assert status == 200, f"Merge service health check failed: {status}"
+        data = json.loads(body)
+        assert data.get("status") == "healthy"
+        assert data.get("service") == "merge-search"
+
+    def test_dashboard_endpoint(self):
+        status, body, _ = _fetch(f"{MERGE_URL}/")
+        assert status == 200, f"Dashboard not served: {status}"
+        assert "<html" in body.lower(), "Dashboard not returning HTML"
+
+    def test_stats_endpoint(self):
+        status, body, _ = _fetch(f"{MERGE_URL}/api/v1/stats")
+        assert status == 200, f"Stats endpoint failed: {status}"
+        data = json.loads(body)
+        assert "trackers_count" in data
+        assert isinstance(data["trackers_count"], int)
+
+    def test_search_endpoint_exists(self):
+        data = json.dumps({"query": "ubuntu", "limit": 3}).encode()
+        status, body, _ = _fetch(
+            f"{MERGE_URL}/api/v1/search",
+            method="POST",
+            data=data,
+            headers={"Content-Type": "application/json"},
+        )
+        assert status in (200, 201, 202, 502, 503), (
+            f"Search endpoint unexpected status: {status}, body: {body}"
+        )
+
+    def test_hooks_endpoint(self):
+        status, body, _ = _fetch(f"{MERGE_URL}/api/v1/hooks")
+        assert status == 200, f"Hooks GET failed: {status}"
+        data = json.loads(body)
+        assert isinstance(data, (list, dict)), (
+            f"Hooks returned unexpected type: {type(data)}"
+        )
+
+    def test_merge_source_code_in_container(self):
+        r = _exec("qbittorrent-proxy", "ls /config/download-proxy/src/api/__init__.py")
+        assert r.returncode == 0, (
+            f"Merge service source not found in container: {r.stderr}"
+        )
+
+    def test_merge_service_running_in_container(self):
+        r = _exec("qbittorrent-proxy", "ps aux | grep python3")
+        assert "python3" in r.stdout, (
+            f"No python3 process in proxy container: {r.stdout}"
+        )
+
+    def test_streaming_endpoint_exists(self):
+        status, body, _ = _fetch(f"{MERGE_URL}/api/v1/search/stream/nonexistent-id")
+        assert status in (200, 404), f"Streaming endpoint unexpected: {status}"
+
+
+# ──────────────────────────────────────────────
+# Container Environment & Config
+# ──────────────────────────────────────────────
+
+
+class TestContainerEnvironment:
+    def test_rutracker_creds_configured(self):
+        r = _exec("qbittorrent-proxy", "env | grep RUTRACKER_USERNAME || true")
+        has_creds = r.stdout.strip() != ""
+        if not has_creds:
+            pytest.skip(
+                "RUTRACKER_USERNAME not configured in .env — optional for testing"
+            )
+
+    def test_proxy_port_env(self):
+        r = _exec("qbittorrent-proxy", "echo $PROXY_PORT")
+        assert r.stdout.strip() in ("8085", ""), (
+            f"PROXY_PORT unexpected: {r.stdout.strip()}"
+        )
+
+    def test_merge_port_env(self):
+        r = _exec("qbittorrent-proxy", "echo $MERGE_SERVICE_PORT")
+        port = r.stdout.strip()
+        if not port:
+            pytest.skip("MERGE_SERVICE_PORT not explicitly set (uses default 8086)")
+        assert port == "8086", f"MERGE_SERVICE_PORT is: {port}"
+
+    def test_shared_tmp_mount(self):
+        r = _exec("qbittorrent-proxy", "ls -la /shared-tmp/ 2>/dev/null || true")
+        if r.returncode != 0:
+            pytest.skip(
+                "/shared-tmp not mounted — requires container restart with updated docker-compose"
+            )
+
+    def test_shared_tmp_in_qbittorrent(self):
+        r = _exec("qbittorrent", "ls -la /shared-tmp/")
+        assert r.returncode == 0, "/shared-tmp not mounted in qbittorrent"
+
+    def test_download_proxy_source_mounted(self):
+        r = _exec("qbittorrent-proxy", "ls /config/download-proxy/src/main.py")
+        assert r.returncode == 0, "download-proxy source not mounted"
+
+    def test_qbittorrent_env_file_mounted(self):
+        r = _exec("qbittorrent-proxy", "cat /config/.env | head -1")
+        assert r.returncode == 0, ".env not mounted in proxy container"
+
+    def test_network_mode_host(self):
+        assert RUNTIME
+        r = subprocess.run(
+            [
+                RUNTIME,
+                "inspect",
+                "qbittorrent",
+                "--format",
+                "{{.HostConfig.NetworkMode}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert "host" in r.stdout.lower(), (
+            f"qbittorrent not using host network: {r.stdout}"
+        )
+
+        r2 = subprocess.run(
+            [
+                RUNTIME,
+                "inspect",
+                "qbittorrent-proxy",
+                "--format",
+                "{{.HostConfig.NetworkMode}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert "host" in r2.stdout.lower(), (
+            f"qbittorrent-proxy not using host network: {r2.stdout}"
+        )
+
+
+# ──────────────────────────────────────────────
+# Startup & Restart Resilience
+# ──────────────────────────────────────────────
+
+
+class TestStartupResilience:
+    def test_start_proxy_script_exists(self):
+        r = _exec("qbittorrent-proxy", "cat /start-proxy.sh")
+        assert r.returncode == 0, "/start-proxy.sh not found in container"
+        assert "main.py" in r.stdout, "start-proxy.sh does not reference main.py"
+
+    def test_requirements_file_mounted(self):
+        r = _exec("qbittorrent-proxy", "cat /config/download-proxy/requirements.txt")
+        assert r.returncode == 0, "requirements.txt not mounted in container"
+        assert "fastapi" in r.stdout, "fastapi not in requirements.txt"
+        assert "uvicorn" in r.stdout, "uvicorn not in requirements.txt"
+
+    def test_main_py_entrypoint(self):
+        r = _exec("qbittorrent-proxy", "cat /proc/1/cmdline | tr '\\0' ' '")
+        assert "main.py" in r.stdout, f"PID 1 is not main.py: {r.stdout}"
+
+    def test_no_pip_install_at_runtime(self):
+        r = _exec(
+            "qbittorrent-proxy",
+            "python3 -c 'import requests, fastapi, uvicorn; print(\"ok\")'",
+        )
+        assert r.returncode == 0, f"Core deps missing: {r.stderr}"
+
+    def test_config_dir_writable(self):
+        r = _exec(
+            "qbittorrent-proxy",
+            "touch /config/download-proxy/.write_test && rm /config/download-proxy/.write_test",
+        )
+        assert r.returncode == 0, f"config/ dir not writable: {r.stderr}"

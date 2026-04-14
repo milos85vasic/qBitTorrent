@@ -27,6 +27,25 @@ print_success() { echo -e "${GREEN}[✓]${NC} $1"; }
 print_error() { echo -e "${RED}[✗]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
 
+detect_container_runtime() {
+    if command -v podman &> /dev/null; then
+        echo "podman"
+    elif command -v docker &> /dev/null; then
+        echo "docker"
+    else
+        echo ""
+    fi
+}
+
+RUNTIME=$(detect_container_runtime)
+
+if [[ -z "$RUNTIME" ]]; then
+    print_error "Neither podman nor docker found"
+    exit 1
+fi
+
+print_info "Using container runtime: $RUNTIME"
+
 # Initialize results
 OVERALL_STATUS=0
 TEST_RESULTS=""
@@ -51,16 +70,16 @@ run_test() {
     fi
 }
 
-print_header "🧪 RUNNING ALL TESTS - COMPREHENSIVE VALIDATION"
+print_header "RUNNING ALL TESTS - COMPREHENSIVE VALIDATION"
 
 # Check prerequisites
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 1/5: Checking Prerequisites"
+echo "STEP 1/7: Checking Prerequisites"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-if ! podman ps | grep -q "qbittorrent"; then
+if ! $RUNTIME ps --format '{{.Names}}' 2>/dev/null | grep -q "qbittorrent"; then
     print_error "qBittorrent container not running!"
     print_info "Starting container..."
     ./start.sh
@@ -72,7 +91,7 @@ print_success "Container is running"
 # Test Suite 1: Comprehensive Plugin Test
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 2/5: Comprehensive Plugin Test (12 plugins)"
+echo "STEP 2/7: Comprehensive Plugin Test (12 plugins)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -82,7 +101,7 @@ run_test "Plugin Structure, Search, Download, Columns" \
 # Test Suite 2: Unit Tests
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 3/5: Unit Tests"
+echo "STEP 3/7: Unit Tests"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -92,22 +111,42 @@ run_test "Plugin Unit Tests" \
 # Test Suite 3: Integration Tests
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 4/5: Integration Tests"
+echo "STEP 4/7: Integration Tests"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 run_test "Plugin Integration" \
     "python3 tests/test_plugin_integration.py"
 
-# Test Suite 4: Provider Tests
+# Test Suite 4: Merge Service Unit Tests
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 5/5: Provider Functionality Tests"
+echo "STEP 5/7: Merge Service Unit Tests"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-run_test "All Provider Tests" \
-    "python3 tests/final_verification.py"
+run_test "Merge Service Unit Tests" \
+    "python3 -m pytest tests/unit/merge_service/ -v --import-mode=importlib"
+
+# Test Suite 5: Merge Service Integration
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "STEP 6/7: Merge Service Integration Tests"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+run_test "Merge Service Integration Tests" \
+    "python3 -m pytest tests/integration/test_merge_api.py -v --import-mode=importlib"
+
+# Test Suite 6: Live Container Tests
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "STEP 7/7: Live Container Tests"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+run_test "Live Container Health Tests" \
+    "python3 -m pytest tests/integration/test_live_containers.py -v --import-mode=importlib"
 
 # Generate Report
 echo ""
@@ -126,8 +165,9 @@ REPORT_FILE="test_report_$(date +%Y%m%d_%H%M%S).txt"
     echo "════════════════════════════════════════════════════════════════════════════"
     echo ""
     echo "CONTAINER STATUS:"
-    echo "  Container: $(podman ps --filter name=qbittorrent --format '{{.Names}}' 2>/dev/null || echo 'Not running')"
-    echo "  Status: $(podman ps --filter name=qbittorrent --format '{{.Status}}' 2>/dev/null || echo 'Unknown')"
+    echo "  Runtime: $RUNTIME"
+    echo "  Container: $($RUNTIME ps --filter name=qbittorrent --format '{{.Names}}' 2>/dev/null || echo 'Not running')"
+    echo "  Status: $($RUNTIME ps --filter name=qbittorrent --format '{{.Status}}' 2>/dev/null || echo 'Unknown')"
     echo "  WebUI: http://localhost:8085"
     echo ""
     echo "TEST RESULTS:"
