@@ -82,6 +82,9 @@ config/download-proxy/src/hooks.json
 # Download-proxy runtime files
 config/download-proxy/hooks.json
 
+# Scheduler runtime files
+config/merge-service/
+
 # Duplicate source tree (container gets code via volume mount)
 config/download-proxy/src/
 
