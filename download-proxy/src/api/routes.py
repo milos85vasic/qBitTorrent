@@ -312,6 +312,7 @@ TRACKER_DOMAINS = (
     "kinozal.guru",
     "nnmclub.to",
     "nnmclub.ro",
+    "nnm-club.me",
     "iptorrents.com",
     "iptorrents.me",
 )
@@ -328,7 +329,7 @@ def _is_tracker_url(url: str) -> Optional[str]:
                     return "rutracker"
                 if "kinozal" in domain:
                     return "kinozal"
-                if "nnmclub" in domain:
+                if "nnmclub" in domain or "nnm-club" in domain:
                     return "nnmclub"
                 if "iptorrents" in domain:
                     return "iptorrents"

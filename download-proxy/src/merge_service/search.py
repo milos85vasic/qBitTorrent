@@ -260,7 +260,7 @@ class SearchOrchestrator:
             )
         if os.getenv("NNMCLUB_COOKIES"):
             trackers.append(
-                TrackerSource(name="nnmclub", url="https://nnmclub.to", enabled=True)
+                TrackerSource(name="nnmclub", url="https://nnm-club.me", enabled=True)
             )
         if os.getenv("IPTORRENTS_USERNAME") and os.getenv("IPTORRENTS_PASSWORD"):
             trackers.append(
@@ -274,7 +274,7 @@ class SearchOrchestrator:
                     name="rutracker", url="https://rutracker.org", enabled=True
                 ),
                 TrackerSource(name="kinozal", url="https://kinozal.tv", enabled=True),
-                TrackerSource(name="nnmclub", url="https://nnmclub.to", enabled=True),
+                TrackerSource(name="nnmclub", url="https://nnm-club.me", enabled=True),
             ]
         return trackers
 
@@ -530,7 +530,9 @@ class SearchOrchestrator:
 
         try:
             base_url = (
-                os.getenv("NNMCLUB_MIRRORS", "https://nnmclub.to").split(",")[0].strip()
+                os.getenv("NNMCLUB_MIRRORS", "https://nnm-club.me")
+                .split(",")[0]
+                .strip()
             )
             async with aiohttp.ClientSession() as session:
                 async with session.get(

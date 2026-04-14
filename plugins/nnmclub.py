@@ -146,8 +146,8 @@ config = Config()
 
 class NNMClub:
     name = "NoNaMe-Club"
-    url = "https://nnmclub.to/forum/"
-    url_dl = "https://bulk.nnmclub.to/"
+    url = "https://nnm-club.me/forum/"
+    url_dl = "https://bulk.nnm-club.me/"
     supported_categories = {
         "all": "-1",
         "movies": "14",
@@ -181,7 +181,7 @@ class NNMClub:
                     value,
                     None,
                     False,
-                    "nnmclub.to",
+                    "nnm-club.me",
                     True,
                     False,
                     "/",
