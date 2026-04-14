@@ -66,7 +66,7 @@ import sys, os, time, requests
 from datetime import datetime
 from playwright.sync_api import sync_playwright, TimeoutError
 
-BASE_URL = "http://localhost:8085"
+BASE_URL = "http://localhost:7186"
 SCREENSHOT_DIR = "/tmp/qb_screenshots"
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
@@ -235,7 +235,7 @@ echo "  Testing end-to-end flow..."
 
 # Login
 LOGIN_RESULT=$(curl -s -c /tmp/smoke_cookie.txt -X POST \
-    "http://localhost:8085/api/v2/auth/login" \
+    "http://localhost:7186/api/v2/auth/login" \
     -d "username=admin" -d "password=admin")
 
 if [ "$LOGIN_RESULT" = "Ok." ]; then
@@ -248,7 +248,7 @@ fi
 
 # Search
 SEARCH_ID=$(curl -s -b /tmp/smoke_cookie.txt -X POST \
-    "http://localhost:8085/api/v2/search/start" \
+    "http://localhost:7186/api/v2/search/start" \
     -d "pattern=test" -d "plugins=rutracker" -d "category=all" | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
 
 if [ -n "$SEARCH_ID" ]; then
@@ -258,7 +258,7 @@ if [ -n "$SEARCH_ID" ]; then
     # Get results
     sleep 5
     RESULTS=$(curl -s -b /tmp/smoke_cookie.txt \
-        "http://localhost:8085/api/v2/search/results?id=$SEARCH_ID&limit=1")
+        "http://localhost:7186/api/v2/search/results?id=$SEARCH_ID&limit=1")
     
     if echo "$RESULTS" | grep -q '"fileName"'; then
         echo -e "${GREEN}  ✓ Search Results${NC}"
@@ -273,7 +273,7 @@ fi
 
 # Torrent list
 TORRENTS=$(curl -s -b /tmp/smoke_cookie.txt \
-    "http://localhost:8085/api/v2/torrents/info")
+    "http://localhost:7186/api/v2/torrents/info")
 
 if echo "$TORRENTS" | grep -q '"name"'; then
     COUNT=$(echo "$TORRENTS" | grep -o '"name"' | wc -l)
@@ -298,7 +298,7 @@ if [ $TOTAL_FAILED -eq 0 ]; then
     echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "${GREEN}Access qBittorrent:${NC}"
-    echo "  URL:    http://localhost:8085"
+    echo "  URL:    http://localhost:7186"
     echo "  Login:  admin / admin"
     echo ""
     echo -e "${GREEN}Test Coverage:${NC}"

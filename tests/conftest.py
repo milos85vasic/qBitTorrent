@@ -14,7 +14,7 @@ def qbittorrent_host():
 @pytest.fixture
 def qbittorrent_port():
     """Default qBittorrent WebUI port"""
-    return os.environ.get("QBITTORRENT_PORT", "79085")
+    return os.environ.get("QBITTORRENT_PORT", "7185")
 
 
 @pytest.fixture

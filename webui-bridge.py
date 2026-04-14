@@ -23,8 +23,8 @@ import urllib.parse
 
 # Configuration
 QBITTORRENT_HOST = os.environ.get("QBITTORRENT_HOST", "localhost")
-QBITTORRENT_PORT = int(os.environ.get("QBITTORRENT_PORT", "79085"))
-BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "78666"))
+QBITTORRENT_PORT = int(os.environ.get("QBITTORRENT_PORT", "7185"))
+BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "7188"))
 
 # Private tracker URL patterns
 PRIVATE_TRACKERS = {

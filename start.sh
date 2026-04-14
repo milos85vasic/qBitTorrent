@@ -116,28 +116,32 @@ cleanup_stale_config() {
 
 _ensure_webui_credentials() {
     local config_file="$1"
+    local webui_port="${WEBUI_PORT:-7185}"
 
     if [[ ! -f "$config_file" ]]; then
-        return 1
+        return 0
     fi
 
-    if ! grep -q "^WebUI\\\\Username=admin$" "$config_file" 2>/dev/null; then
-        print_info "Ensuring WebUI credentials in: $config_file"
-        if grep -q "^WebUI\\\\Username=" "$config_file" 2>/dev/null; then
-            sed -i 's/^WebUI\\Username=.*/WebUI\\Username=admin/' "$config_file"
-        else
-            echo "WebUI\\Username=admin" >> "$config_file"
-        fi
+    print_info "Ensuring WebUI credentials and port in: $config_file"
+
+    if grep -q "^WebUI\\\\Port=" "$config_file" 2>/dev/null; then
+        sed -i "s/^WebUI\\\\Port=.*/WebUI\\\\Port=${webui_port}/" "$config_file"
+    fi
+
+    if grep -q "^WebUI\\\\Username=" "$config_file" 2>/dev/null; then
+        sed -i 's/^WebUI\\Username=.*/WebUI\\Username=admin/' "$config_file"
     fi
 
     local pbkdf2_hash='@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)'
-    if ! grep -q "XGCniD5hOQPEcE510BED2Q" "$config_file" 2>/dev/null; then
-        if grep -q "^WebUI\\\\Password_PBKDF2=" "$config_file" 2>/dev/null; then
-            sed -i "s|^WebUI\\\\Password_PBKDF2=.*|WebUI\\\\Password_PBKDF2=${pbkdf2_hash}|" "$config_file"
-        else
-            echo "WebUI\\Password_PBKDF2=${pbkdf2_hash}" >> "$config_file"
-        fi
+    if grep -q "^WebUI\\\\Password_PBKDF2=" "$config_file" 2>/dev/null; then
+        sed -i "s|^WebUI\\\\Password_PBKDF2=.*|WebUI\\\\Password_PBKDF2=${pbkdf2_hash}|" "$config_file"
     fi
+
+    local dup_lines
+    dup_lines=$(grep -n "^\\[Application\\]$" "$config_file" 2>/dev/null | tail -n +2 | cut -d: -f1 | sort -rn || true)
+    for line_num in $dup_lines; do
+        sed -i "${line_num}d" "$config_file"
+    done
 }
 
 update_qbittorrent_config() {
@@ -152,7 +156,7 @@ update_qbittorrent_config() {
 
     if [[ ! -f "$template_config" ]]; then
         print_info "Creating default qBittorrent configuration..."
-        cat > "$template_config" << 'EOF'
+        cat > "$template_config" << EOF
 [LegalNotice]
 Accepted=true
 
@@ -193,7 +197,7 @@ General\UseRandomPort=true
 General\ExitCheckDownloads=true
 
 WebUI\Enabled=true
-WebUI\Port=${WEBUI_PORT:-79085}
+WebUI\Port=${WEBUI_PORT:-7185}
 WebUI\Address=*
 WebUI\Username=admin
 WebUI\Password_PBKDF2="@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)"
@@ -337,12 +341,61 @@ wait_for_container() {
     return 0
 }
 
+ensure_webui_password() {
+    local webui_port="${WEBUI_PORT:-7185}"
+    local max_attempts=30
+    local attempt=0
+
+    print_info "Waiting for WebUI to be ready..."
+    while [[ $attempt -lt $max_attempts ]]; do
+        if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${webui_port}/" 2>/dev/null | grep -q "200"; then
+            break
+        fi
+        ((attempt++))
+        sleep 1
+    done
+
+    if [[ $attempt -ge $max_attempts ]]; then
+        print_warning "WebUI not ready, skipping password setup"
+        return 0
+    fi
+
+    local temp_pass
+    temp_pass=$($CONTAINER_RUNTIME logs qbittorrent 2>&1 | grep "temporary password" | tail -1 | grep -oP 'temporary password is provided for this session: \K.*' || true)
+
+    if [[ -z "$temp_pass" ]]; then
+        print_info "No temporary password found, trying direct login"
+        local login_result
+        login_result=$(curl -s -c /tmp/qbit_setup -X POST "http://localhost:${webui_port}/api/v2/auth/login" -d "username=admin&password=admin" 2>/dev/null || true)
+        if [[ "$login_result" == "Ok." ]]; then
+            print_success "WebUI login with admin/admin successful"
+            return 0
+        fi
+        print_warning "Could not determine WebUI password"
+        return 0
+    fi
+
+    local login_result
+    login_result=$(curl -s -c /tmp/qbit_setup -X POST "http://localhost:${webui_port}/api/v2/auth/login" -d "username=admin&password=${temp_pass}" 2>/dev/null || true)
+
+    if [[ "$login_result" != "Ok." ]]; then
+        print_warning "Could not login with temp password"
+        return 0
+    fi
+
+    curl -s -b /tmp/qbit_setup "http://localhost:${webui_port}/api/v2/app/setPreferences" \
+        -d 'json={"WebUI":{"Password":"admin"}}' 2>/dev/null || true
+
+    rm -f /tmp/qbit_setup 2>/dev/null
+    print_success "WebUI password set to admin"
+}
+
 show_status() {
     echo ""
     print_info "Container Status:"
     $COMPOSE_CMD ps
     echo ""
-    print_success "qBitTorrent Web UI: http://localhost:${WEBUI_PORT:-79085}"
+    print_success "qBitTorrent Web UI: http://localhost:${WEBUI_PORT:-7185}"
     print_info "Default credentials: admin / admin"
     print_warning "Remember to change the default password!"
     echo ""
@@ -446,6 +499,7 @@ main() {
 
     start_container
     wait_for_container
+    ensure_webui_password
     show_status
 }
 

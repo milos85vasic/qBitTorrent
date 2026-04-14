@@ -44,7 +44,7 @@ vim .env
 python3 webui-bridge.py
 
 # Access WebUI
-http://localhost:78085
+http://localhost:7186
 # Login: admin / admin
 ```
 
@@ -119,10 +119,10 @@ NNMCLUB_COOKIES="uid=123456; pass=abcdef1234567890abcdef1234567890"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `QBITTORRENT_DATA_DIR` | `/mnt/DATA` | Download directory |
-| `WEBUI_PORT` | `78085` | WebUI port |
+| `WEBUI_PORT` | `7186` | WebUI port |
 | `WEBUI_USERNAME` | `admin` | WebUI login |
 | `WEBUI_PASSWORD` | `admin` | WebUI password |
-| `BRIDGE_PORT` | `78666` | WebUI Bridge port |
+| `BRIDGE_PORT` | `7188` | WebUI Bridge port |
 
 ---
 
@@ -130,7 +130,7 @@ NNMCLUB_COOKIES="uid=123456; pass=abcdef1234567890abcdef1234567890"
 
 ### Basic Search
 
-1. Open `http://localhost:78085`
+1. Open `http://localhost:7186`
 2. Login with admin/admin
 3. Click "Search" tab
 4. Enter search term (e.g., "ubuntu")
@@ -256,7 +256,7 @@ The Merge Search Service is a unified search interface that queries multiple pri
 Open your browser to:
 
 ```
-http://localhost:78086/
+http://localhost:7187/
 ```
 
 The dashboard runs inside the `qbittorrent-proxy` container and is available whenever containers are running.
@@ -279,7 +279,7 @@ The dashboard runs inside the `qbittorrent-proxy` container and is available whe
 
 Example:
 ```bash
-curl "http://localhost:78086/api/search?q=ubuntu&tracker=rutracker"
+curl "http://localhost:7187/api/search?q=ubuntu&tracker=rutracker"
 ```
 
 ### Configuration
@@ -467,8 +467,8 @@ See `docs/PLUGIN_DEVELOPMENT.md` for creating custom search plugins.
 Edit `webui-bridge.py`:
 ```python
 QBITTORRENT_HOST = 'localhost'  # Change if remote
-QBITTORRENT_PORT = 78085         # WebUI port
-BRIDGE_PORT = 78666              # Bridge port
+QBITTORRENT_PORT = 7186         # WebUI port
+BRIDGE_PORT = 7188              # Bridge port
 ```
 
 ### Backup and Restore

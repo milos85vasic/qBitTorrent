@@ -29,7 +29,7 @@ sys.path.insert(0, SCRIPT_DIR)
 
 # qBittorrent API configuration
 QBITTORRENT_HOST = os.environ.get('QBITTORRENT_HOST', 'localhost')
-QBITTORRENT_PORT = os.environ.get('QBITTORRENT_PORT', '8085')
+QBITTORRENT_PORT = os.environ.get('QBITTORRENT_PORT', '7186')
 QBITTORRENT_USER = os.environ.get('QBITTORRENT_USER', 'admin')
 QBITTORRENT_PASS = os.environ.get('QBITTORRENT_PASS', 'admin')
 

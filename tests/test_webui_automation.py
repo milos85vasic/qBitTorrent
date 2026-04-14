@@ -65,7 +65,7 @@ def print_header(text): print(f"\n{Colors.BOLD}{Colors.BLUE}{text}{Colors.ENDC}"
 class WebUIAutomationTester:
     """Automates WebUI testing using Playwright."""
     
-    def __init__(self, host='localhost', port=78085, username='admin', password='admin', headed=False):
+    def __init__(self, host='localhost', port=7186, username='admin', password='admin', headed=False):
         self.host = host
         self.port = port
         self.username = username
@@ -265,7 +265,7 @@ class WebUIAutomationTester:
 def main():
     parser = argparse.ArgumentParser(description='WebUI Automation Test Suite')
     parser.add_argument('--host', type=str, default='localhost', help='qBittorrent host')
-    parser.add_argument('--port', type=str, default='8085', help='qBittorrent port')
+    parser.add_argument('--port', type=str, default='7186', help='qBittorrent port')
     parser.add_argument('--username', type=str, default='admin', help='qBittorrent username')
     parser.add_argument('--password', type=str, default='admin', help='qBittorrent password')
     parser.add_argument('--headed', action='store_true', help='Show browser window')

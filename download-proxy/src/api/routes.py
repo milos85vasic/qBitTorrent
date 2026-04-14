@@ -253,7 +253,7 @@ async def get_search(search_id: str, req: Request):
 async def get_active_downloads():
     import aiohttp
 
-    qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:79085")
+    qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:7185")
     qbit_user = os.getenv("QBITTORRENT_USER", "admin")
     qbit_pass = os.getenv("QBITTORRENT_PASS", "admin")
 
@@ -340,7 +340,7 @@ async def initiate_download(request: DownloadRequest, req: Request):
             "url_count": len(request.download_urls),
         },
     )
-    qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:79085")
+    qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:7185")
     qbit_user = os.getenv("QBITTORRENT_USER", "admin")
     qbit_pass = os.getenv("QBITTORRENT_PASS", "admin")
 

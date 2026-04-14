@@ -311,7 +311,7 @@ test_container_running() {
 }
 
 test_port_available() {
-    local port="${1:-8085}"
+    local port="${1:-7186}"
     if command -v ss &> /dev/null; then
         if ! ss -tln 2>/dev/null | grep -q ":${port} "; then
             print_pass "Port $port is available"
@@ -335,7 +335,7 @@ test_port_available() {
 }
 
 test_webui_accessible() {
-    local port="${1:-8085}"
+    local port="${1:-7186}"
     local url="http://localhost:${port}"
     if command -v curl &> /dev/null; then
         if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$url" 2>/dev/null | grep -q "200\|401\|403"; then
@@ -466,7 +466,7 @@ run_all_tests() {
     
     if podman ps --format '{{.Names}}' 2>/dev/null | grep -q "^qbittorrent$" || \
        docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^qbittorrent$"; then
-        test_webui_accessible "8085" || true
+        test_webui_accessible "7186" || true
         test_container_write_permissions "qbittorrent" || true
     else
         print_skip "Web UI accessibility (container not running)"
@@ -622,7 +622,7 @@ main() {
             ;;
         container)
             test_container_running "qbittorrent" || true
-            test_webui_accessible "8085" || true
+            test_webui_accessible "7186" || true
             ;;
     esac
 }

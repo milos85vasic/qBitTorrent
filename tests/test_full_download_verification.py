@@ -61,7 +61,7 @@ def print_header(text): print(f"\n{Colors.BOLD}{Colors.BLUE}{text}{Colors.ENDC}"
 class QBittorrentAPI:
     """qBittorrent Web API client."""
     
-    def __init__(self, host='localhost', port=78085, username='admin', password='admin'):
+    def __init__(self, host='localhost', port=7186, username='admin', password='admin'):
         self.host = host
         self.port = port
         self.username = username
@@ -402,7 +402,7 @@ def main():
     parser = argparse.ArgumentParser(description='Full Download Verification Test Suite')
     parser.add_argument('--plugin', type=str, help='Test specific plugin')
     parser.add_argument('--host', type=str, default='localhost', help='qBittorrent host')
-    parser.add_argument('--port', type=str, default='8085', help='qBittorrent port')
+    parser.add_argument('--port', type=str, default='7186', help='qBittorrent port')
     parser.add_argument('--username', type=str, default='admin', help='qBittorrent username')
     parser.add_argument('--password', type=str, default='admin', help='qBittorrent password')
     parser.add_argument('--output', type=str, default='download_verification_report.json', help='Output file')

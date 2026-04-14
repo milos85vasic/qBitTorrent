@@ -116,7 +116,7 @@ user-facing errors.
 ### V. Private Tracker Bridge Pattern
 
 Private-tracker downloads through the WebUI MUST be proxied through
-the `webui-bridge.py` host process (port 8666), which routes requests
+the `webui-bridge.py` host process (port 7188), which routes requests
 to `nova2dl.py` with proper authentication.
 
 - `webui-bridge.py` is a separate host process, NOT a container.
@@ -204,9 +204,9 @@ suspension. Automation must be ratio-safe by default.
 - `.env` file MUST have `600` permissions: `chmod 600 .env`.
 - All inter-container communication uses `localhost` via `network_mode:
   host`. No inter-container TLS is required.
-- WebUI is exposed on port 8085 (proxy) and 18085 (direct) — both
+- WebUI is exposed on port 7186 (proxy) and 7185 (direct) — both
   MUST be firewalled from public access in production deployments.
-- The bridge port (8666) MUST NOT be exposed outside localhost.
+- The bridge port (7188) MUST NOT be exposed outside localhost.
 - No root escalation: containers run with `PUID=1000`/`PGID=1000`.
 - Empty root files (`CONFIG`, `SCRIPT`, `EOF`) MUST NOT be removed —
   they may be referenced by existing tooling.

@@ -11,7 +11,7 @@ import requests
 from datetime import datetime
 
 # Configuration
-BASE_URL = "http://localhost:78085"
+BASE_URL = "http://localhost:7186"
 USERNAME = "admin"
 PASSWORD = "admin"
 

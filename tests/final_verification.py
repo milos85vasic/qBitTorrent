@@ -111,7 +111,7 @@ def main():
         print("✓ ALL PLUGINS VERIFIED AND READY!")
         print()
         print("Next steps:")
-        print("  1. Access WebUI at http://localhost:78085")
+        print("  1. Access WebUI at http://localhost:7186")
         print("  2. Login with admin/admin")
         print("  3. Go to Search → Search Plugins")
         print("  4. Enable plugins you want to use")

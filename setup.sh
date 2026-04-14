@@ -50,7 +50,7 @@ if [[ ! -f ".env" ]]; then
 PUID=1000
 PGID=1000
 TZ=Europe/Moscow
-WEBUI_PORT=8085
+WEBUI_PORT=7186
 WEBUI_USERNAME=admin
 WEBUI_PASSWORD=admin
 
@@ -169,12 +169,12 @@ echo "╚═══════════════════════�
 echo ""
 echo "📊 STATUS:"
 echo "  • Container: Running"
-echo "  • WebUI: http://localhost:8085"
+echo "  • WebUI: http://localhost:7186"
 echo "  • Login: admin / admin"
 echo "  • Plugins: 12 installed"
 echo ""
 echo "🚀 NEXT STEPS:"
-echo "  1. Open WebUI: http://localhost:8085"
+echo "  1. Open WebUI: http://localhost:7186"
 echo "  2. Go to Search → Search Plugins"
 echo "  3. Enable plugins you want to use"
 echo "  4. Test search and download"

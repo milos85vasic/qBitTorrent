@@ -28,7 +28,7 @@ class QBittorrentAPIClient:
     """Client for qBittorrent Web API."""
 
     def __init__(
-        self, host="localhost", port=78085, username="admin", password="adminadmin"
+        self, host="localhost", port=7186, username="admin", password="adminadmin"
     ):
         self.base_url = f"http://{host}:{port}"
         self.session = requests.Session()
@@ -285,7 +285,7 @@ def is_container_running():
 def is_webui_accessible():
     """Check if WebUI is accessible."""
     try:
-        response = requests.get("http://localhost:78085", timeout=5)
+        response = requests.get("http://localhost:7186", timeout=5)
         return response.status_code in [200, 401, 403]
     except:
         return False

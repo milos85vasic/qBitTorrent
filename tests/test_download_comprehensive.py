@@ -23,7 +23,7 @@ sys.path.insert(0, tests_dir)
 class QBittorrentClient:
     """Simple qBittorrent API client."""
 
-    def __init__(self, host="localhost", port=78085, username="admin", password="admin"):
+    def __init__(self, host="localhost", port=7186, username="admin", password="admin"):
         self.base_url = f"http://{host}:{port}"
         self.session = requests.Session()
         self.username = username

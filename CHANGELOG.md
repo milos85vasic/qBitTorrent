@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Merge Search Service
-- **FastAPI-based Merge Search Service** running on port 78086 inside the qbittorrent-proxy container
+- **FastAPI-based Merge Search Service** running on port 7187 inside the qbittorrent-proxy container
 - **Multi-tracker search** with results from RuTracker, Kinozal, NNMClub — 50 real results from RuTracker
 - **Download proxy** for authenticated tracker downloads — intercepts tracker URLs, fetches with auth cookies, uploads as .torrent to qBittorrent
 - **SSE streaming** for real-time search results via `GET /api/v1/search/stream/{id}`
-- **Dark theme dashboard** at `http://localhost:78086/`
+- **Dark theme dashboard** at `http://localhost:7187/`
 - **Hook system** with JSON persistence — `GET/POST/DELETE /api/v1/hooks`
 - **Quality detection** automatically tags results as UHD 4K, Full HD, HD, SD
 - **Tiered deduplication** — exact hash match → name+size → fuzzy similarity
@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `docker-compose.yml` now exposes port 78086 (`MERGE_SERVICE_PORT`) from download-proxy container
+- `docker-compose.yml` now exposes port 7187 (`MERGE_SERVICE_PORT`) from download-proxy container
 - Kinozal and NNMClub HTML parsing fixed for current site layouts
 - Branch: `001-merge-search-trackers` — 6 commits, all pushed to origin
 

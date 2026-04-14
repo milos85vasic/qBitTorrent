@@ -14,7 +14,7 @@ import requests
 
 
 # Test configuration
-BASE_URL = "http://localhost:78085"
+BASE_URL = "http://localhost:7186"
 USERNAME = "admin"
 PASSWORD = "admin"
 HEADLESS = True
