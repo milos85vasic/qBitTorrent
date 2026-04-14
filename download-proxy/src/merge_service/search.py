@@ -41,9 +41,7 @@ class TrackerSource:
             "name": self.name,
             "url": self.url,
             "enabled": self.enabled,
-            "last_checked": self.last_checked.isoformat()
-            if self.last_checked
-            else None,
+            "last_checked": self.last_checked.isoformat() if self.last_checked else None,
             "health_status": self.health_status,
             "scrape_url": self.scrape_url,
         }
@@ -135,8 +133,7 @@ class MergedResult:
         return {
             "canonical_identity": self.canonical_identity.to_dict(),
             "sources": [
-                {"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers}
-                for r in self.original_results
+                {"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers} for r in self.original_results
             ],
             "total_seeds": self.total_seeds,
             "total_leechers": self.total_leechers,
@@ -165,15 +162,61 @@ class SearchMetadata:
             "query": self.query,
             "category": self.category,
             "started_at": self.started_at.isoformat(),
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "total_results": self.total_results,
             "merged_results": self.merged_results,
             "trackers_searched": self.trackers_searched,
             "errors": self.errors,
             "status": self.status,
         }
+
+
+PUBLIC_TRACKERS = {
+    "academictorrents": "https://academictorrents.com/",
+    "ali213": "http://down.ali213.net/",
+    "anilibra": "https://anilibria.tv",
+    "audiobookbay": "http://theaudiobookbay.se/",
+    "bitru": "https://bitru.org",
+    "bt4g": "https://bt4gprx.com/",
+    "btsow": "https://btsow.motorcycles",
+    "extratorrent": "https://extratorrent.st",
+    "eztv": "https://eztv.re",
+    "gamestorrents": "https://www.gamestorrents.fm",
+    "glotorrents": "https://glodls.to/",
+    "kickass": "https://katcr.to/",
+    "limetorrents": "https://www.limetorrents.lol",
+    "linuxtracker": "http://linuxtracker.org",
+    "megapeer": "https://megapeer.vip",
+    "nyaa": "https://nyaa.si",
+    "one337x": "https://1337x.to",
+    "pctorrent": "https://pctorrent.ru",
+    "piratebay": "https://thepiratebay.org",
+    "pirateiro": "https://pirateiro.io/",
+    "rockbox": "https://rawkbawx.rocks/",
+    "rutor": "https://rutor.info/",
+    "snowfl": "https://snowfl.com/",
+    "solidtorrents": "https://solidtorrents.to",
+    "therarbg": "https://therarbg.com",
+    "tokyotoshokan": "http://tokyotosho.info",
+    "torlock": "https://www.torlock.com",
+    "torrentdownload": "https://www.torrentdownload.info/",
+    "torrentfunk": "https://www.torrentfunk.com",
+    "torrentgalaxy": "https://torrentgalaxy.to",
+    "torrentkitty": "https://www.torrentkitty.tv",
+    "torrentproject": "https://torrentproject.com.se",
+    "torrentscsv": "https://torrents-csv.com",
+    "xfsub": "https://www.xfsub.com",
+    "yihua": "https://www.yihua.biz",
+    "yourbittorrent": "https://yourbittorrent.com/",
+    "yts": "https://movies-api.accel.li",
+}
+
+PRIVATE_TRACKERS = {
+    "rutracker": "https://rutracker.org",
+    "kinozal": "https://kinozal.tv",
+    "nnmclub": "https://nnm-club.me",
+    "iptorrents": "https://iptorrents.com",
+}
 
 
 class SearchOrchestrator:
@@ -196,9 +239,7 @@ class SearchOrchestrator:
         try:
             load_env()
         except Exception as e:
-            logger.debug(
-                f"config.load_env() failed, falling back to manual parsing: {e}"
-            )
+            logger.debug(f"config.load_env() failed, falling back to manual parsing: {e}")
             import os
 
             for path in [
@@ -238,18 +279,25 @@ class SearchOrchestrator:
             trackers = self._get_enabled_trackers()
             metadata.trackers_searched = [t.name for t in trackers]
 
-            all_results = []
-            for tracker in trackers:
+            async def _search_one(tracker):
                 try:
                     results = await self._search_tracker(tracker, query, category)
-                    all_results.extend(results)
-                    metadata.total_results += len(results)
-                    logger.info(
-                        f"Tracker {tracker.name}: {len(results)} results for '{query}'"
-                    )
+                    logger.info(f"Tracker {tracker.name}: {len(results)} results for '{query}'")
+                    return tracker.name, results, None
                 except Exception as e:
-                    metadata.errors.append(f"{tracker.name}: {str(e)}")
                     logger.error(f"Tracker {tracker.name} error: {e}")
+                    return tracker.name, [], str(e)
+
+            import asyncio
+
+            search_results = await asyncio.gather(*[_search_one(t) for t in trackers])
+
+            all_results = []
+            for name, results, error in search_results:
+                all_results.extend(results)
+                metadata.total_results += len(results)
+                if error:
+                    metadata.errors.append(f"{name}: {error}")
 
             merged = self.deduplicator.merge_results(all_results)
             metadata.merged_results = len(merged)
@@ -268,38 +316,20 @@ class SearchOrchestrator:
 
         trackers = []
         if os.getenv("RUTRACKER_USERNAME") and os.getenv("RUTRACKER_PASSWORD"):
-            trackers.append(
-                TrackerSource(
-                    name="rutracker", url="https://rutracker.org", enabled=True
-                )
-            )
+            trackers.append(TrackerSource(name="rutracker", url="https://rutracker.org", enabled=True))
         if os.getenv("KINOZAL_USERNAME") and os.getenv("KINOZAL_PASSWORD"):
-            trackers.append(
-                TrackerSource(name="kinozal", url="https://kinozal.tv", enabled=True)
-            )
+            trackers.append(TrackerSource(name="kinozal", url="https://kinozal.tv", enabled=True))
         if os.getenv("NNMCLUB_COOKIES"):
-            trackers.append(
-                TrackerSource(name="nnmclub", url="https://nnm-club.me", enabled=True)
-            )
+            trackers.append(TrackerSource(name="nnmclub", url="https://nnm-club.me", enabled=True))
         if os.getenv("IPTORRENTS_USERNAME") and os.getenv("IPTORRENTS_PASSWORD"):
-            trackers.append(
-                TrackerSource(
-                    name="iptorrents", url="https://iptorrents.com", enabled=True
-                )
-            )
-        if not trackers:
-            trackers = [
-                TrackerSource(
-                    name="rutracker", url="https://rutracker.org", enabled=True
-                ),
-                TrackerSource(name="kinozal", url="https://kinozal.tv", enabled=True),
-                TrackerSource(name="nnmclub", url="https://nnm-club.me", enabled=True),
-            ]
+            trackers.append(TrackerSource(name="iptorrents", url="https://iptorrents.com", enabled=True))
+
+        for name, url in sorted(PUBLIC_TRACKERS.items()):
+            trackers.append(TrackerSource(name=name, url=url, enabled=True))
+
         return trackers
 
-    async def _search_tracker(
-        self, tracker: TrackerSource, query: str, category: str
-    ) -> List[SearchResult]:
+    async def _search_tracker(self, tracker: TrackerSource, query: str, category: str) -> List[SearchResult]:
         import logging
 
         logger = logging.getLogger(__name__)
@@ -315,8 +345,88 @@ class SearchOrchestrator:
                 results = await self._search_nnmclub(query, category)
             elif tracker.name == "iptorrents":
                 results = await self._search_iptorrents(query, category)
+            elif tracker.name in PUBLIC_TRACKERS:
+                results = await self._search_public_tracker(tracker.name, query, category)
         except Exception as e:
             logger.error(f"Error searching {tracker.name}: {e}")
+
+        return results
+
+    async def _search_public_tracker(self, tracker_name: str, query: str, category: str) -> List[SearchResult]:
+        import asyncio
+        import json
+        import logging
+
+        logger = logging.getLogger(__name__)
+        results = []
+
+        script = (
+            "import sys, os, json as _json\n"
+            "sys.path.insert(0, '/config/qBittorrent/nova3')\n"
+            "os.chdir('/config/qBittorrent/nova3')\n"
+            "import importlib\n"
+            "_results = []\n"
+            "try:\n"
+            "    import engines.novaprinter as _np\n"
+            "    def _capture(d):\n"
+            "        _results.append(d)\n"
+            "    _np.prettyPrinter = _capture\n"
+            f"    _mod = importlib.import_module(f'engines.{{tracker_name}}')\n"
+            f"    _cls = getattr(_mod, '{{tracker_name}}')\n"
+            "    _engine = _cls()\n"
+            f"    _engine.search({query!r}, {category!r})\n"
+            "except Exception as _e:\n"
+            "    print(_json.dumps({'error': str(_e)}), file=sys.stderr)\n"
+            "print(_json.dumps(_results))\n"
+        )
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "python3",
+                "-c",
+                script,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+
+            if proc.returncode != 0:
+                err = stderr.decode(errors="replace").strip()
+                if err:
+                    logger.debug(f"Plugin {tracker_name} stderr: {err}")
+                return results
+
+            raw = stdout.decode(errors="replace").strip()
+            if not raw:
+                return results
+
+            plugin_results = json.loads(raw)
+            if isinstance(plugin_results, dict) and "error" in plugin_results:
+                logger.debug(f"Plugin {tracker_name} error: {plugin_results['error']}")
+                return results
+
+            for r in plugin_results:
+                try:
+                    results.append(
+                        SearchResult(
+                            name=r.get("name", ""),
+                            size=r.get("size", "0 B"),
+                            seeds=int(r.get("seeds", 0)),
+                            leechers=int(r.get("leech", 0)),
+                            link=r.get("link", ""),
+                            desc_link=r.get("desc_link", ""),
+                            tracker=tracker_name,
+                            engine_url=PUBLIC_TRACKERS.get(tracker_name, ""),
+                        )
+                    )
+                except Exception as e:
+                    logger.debug(f"Skipping malformed {tracker_name} result: {e}")
+                    continue
+
+        except asyncio.TimeoutError:
+            logger.debug(f"Plugin {tracker_name} timed out")
+        except Exception as e:
+            logger.debug(f"Plugin {tracker_name} execution error: {e}")
 
         return results
 
@@ -335,14 +445,8 @@ class SearchOrchestrator:
             return []
 
         try:
-            base_url = (
-                os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org")
-                .split(",")[0]
-                .strip()
-            )
-            search_url = (
-                f"{base_url}/forum/tracker.php?{urlencode({'nm': query, 'fo': 1})}"
-            )
+            base_url = os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org").split(",")[0].strip()
+            search_url = f"{base_url}/forum/tracker.php?{urlencode({'nm': query, 'fo': 1})}"
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -370,9 +474,7 @@ class SearchOrchestrator:
 
         return results
 
-    def _parse_rutracker_html(
-        self, html_content: str, base_url: str
-    ) -> List[SearchResult]:
+    def _parse_rutracker_html(self, html_content: str, base_url: str) -> List[SearchResult]:
         import re
         import html
 
@@ -460,13 +562,9 @@ class SearchOrchestrator:
             return []
 
         try:
-            base_url = (
-                os.getenv("KINOZAL_MIRRORS", "https://kinozal.tv").split(",")[0].strip()
-            )
+            base_url = os.getenv("KINOZAL_MIRRORS", "https://kinozal.tv").split(",")[0].strip()
             async with aiohttp.ClientSession() as session:
-                login_data = urlencode(
-                    {"username": username, "password": password}, encoding="cp1251"
-                )
+                login_data = urlencode({"username": username, "password": password}, encoding="cp1251")
                 async with session.post(
                     f"{base_url}/takelogin.php",
                     data=login_data,
@@ -500,9 +598,7 @@ class SearchOrchestrator:
 
         return results
 
-    def _parse_kinozal_html(
-        self, html_content: str, base_url: str
-    ) -> List[SearchResult]:
+    def _parse_kinozal_html(self, html_content: str, base_url: str) -> List[SearchResult]:
         import re
         from html import unescape
 
@@ -513,9 +609,7 @@ class SearchOrchestrator:
             r">(?P<leech>\d+?)<.+?s\'>(?P<pub_date>.+?)</td>",
             re.S,
         )
-        cyrillic_table = str.maketrans(
-            {"Т": "T", "Г": "G", "М": "M", "К": "K", "Б": "B"}
-        )
+        cyrillic_table = str.maketrans({"Т": "T", "Г": "G", "М": "M", "К": "K", "Б": "B"})
         url_dl = base_url.replace("//", "//dl.")
 
         for tor in torrent_re.finditer(html_content):
@@ -563,11 +657,7 @@ class SearchOrchestrator:
             return []
 
         try:
-            base_url = (
-                os.getenv("NNMCLUB_MIRRORS", "https://nnm-club.me")
-                .split(",")[0]
-                .strip()
-            )
+            base_url = os.getenv("NNMCLUB_MIRRORS", "https://nnm-club.me").split(",")[0].strip()
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{base_url}/forum/tracker.php?{urlencode({'nm': query, 'f': '-1'})}",
@@ -585,9 +675,7 @@ class SearchOrchestrator:
 
         return results
 
-    def _parse_nnmclub_html(
-        self, html_content: str, base_url: str
-    ) -> List[SearchResult]:
+    def _parse_nnmclub_html(self, html_content: str, base_url: str) -> List[SearchResult]:
         import re
         from html import unescape
 
@@ -654,9 +742,7 @@ class SearchOrchestrator:
                 ) as resp:
                     cookies = {c.key: c.value for c in resp.cookies.values()}
                     if not cookies:
-                        logger.error(
-                            f"IPTorrents login failed: HTTP {resp.status}, no cookies returned"
-                        )
+                        logger.error(f"IPTorrents login failed: HTTP {resp.status}, no cookies returned")
 
                 self._tracker_sessions["iptorrents"] = {
                     "cookies": cookies,
@@ -681,16 +767,12 @@ class SearchOrchestrator:
 
         return results
 
-    def _parse_iptorrents_html(
-        self, html_content: str, base_url: str
-    ) -> List[SearchResult]:
+    def _parse_iptorrents_html(self, html_content: str, base_url: str) -> List[SearchResult]:
         import re
         import html
 
         results = []
-        table_match = re.search(
-            r'<table[^>]*id="torrents"[^>]*>(.+?)</table>', html_content, re.S
-        )
+        table_match = re.search(r'<table[^>]*id="torrents"[^>]*>(.+?)</table>', html_content, re.S)
         if not table_match:
             return results
         table = table_match.group(1)
@@ -708,15 +790,11 @@ class SearchOrchestrator:
             if not name_match:
                 continue
 
-            dl_match = re.search(
-                r'href="(?P<link>/download\.php/\d+/[^"]+\.torrent)"', row_text
-            )
+            dl_match = re.search(r'href="(?P<link>/download\.php/\d+/[^"]+\.torrent)"', row_text)
             if not dl_match:
                 continue
 
-            size_match = re.search(
-                r">(?P<size>[\d.]+\s*(?:K|M|G|T)?B)<", row_text, re.I
-            )
+            size_match = re.search(r">(?P<size>[\d.]+\s*(?:K|M|G|T)?B)<", row_text, re.I)
 
             td_values = re.findall(r"<td[^>]*>(?P<val>\d+)</td>", row_text)
             seeds = int(td_values[0]) if len(td_values) > 0 else 0
@@ -777,13 +855,9 @@ class SearchOrchestrator:
         try:
             async with aiohttp.ClientSession() as session:
                 headers = {"Referer": base_url}
-                async with session.get(
-                    url, cookies=cookies, headers=headers, allow_redirects=True
-                ) as resp:
+                async with session.get(url, cookies=cookies, headers=headers, allow_redirects=True) as resp:
                     if resp.status != 200:
-                        logger.error(
-                            f"fetch_torrent {tracker}: HTTP {resp.status} for {url}"
-                        )
+                        logger.error(f"fetch_torrent {tracker}: HTTP {resp.status} for {url}")
                         return None
                     content_type = resp.headers.get("Content-Type", "")
                     data = await resp.read()
@@ -795,24 +869,16 @@ class SearchOrchestrator:
                     ):
                         return data
                     if tracker == "rutracker":
-                        return await self._fetch_rutracker_redirect(
-                            session, url, cookies, base_url
-                        )
+                        return await self._fetch_rutracker_redirect(session, url, cookies, base_url)
                     if tracker == "kinozal":
-                        return await self._fetch_kinozal_torrent(
-                            session, url, cookies, base_url
-                        )
-                    logger.error(
-                        f"fetch_torrent {tracker}: response not a torrent file ({content_type})"
-                    )
+                        return await self._fetch_kinozal_torrent(session, url, cookies, base_url)
+                    logger.error(f"fetch_torrent {tracker}: response not a torrent file ({content_type})")
                     return None
         except Exception as e:
             logger.error(f"fetch_torrent {tracker}: {e}")
             return None
 
-    async def _fetch_rutracker_redirect(
-        self, session, url: str, cookies: dict, base_url: str
-    ) -> Optional[bytes]:
+    async def _fetch_rutracker_redirect(self, session, url: str, cookies: dict, base_url: str) -> Optional[bytes]:
         import re
         import logging
 
@@ -834,9 +900,7 @@ class SearchOrchestrator:
             logger.error(f"_fetch_rutracker_redirect: {e}")
         return None
 
-    async def _fetch_kinozal_torrent(
-        self, session, url: str, cookies: dict, base_url: str
-    ) -> Optional[bytes]:
+    async def _fetch_kinozal_torrent(self, session, url: str, cookies: dict, base_url: str) -> Optional[bytes]:
         import logging
 
         logger = logging.getLogger(__name__)
