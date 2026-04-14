@@ -7,6 +7,8 @@ Supports:
 - Tracker health status tracking
 """
 
+from __future__ import annotations
+
 import asyncio
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
@@ -18,6 +20,7 @@ try:
 
     AIOHTTP_AVAILABLE = True
 except ImportError:
+    aiohttp = None  # type: ignore
     AIOHTTP_AVAILABLE = False
 
 
