@@ -42,7 +42,9 @@ download-proxy/src/
 │   ├── __init__.py               # App factory, lifespan, health check, stats endpoint
 │   ├── routes.py                 # Search, download, streaming endpoints
 │   ├── hooks.py                  # Webhook CRUD with JSON file persistence
-│   └── streaming.py              # SSE streaming for real-time results
+│   ├── streaming.py              # SSE streaming for real-time results
+│   ├── auth.py                   # Tracker auth endpoints (RuTracker CAPTCHA proxy)
+│   └── scheduler.py              # Scheduler CRUD endpoints
 ├── merge_service/                # Core business logic
 │   ├── __init__.py
 │   ├── search.py                 # SearchOrchestrator, data models (ContentType, QualityTier, TorrentResult)
@@ -53,6 +55,8 @@ download-proxy/src/
 │   └── scheduler.py              # Scheduled search with persistence
 ├── config/
 │   └── __init__.py               # Configuration module
+├── plugins/
+│   └── env_loader.py             # Shared env file loader
 └── ui/
     ├── __init__.py
     └── templates/dashboard.html  # Dark theme search dashboard
@@ -65,6 +69,9 @@ download-proxy/src/
 | `download-proxy/src/api/__init__.py` | FastAPI app, lifespan (init SearchOrchestrator + TrackerValidator), health, stats, dashboard routes |
 | `download-proxy/src/api/routes.py` | `POST /search`, `GET /search/stream/{id}`, `POST /download`, `GET /downloads/active` |
 | `download-proxy/src/api/hooks.py` | `GET/POST/DELETE /hooks` — JSON file at `/config/download-proxy/hooks.json` |
+| `download-proxy/src/api/auth.py` | Tracker auth endpoints: RuTracker CAPTCHA fetch/login/cookie-login, multi-tracker auth status at `/auth/status` |
+| `download-proxy/src/api/scheduler.py` | Scheduler CRUD endpoints at `/api/v1/schedules` |
+| `download-proxy/src/api/streaming.py` | SSE streaming via `SSEHandler` class — `search_results_stream()`, `download_progress_stream()` |
 | `download-proxy/src/merge_service/search.py` | `SearchOrchestrator` class, `ContentType`/`QualityTier` enums, `TorrentResult` dataclass |
 | `download-proxy/src/merge_service/deduplicator.py` | Tiered deduplication engine |
 | `download-proxy/src/merge_service/enricher.py` | Multi-provider metadata enrichment |
@@ -96,6 +103,10 @@ Test files:
 | `tests/unit/merge_service/test_hooks.py` | Hook creation, persistence, execution |
 | `tests/unit/merge_service/test_validator.py` | Tracker HTTP and UDP scrape validation |
 | `tests/unit/merge_service/test_enricher.py` | Metadata enrichment from multiple providers |
+| `tests/unit/test_auth.py` | RuTracker CAPTCHA auth endpoint tests |
+| `tests/unit/test_scheduler_api.py` | Scheduler CRUD API endpoint tests |
+| `tests/unit/test_streaming.py` | SSE streaming handler tests |
+| `tests/unit/test_config.py` | Config env loading and fallback tests |
 | `tests/integration/test_merge_api.py` | Full API endpoint integration tests |
 
 ## Key Commands

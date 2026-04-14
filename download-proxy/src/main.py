@@ -22,7 +22,7 @@ def start_original_proxy():
     """Start the original download_proxy.py."""
     logger.info("Starting original download proxy...")
     try:
-        engines_dir = "/config/qBittorrent/nova3/engines"
+        engines_dir = os.environ.get("ENGINES_DIR", "/config/qBittorrent/nova3/engines")
         if engines_dir not in sys.path:
             sys.path.insert(0, engines_dir)
         from download_proxy import run_server
@@ -36,8 +36,9 @@ def start_fastapi_server():
     """Start the FastAPI merge service."""
     logger.info("Starting FastAPI merge service...")
     try:
-        # Add merge service to path
-        sys.path.insert(0, "/config/download-proxy/src")
+        src_dir = os.path.dirname(os.path.abspath(__file__))
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
 
         import uvicorn
         from api import app

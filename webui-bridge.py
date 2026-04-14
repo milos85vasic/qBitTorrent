@@ -97,8 +97,8 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
                     # Cleanup
                     try:
                         os.unlink(torrent_file)
-                    except:
-                        pass
+                    except OSError as e:
+                        print(f"[WebUI-Bridge] Cleanup error: {e}")
                     return
 
         # Not a private tracker or download failed, proxy to qBittorrent

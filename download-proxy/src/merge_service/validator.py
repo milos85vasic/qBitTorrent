@@ -10,9 +10,12 @@ Supports:
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 from enum import Enum
 
 try:
@@ -322,7 +325,8 @@ class TrackerValidator:
         try:
             result, _ = self._decode_benc(data, 0)
             return result if isinstance(result, dict) else {}
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Bencode parse failed: {e}")
             return {}
 
     def _decode_benc(self, data: bytes, pos: int):

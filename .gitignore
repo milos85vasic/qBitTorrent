@@ -81,3 +81,22 @@ config/download-proxy/src/hooks.json
 
 # Download-proxy runtime files
 config/download-proxy/hooks.json
+
+# Duplicate source tree (container gets code via volume mount)
+config/download-proxy/src/
+
+# Generated reports
+plugin_update_report.json
+test_report.json
+tmp/
+
+# IDE directories
+.opencode/
+.specify/
+
+# Status/summary markdown (orphaned)
+FINAL_STATUS.md
+FIXES_SUMMARY.md
+FORK_SUMMARY.md
+ISSUES_AND_TODOS.md
+PLUGIN_STATUS.md

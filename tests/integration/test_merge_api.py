@@ -35,6 +35,7 @@ def _create_test_client():
         return {"status": "healthy", "service": "merge-search", "version": "1.0.0"}
 
     app.include_router(api_router, prefix="/api/v1")
+    app.include_router(hooks_router, prefix="/api/v1/hooks")
     return TestClient(app)
 
 
@@ -46,7 +47,7 @@ def client():
 @pytest.fixture(autouse=True)
 def _reset_hooks_state(tmp_path, monkeypatch):
     hooks_file = str(tmp_path / "hooks.json")
-    monkeypatch.setattr("api.routes.HOOKS_FILE", hooks_file)
+    monkeypatch.setattr("api.hooks.HOOKS_FILE", hooks_file)
     yield
 
 
@@ -184,7 +185,7 @@ class TestHooksEndpoint:
             "script_path": "/tmp/custom.sh",
         }
         resp = client.post("/api/v1/hooks", json=hook_data)
-        assert resp.status_code == 200
+        assert resp.status_code == 400
 
     def test_list_hooks_after_create(self, client):
         hook_data = {
@@ -215,9 +216,9 @@ class TestHooksEndpoint:
         list_resp = client.get("/api/v1/hooks")
         assert list_resp.json()["count"] == 0
 
-    def test_delete_nonexistent_hook_returns_200(self, client):
+    def test_delete_nonexistent_hook_returns_404(self, client):
         resp = client.delete("/api/v1/hooks/no-such-hook")
-        assert resp.status_code == 200
+        assert resp.status_code == 404
 
     def test_create_hook_missing_name_returns_422(self, client):
         resp = client.post(

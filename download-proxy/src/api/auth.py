@@ -10,7 +10,9 @@ import logging
 import secrets
 from typing import Optional
 
-sys.path.insert(0, "/config/download-proxy/src")
+_src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -159,8 +161,8 @@ async def rutracker_fetch_captcha():
                     )
                     if not captcha_img:
                         login_html = login_text
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Secondary login page fetch failed: {e}")
 
             if not captcha_img:
                 return {

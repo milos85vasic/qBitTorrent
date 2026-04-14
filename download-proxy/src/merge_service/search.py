@@ -188,6 +188,9 @@ class SearchOrchestrator:
         self._last_merged_results: Dict[str, tuple] = {}
 
     def _load_env(self):
+        import logging
+
+        logger = logging.getLogger(__name__)
         from config import load_env
 
         try:
@@ -210,8 +213,8 @@ class SearchOrchestrator:
                                     k, v = k.strip(), v.strip().strip('"').strip("'")
                                     if k and k not in os.environ:
                                         os.environ[k] = v
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Could not load env from {path}: {e}")
 
     async def search(
         self,
@@ -753,8 +756,8 @@ class SearchOrchestrator:
                     await self._search_nnmclub("__probe__", "all")
                 elif tracker == "iptorrents":
                     await self._search_iptorrents("__probe__", "all")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Tracker probe failed for {tracker}: {e}")
             session_data = self._tracker_sessions.get(tracker)
 
         if not session_data:

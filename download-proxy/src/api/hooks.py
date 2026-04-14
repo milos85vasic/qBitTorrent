@@ -89,6 +89,12 @@ async def create_hook(request: HookCreateRequest):
             detail=f"Invalid event type. Must be one of: {', '.join(VALID_EVENTS)}",
         )
 
+    if ".." in request.script_path:
+        raise HTTPException(
+            status_code=400,
+            detail="script_path cannot contain path traversal ('..')",
+        )
+
     hook_id = str(uuid.uuid4())
     hook = {
         "hook_id": hook_id,

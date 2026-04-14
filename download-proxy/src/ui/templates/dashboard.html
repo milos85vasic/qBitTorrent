@@ -286,6 +286,7 @@
             .catch(function(err) {
                 btn.disabled = false;
                 status.textContent = 'Error: ' + err.message;
+                document.getElementById('results-tab').innerHTML = '<p class="empty-state">Search failed</p>';
             });
         }
 
@@ -358,7 +359,7 @@
                 document.getElementById('stat-trackers').textContent = data.trackers_count;
                 renderTrackers(data.trackers || []);
             })
-            .catch(function() {});
+            .catch(function(err) { console.error('Failed to load stats:', err); });
         }
 
         function renderTrackers(trackers) {
@@ -405,7 +406,7 @@
                 html += '</tbody></table>';
                 tab.innerHTML = html;
             })
-            .catch(function() {});
+            .catch(function(err) { console.error('Failed to load downloads:', err); });
         }
 
         function loadAllAuthStatus() {
@@ -476,13 +477,13 @@
                 document.getElementById('sched-query').value = '';
                 loadSchedules();
             })
-            .catch(function() {});
+            .catch(function(err) { console.error('Failed to create schedule:', err); });
         }
 
         function deleteSchedule(id) {
             fetch('/api/v1/schedules/' + id, { method: 'DELETE' })
             .then(function() { loadSchedules(); })
-            .catch(function() {});
+            .catch(function(err) { console.error('Failed to delete schedule:', err); });
         }
 
         function loadHooks() {
@@ -515,7 +516,7 @@
         function deleteHook(id) {
             fetch('/api/v1/hooks/' + id, { method: 'DELETE' })
             .then(function() { loadHooks(); })
-            .catch(function() {});
+            .catch(function(err) { console.error('Failed to delete hook:', err); });
         }
 
         function openCaptchaModal() {

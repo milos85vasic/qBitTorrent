@@ -11,7 +11,9 @@ import json
 from typing import Optional, List
 from datetime import datetime
 
-sys.path.insert(0, "/config/download-proxy/src")
+_src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse

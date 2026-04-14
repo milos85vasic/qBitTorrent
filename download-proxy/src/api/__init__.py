@@ -7,7 +7,9 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 
-sys.path.insert(0, "/config/download-proxy/src")
+_src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse
@@ -61,7 +63,6 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -132,6 +133,6 @@ from .auth import router as auth_router
 from .scheduler import router as scheduler_router
 
 app.include_router(api_router, prefix="/api/v1")
-app.include_router(hooks_router, prefix="/api/v1")
+app.include_router(hooks_router, prefix="/api/v1/hooks")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(scheduler_router, prefix="/api/v1/schedules")
