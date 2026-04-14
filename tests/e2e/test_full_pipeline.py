@@ -7,18 +7,25 @@ These tests verify the complete workflow:
 3. Download initiation to qBittorrent
 """
 
+import sys
+import os
 import pytest
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
 
-from download_proxy.src.merge_service.search import (
+_src = os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src")
+_src = os.path.abspath(_src)
+if _src not in sys.path:
+    sys.path.insert(0, _src)
+
+from merge_service.search import (
     SearchOrchestrator,
     SearchMetadata,
     SearchResult,
     TrackerSource,
 )
-from download_proxy.src.merge_service.deduplicator import Deduplicator
+from merge_service.deduplicator import Deduplicator
 
 
 class TestFullPipeline:
@@ -126,9 +133,7 @@ class TestDeduplication:
         dedup = Deduplicator()
 
         # Very similar names should match
-        similarity = dedup._calculate_similarity(
-            "Ubuntu 22.04 LTS Desktop", "Ubuntu 22.04 LTS Desktop amd64"
-        )
+        similarity = dedup._calculate_similarity("Ubuntu 22.04 LTS Desktop", "Ubuntu 22.04 LTS Desktop amd64")
         assert similarity >= 0.5  # Should be quite high
 
     def test_normalize_name_removes_year(self):

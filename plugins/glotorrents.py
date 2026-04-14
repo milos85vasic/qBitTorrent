@@ -48,9 +48,7 @@ class glotorrents(object):
 
         def __findTorrents(self, html):
             torrents = []
-            trs = re.findall(
-                r"<tr class=\'t-row\'> <td class=\'ttable_col1\'.+?</tr>", html
-            )
+            trs = re.findall(r"<tr class=\'t-row\'> <td class=\'ttable_col1\'.+?</tr>", html)
             for tr in trs:
                 # Extract from the A node all the needed information
                 url_titles = re.search(
@@ -68,6 +66,19 @@ class glotorrents(object):
                     ]
                     torrents.append(torrent_data)
             return torrents
+
+    def download_torrent(self, url):
+        if url.startswith("magnet:"):
+            print(url + " " + self.url)
+            return
+        from helpers import retrieve_url
+
+        data = retrieve_url(url)
+        magnet_match = re.search(r'(magnet:\?[^"<\s]+)', data)
+        if magnet_match:
+            print(magnet_match.group(1) + " " + self.url)
+        else:
+            print(url + " " + self.url)
 
     def search(self, what, cat="all"):
         what = what.replace("%20", "+")

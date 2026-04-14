@@ -123,18 +123,12 @@ class MetadataEnricher:
                             return MetadataResult(
                                 source="OMDb",
                                 title=data.get("Title", ""),
-                                year=int(data.get("Year", "0").split("-")[0])
-                                if data.get("Year")
-                                else None,
-                                content_type="movie"
-                                if data.get("Type") == "movie"
-                                else "tv",
+                                year=int(data.get("Year", "0").split("-")[0]) if data.get("Year") else None,
+                                content_type="movie" if data.get("Type") == "movie" else "tv",
                                 imdb_id=data.get("imdbID"),
                                 poster_url=data.get("Poster"),
                                 overview=data.get("Plot"),
-                                genres=data.get("Genre", "").split(", ")
-                                if data.get("Genre")
-                                else [],
+                                genres=data.get("Genre", "").split(", ") if data.get("Genre") else [],
                             )
         except Exception as e:
             logger.debug(f"OMDb lookup failed: {e}")
@@ -199,9 +193,7 @@ class MetadataEnricher:
                                 if result.get("premiered")
                                 else None,
                                 content_type="tv",
-                                poster_url=result.get("image", {}).get("medium")
-                                if result.get("image")
-                                else None,
+                                poster_url=result.get("image", {}).get("medium") if result.get("image") else None,
                                 overview=result.get("summary", "").strip("<p></p>"),
                             )
         except Exception as e:
@@ -241,8 +233,7 @@ class MetadataEnricher:
                         if media:
                             return MetadataResult(
                                 source="AniList",
-                                title=media.get("title", {}).get("english")
-                                or media.get("title", {}).get("romaji", ""),
+                                title=media.get("title", {}).get("english") or media.get("title", {}).get("romaji", ""),
                                 year=media.get("startDate", {}).get("year"),
                                 content_type="anime",
                                 anilist_id=str(media.get("id")),
@@ -271,9 +262,7 @@ class MetadataEnricher:
                             return MetadataResult(
                                 source="MusicBrainz",
                                 title=rg.get("title", ""),
-                                year=int(
-                                    rg.get("first-release-date", "0").split("-")[0]
-                                )
+                                year=int(rg.get("first-release-date", "0").split("-")[0])
                                 if rg.get("first-release-date")
                                 else None,
                                 content_type="music",
@@ -303,9 +292,7 @@ class MetadataEnricher:
                                 title=doc.get("title", ""),
                                 year=doc.get("first_publish_year"),
                                 content_type="book",
-                                openlibrary_id=doc.get("key", "").replace(
-                                    "/works/", ""
-                                ),
+                                openlibrary_id=doc.get("key", "").replace("/works/", ""),
                             )
         except Exception as e:
             logger.debug(f"OpenLibrary lookup failed: {e}")
@@ -321,28 +308,26 @@ class MetadataEnricher:
         Detect quality tier from torrent name.
 
         Parses common quality indicators:
-        - Resolution: 720p, 1080p, 2160p, 4K, 8K
-        - Source: BluRay, WEB-DL, HDTV, DVD
+        - Resolution: 720p, 1080p, 2160p, 4K, 8K, UHD, FHD, FullHD
+        - Source: BluRay, WEB-DL, WEBRip, HDTV, DVD, HDRip, CamRip
         - Codec: x264, x265, HEVC
         """
         import re
 
-        name_lower = name.lower()
+        name_lower = name.lower() if name else ""
 
-        # Resolution detection
-        if "2160p" in name_lower or "4k" in name_lower:
+        if re.search(r"2160p|4k|uhd", name_lower):
             return "4K"
-        if "1080p" in name_lower:
+        if re.search(r"1080p|fullhd|fhd", name_lower):
             return "1080p"
-        if "720p" in name_lower:
+        if re.search(r"720p|hdrip", name_lower):
             return "720p"
-        if "480p" in name_lower or "sd" in name_lower:
+        if re.search(r"480p|sd|camrip", name_lower):
             return "SD"
 
-        # Source-based detection
         if "bluray" in name_lower or "blu-ray" in name_lower:
             return "BluRay"
-        if "web-dl" in name_lower or "webrip" in name_lower:
+        if "web-dl" in name_lower or "webrip" in name_lower or "web.dl" in name_lower or "webdl" in name_lower:
             return "WEB-DL"
         if "hdtv" in name_lower:
             return "HDTV"

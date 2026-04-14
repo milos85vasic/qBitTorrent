@@ -48,7 +48,7 @@ class ScheduledSearch:
 class Scheduler:
     """Manages scheduled searches with persistence."""
 
-    def __init__(self, config_path: str = "/config/merge-service/scheduling.yaml"):
+    def __init__(self, config_path: str = "/config/merge-service/scheduling.json"):
         self._config_path = config_path
         self._scheduled_searches: Dict[str, ScheduledSearch] = {}
         self._running = False
@@ -61,7 +61,7 @@ class Scheduler:
 
     async def load(self):
         """Load scheduled searches from persistent storage."""
-        json_path = self._config_path.replace(".yaml", ".json")
+        json_path = self._config_path
 
         if os.path.exists(json_path):
             try:
@@ -75,27 +75,21 @@ class Scheduler:
                             category=item.get("category", "all"),
                             interval_minutes=item.get("interval_minutes", 60),
                             enabled=item.get("enabled", True),
-                            last_run=datetime.fromisoformat(item["last_run"])
-                            if item.get("last_run")
-                            else None,
-                            next_run=datetime.fromisoformat(item["next_run"])
-                            if item.get("next_run")
-                            else None,
+                            last_run=datetime.fromisoformat(item["last_run"]) if item.get("last_run") else None,
+                            next_run=datetime.fromisoformat(item["next_run"]) if item.get("next_run") else None,
                             status=ScheduleStatus(item.get("status", "active")),
                             results_count=item.get("results_count", 0),
                             error_message=item.get("error_message"),
                         )
                         self._scheduled_searches[search.id] = search
 
-                logger.info(
-                    f"Loaded {len(self._scheduled_searches)} scheduled searches"
-                )
+                logger.info(f"Loaded {len(self._scheduled_searches)} scheduled searches")
             except Exception as e:
                 logger.error(f"Failed to load scheduled searches: {e}")
 
     async def save(self):
         """Save scheduled searches to persistent storage."""
-        json_path = self._config_path.replace(".yaml", ".json")
+        json_path = self._config_path
 
         try:
             data = {
@@ -169,11 +163,7 @@ class Scheduler:
 
     def get_active_scheduled_searches(self) -> List[ScheduledSearch]:
         """Get all active scheduled searches."""
-        return [
-            s
-            for s in self._scheduled_searches.values()
-            if s.enabled and s.status == ScheduleStatus.ACTIVE
-        ]
+        return [s for s in self._scheduled_searches.values() if s.enabled and s.status == ScheduleStatus.ACTIVE]
 
     async def start(self):
         """Start the scheduler."""
@@ -211,9 +201,7 @@ class Scheduler:
 
                         # Schedule next run
                         search.last_run = now
-                        search.next_run = now + timedelta(
-                            minutes=search.interval_minutes
-                        )
+                        search.next_run = now + timedelta(minutes=search.interval_minutes)
 
                 # Save periodically
                 await self.save()
@@ -240,9 +228,7 @@ class Scheduler:
             search.status = ScheduleStatus.COMPLETED
             search.error_message = None
 
-            logger.info(
-                f"Scheduled search {search.name} completed: {search.results_count} results"
-            )
+            logger.info(f"Scheduled search {search.name} completed: {search.results_count} results")
 
         except Exception as e:
             search.status = ScheduleStatus.FAILED

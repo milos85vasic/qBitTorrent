@@ -66,6 +66,19 @@ class kickass(object):
             else:
                 return "NotFound"
 
+    def download_torrent(self, url):
+        if url.startswith("magnet:"):
+            print(url + " " + self.url)
+            return
+        from helpers import retrieve_url
+
+        data = retrieve_url(url)
+        magnet_match = re.search(r'(magnet:\?[^"<\s]+)', data)
+        if magnet_match:
+            print(magnet_match.group(1) + " " + self.url)
+        else:
+            print(url + " " + self.url)
+
     def search(self, what, cat="all"):
         parser = self.HTMLParser(self.url)
         category = "" if cat == "all" else "category/{0}/".format(self.supported_categories[cat])

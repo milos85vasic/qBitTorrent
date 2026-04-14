@@ -55,12 +55,12 @@ download-proxy/src/
 │   └── scheduler.py              # Scheduled search with persistence
 ├── config/
 │   └── __init__.py               # Configuration module
-├── plugins/
-│   └── env_loader.py             # Shared env file loader
 └── ui/
     ├── __init__.py
     └── templates/dashboard.html  # Dark theme search dashboard
 ```
+
+Plugin support files live at `plugins/env_loader.py` (shared env file loader, not inside `download-proxy/src/`).
 
 ### Key Files
 
@@ -180,10 +180,8 @@ Merge service also uses: `MERGE_SERVICE_PORT` (default 7187), `PROXY_PORT` (defa
 - Private tracker tests need valid credentials in `.env` and sometimes a browser-solved CAPTCHA (RuTracker).
 - **RuTracker login may fail with CAPTCHA** — cookies expire periodically. Re-authenticate via browser if needed.
 - **Kinozal/NNMClub need credentials in `.env`** — `KINOZAL_USERNAME/PASSWORD` and `NNMCLUB_COOKIES` are required for live testing.
-- `.ruff_cache/` is **not in `.gitignore`** — it should be.
-- Several empty root files exist (`CONFIG`, `SCRIPT`, `EOF`) — do not remove, they may be referenced.
 - `webui-bridge.py` default port is 7188, not 7186 or 7185.
 - The proxy container runs `start-proxy.sh` which installs `requests` at startup.
 - Plugin install destination: `config/qBittorrent/nova3/engines/` (not `plugins/`).
 - The merge service hooks file is at `/config/download-proxy/hooks.json` inside the container.
-- `start-proxy.sh` currently only starts the download proxy, not the merge service. The merge service may need a separate startup command or the start script needs updating.
+- `start-proxy.sh` starts both the download proxy and the merge service (dual-thread via `main.py`).

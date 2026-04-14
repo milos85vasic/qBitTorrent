@@ -23,6 +23,9 @@ PROXY_PORT = int(os.environ.get("PROXY_PORT", "7186"))
 
 PLUGIN_PATTERNS = {
     "rutracker": [r"rutracker\.org", r"rutracker\.net", r"rutracker\.nl"],
+    "kinozal": [r"kinozal\.tv", r"kinozal\.me"],
+    "nnmclub": [r"nnmclub\.to", r"nnm-club\.me"],
+    "iptorrents": [r"iptorrents\.(com|me|org)"],
 }
 
 COMPILED_PATTERNS = {plugin: [re.compile(p, re.I) for p in patterns] for plugin, patterns in PLUGIN_PATTERNS.items()}
@@ -130,7 +133,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
                             try:
                                 os.unlink(torrent_file)
-                            except:
+                            except OSError:
                                 pass
                             return
                         else:
@@ -144,7 +147,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
             logger.error(f"Error handling request: {e}")
             try:
                 self.send_error(500, str(e))
-            except:
+            except Exception:
                 pass
 
     def proxy_to_qbittorrent(self, body):
@@ -175,13 +178,13 @@ class DownloadHandler(BaseHTTPRequestHandler):
             logger.error(f"HTTP Error {e.code}: {e.reason}")
             try:
                 self.send_error(e.code, e.reason)
-            except:
+            except Exception:
                 pass
         except Exception as e:
             logger.error(f"Error proxying to qBittorrent: {e}")
             try:
                 self.send_error(502, "Bad Gateway")
-            except:
+            except Exception:
                 pass
 
 

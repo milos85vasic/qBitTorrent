@@ -157,6 +157,22 @@ class nyaa(object):
                 else:
                     pass
 
+    def download_torrent(self, url):
+        if url.startswith("magnet:"):
+            print(url + " " + self.url)
+            return
+        if not url.startswith(self.url):
+            print(url + " " + self.url)
+            return
+        from helpers import retrieve_url
+
+        data = retrieve_url(url)
+        magnet_match = re.search(r'(magnet:\?[^"<\s]+)', data)
+        if magnet_match:
+            print(magnet_match.group(1) + " " + self.url)
+        else:
+            print(url + " " + self.url)
+
     # DO NOT CHANGE the name and parameters of this function
     # This function will be the one called by nova2.py
     def search(self, what, cat="all"):

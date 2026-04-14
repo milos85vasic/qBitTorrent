@@ -89,15 +89,22 @@ def _parse_size_to_bytes(size_str: str) -> float:
 
 
 def _detect_quality(name: str, size: str) -> str:
-    nl = (name or "").lower()
-    if re.search(r"2160p|4k|uhd", nl):
-        return "uhd_4k"
-    if re.search(r"1080p|fullhd|fhd|bluray", nl):
-        return "full_hd"
-    if re.search(r"720p|hdrip|web.dl|webdl", nl):
-        return "hd"
-    if re.search(r"480p|dvdr|dvdrip|camrip", nl):
-        return "sd"
+    from merge_service.enricher import MetadataEnricher
+
+    enricher = MetadataEnricher()
+    quality = enricher.detect_quality(name)
+    if quality:
+        mapping = {
+            "4K": "uhd_4k",
+            "1080p": "full_hd",
+            "720p": "hd",
+            "SD": "sd",
+            "BluRay": "full_hd",
+            "WEB-DL": "hd",
+            "HDTV": "hd",
+            "DVD": "sd",
+        }
+        return mapping.get(quality, "unknown")
     sb = _parse_size_to_bytes(size)
     if sb >= 40 * 1024**3:
         return "uhd_4k"
