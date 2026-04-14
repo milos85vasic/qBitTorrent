@@ -1,304 +1,244 @@
-# qBitTorrent-Fixed 🚀
+# qBitTorrent-Fixed
 
-[![Tests](https://img.shields.io/badge/tests-100%25-success)](tests/)
-[![Plugins](https://img.shields.io/badge/plugins-35-blue)](plugins/)
+[![Tests](https://img.shields.io/badge/tests-119%20passing-success)](tests/)
+[![Plugins](https://img.shields.io/badge/plugins-35+-blue)](plugins/)
+[![Merge Service](https://img.shields.io/badge/merge_service-FastAPI%20%3A8086-orange)](download-proxy/src/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 
-> **A fixed and enhanced version of qBittorrent search plugins with 100% test coverage**
+> **qBittorrent with unified multi-tracker search, 35+ plugins, and a download proxy with authenticated tracker support.**
 
-## 🎯 What Makes This Different
+## Features
 
-This is a **production-ready fork** that fixes all known issues with qBittorrent search plugins:
+- **Merge Search Service** — FastAPI service (port 8086) that searches multiple trackers simultaneously, deduplicates results, and proxies authenticated downloads
+- **35+ Search Plugins** — Public, private, and specialized tracker plugins
+- **WebUI Download Fix** — Private tracker downloads work through the proxy bridge
+- **Dark Theme Dashboard** — Search UI at `http://localhost:8086/`
+- **SSE Streaming** — Real-time search results as they arrive from each tracker
+- **Hook System** — Configure webhooks triggered on search/download events
+- **119 Tests Passing** — HTML parsers, API endpoints, quality detection, deduplication, hooks, validator, enricher
 
-- ✅ **WebUI downloads work** (even for private trackers)
-- ✅ **35 plugins included** (8 official + 27 community)
-- ✅ **Real column data** (seeds, peers, sizes - no more zeros!)
-- ✅ **100% test coverage** (all plugins tested and working)
-- ✅ **Complete documentation** (user manuals, troubleshooting, API docs)
-
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# 1. Clone
-git clone https://github.com/yourusername/qBitTorrent-Fixed.git
-cd qBitTorrent-Fixed
-
-# 2. Setup (one command)
+git clone https://github.com/milos85vasic/qBitTorrent.git
+cd qBitTorrent
+cp .env.example .env
+# Edit .env with tracker credentials
 ./setup.sh
-
-# 3. Start
-./start.sh                    # Terminal 1: Start qBittorrent
-python3 webui-bridge.py       # Terminal 2: Enable private tracker support
-
-# 4. Access
-open http://localhost:8085
+./start.sh -p
+# Access:
+#   qBittorrent WebUI:   http://localhost:8085
+#   Merge Search + UI:   http://localhost:8086/
+#   webui-bridge (host): python3 webui-bridge.py
 # Login: admin / admin
 ```
 
-## 📊 Plugin Status
+## Architecture
 
-### ✅ Fully Working (35 Total)
+```
+                         ┌─────────────────────────┐
+                         │      qbittorrent-proxy   │
+                         │    (python:3.12-alpine)   │
+  http://localhost:8085  │                           │
+  ──────────────────────►│  Download Proxy (:8085)   │────► qBittorrent (:18085)
+                         │                           │
+  http://localhost:8086  │  Merge Search Service     │
+  ──────────────────────►│  (FastAPI :8086)          │────► RuTracker / Kinozal / NNMClub
+                         │                           │
+                         │  ┌─ download-proxy/src/ ─┐│
+                         │  │  api/    merge_service/ ││
+                         │  │  ui/     config/        ││
+                         │  └────────────────────────┘│
+                         └─────────────────────────┘
 
-**Public Trackers (19):**
-- 🏴‍☠️ **The Pirate Bay** - General content, magnet links
-- 📺 **EZTV** - TV shows
-- 🇷🇺 **Rutor** - Russian content
-- 📁 **LimeTorrents** - Verified torrents
-- 🔍 **Solid Torrents** - Fast search
-- 📚 **TorrentProject** - Comprehensive
-- 📊 **torrents-csv** - Open database
-- 🔒 **TorLock** - No fake torrents
-- 🔌 **Jackett** - Meta search (aggregates multiple)
-- 🔢 **1337x** - Popular torrent indexer
-- 🎬 **YTS** - High-quality movies
-- 🌌 **TorrentGalaxy** - General content
-- 📀 **RARBG Alternative** - Movies/TV shows
-- 📥 **ExtraTorrent** - General content
-- 🎯 **TorrentFunk** - Verified torrents
-- 🔗 **BTSOW** - Magnet link aggregator
-- 🐱 **TorrentKitty** - Magnet search
-- 🎮 **GamesTorrents** - PC games
-- 🎵 **RockBox** - Music torrents
-
-**Russian Trackers (6):**
-- 🇷🇺 **RuTracker** - Russian content (with auth)
-- 🎬 **Kinozal** - Movies/TV (with auth)
-- 🌐 **NNMClub** - General (with auth)
-- 🔍 **MegaPeer** - General content
-- 🔗 **BitRu** - General content
-- 🎮 **PC-Torrents** - Russian games
-
-**Anime Trackers (4):**
-- 🌸 **Nyaa** - Anime/manga
-- 🗼 **Tokyo Toshokan** - Anime
-- 🎌 **AniLibra** - Anime releases
-- 📝 **Xfsub** - Anime subtitles
-
-**Specialized (3):**
-- 📖 **AudioBook Bay** - Audiobooks
-- 🎓 **AcademicTorrents** - Research data
-- 🐧 **LinuxTracker** - Linux distros
-
-**Private Trackers (1):**
-- 🔐 **IPTorrents** - Premium private tracker (with auth)
-
-## 🧪 Testing
-
-### Run All Tests
-
-```bash
-# Run comprehensive test suite
-./run-all-tests.sh
-
-# Expected output:
-# ✅ ALL TESTS PASSED - 100% SUCCESS RATE!
+  Host process:
+  python3 webui-bridge.py  (:8666)  — private tracker WebUI download support
 ```
 
-### Test Coverage
+Two containers via `docker-compose.yml` (both use `network_mode: host`):
 
-- ✅ **Plugin Structure** - All 35 plugins valid
-- ✅ **Search Functionality** - All plugins search correctly
-- ✅ **Download Functionality** - All downloads work
-- ✅ **Column Data** - Real seeds/leech/size values
-- ✅ **Authentication** - Private trackers work with credentials
+| Service | Image | Ports | Purpose |
+|---------|-------|-------|---------|
+| **qbittorrent** | `lscr.io/linuxserver/qbittorrent:latest` | 18085 | The qBittorrent app |
+| **download-proxy** | `python:3.12-alpine` | 8085, 8086 | Download proxy + Merge Search API |
 
-## 📖 Documentation
+Container runtime is auto-detected (podman preferred over docker).
+
+## Merge Search API
+
+The merge service runs inside `qbittorrent-proxy` on port **8086**.
+
+### Key Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/search` | Search across multiple trackers |
+| `GET` | `/api/v1/search/stream/{id}` | SSE stream of search results |
+| `POST` | `/api/v1/download` | Download via authenticated proxy |
+| `GET` | `/api/v1/downloads/active` | List active downloads |
+| `GET` | `/api/v1/hooks` | List configured hooks |
+| `POST` | `/api/v1/hooks` | Create a hook |
+| `DELETE` | `/api/v1/hooks` | Delete a hook |
+| `GET` | `/health` | Health check |
+| `GET` | `/api/v1/stats` | Service statistics |
+| `GET` | `/` | Dashboard UI (dark theme) |
+
+### How It Works
+
+1. **Search** — `POST /api/v1/search` dispatches queries to enabled trackers (RuTracker, Kinozal, NNMClub, etc.)
+2. **Deduplicate** — Tiered deduplication: exact hash → name+size → fuzzy similarity
+3. **Enrich** — Metadata from OMDb, TMDB, TVMaze, AniList, MusicBrainz, OpenLibrary
+4. **Quality Detect** — Automatically tags UHD 4K, Full HD, HD, SD
+5. **Stream** — Results delivered via SSE as each tracker responds
+6. **Download** — Authenticated tracker URLs intercepted, fetched with session cookies, uploaded as .torrent to qBittorrent
+
+## Plugin System
+
+### 35+ Plugins
+
+**Public Trackers (19):** The Pirate Bay, EZTV, Rutor, LimeTorrents, Solid Torrents, TorrentProject, torrents-csv, TorLock, Jackett, 1337x, YTS, TorrentGalaxy, RARBG Alt, ExtraTorrent, TorrentFunk, BTSOW, TorrentKitty, GamesTorrents, RockBox
+
+**Russian Trackers (6):** RuTracker (auth), Kinozal (auth), NNMClub (auth), MegaPeer, BitRu, PC-Torrents
+
+**Anime Trackers (4):** Nyaa, Tokyo Toshokan, AniLibra, Xfsub
+
+**Specialized (3):** AudioBook Bay, AcademicTorrents, LinuxTracker
+
+**Private (1):** IPTorrents (auth)
+
+### Managed Plugins (12)
+
+`install-plugin.sh` manages: `eztv jackett limetorrents piratebay solidtorrents torlock torrentproject torrentscsv rutracker rutor kinozal nnmclub`
+
+### Plugin Contract
+
+Each plugin is a Python class with:
+- Class attributes: `url`, `name`, `supported_categories`
+- `search(self, what, cat='all')` — outputs via `novaprinter.print()`
+- `download_torrent(self, url)` — returns magnet link or file path
+
+## Testing
+
+```bash
+./run-all-tests.sh
+./test.sh --all
+python3 -m py_compile plugins/*.py
+python3 -m pytest tests/unit/merge_service/ tests/integration/test_merge_api.py -v --import-mode=importlib
+```
+
+**119 tests passing** covering: HTML parsers, API endpoints, quality detection, deduplicator, hooks, validator, enricher.
+
+## What's Included
+
+```
+plugins/                          # 35+ tracker plugins
+├── eztv.py, piratebay.py, ...   # Individual tracker plugins
+├── helpers.py                    # Shared utilities (build_magnet_link, etc.)
+├── nova2.py                      # Search engine core
+├── novaprinter.py                # Output formatting
+├── socks.py                      # Proxy support
+├── download_proxy.py             # Download proxy server
+└── webui_compatible/             # WebUI variants for private trackers
+
+download-proxy/src/               # Merge Search Service source
+├── api/                          # FastAPI application
+│   ├── __init__.py               # App factory, lifespan, health, stats
+│   ├── routes.py                 # Search, download, streaming endpoints
+│   ├── hooks.py                  # Webhook CRUD with JSON persistence
+│   └── streaming.py              # SSE streaming support
+├── merge_service/                # Core business logic
+│   ├── search.py                 # SearchOrchestrator, data models
+│   ├── deduplicator.py           # Tiered dedup (hash, name+size, fuzzy)
+│   ├── enricher.py               # Metadata enrichment (OMDb, TMDB, etc.)
+│   ├── validator.py              # Tracker HTTP/UDP scrape validation
+│   ├── hooks.py                  # Hook execution engine
+│   └── scheduler.py              # Scheduled search with persistence
+├── config/                       # Configuration module
+└── ui/templates/dashboard.html   # Dark theme dashboard
+
+tests/
+├── unit/merge_service/           # Unit tests for merge service
+│   ├── test_html_parsers.py
+│   ├── test_quality_detection.py
+│   ├── test_deduplicator.py
+│   ├── test_hooks.py
+│   ├── test_validator.py
+│   └── test_enricher.py
+├── integration/
+│   └── test_merge_api.py
+└── ...                           # Plugin tests, e2e, UI automation
+```
+
+## Configuration
+
+### Environment Variables
+
+Edit `.env` (see `.env.example`):
+
+```bash
+RUTRACKER_USERNAME=your_username
+RUTRACKER_PASSWORD=your_password
+KINOZAL_USERNAME=your_username
+KINOZAL_PASSWORD=your_password
+NNMCLUB_COOKIES="uid=123456; pass=abc..."
+IPTORRENTS_USERNAME=your_username
+IPTORRENTS_PASSWORD=your_password
+QBITTORRENT_DATA_DIR=/mnt/DATA
+PUID=1000
+PGID=1000
+```
+
+## Scripts
+
+```bash
+./setup.sh                    # One-time setup
+./start.sh [-p] [-s] [-v]    # Start containers (-p pull images)
+./stop.sh [-r] [--purge]      # Stop (-r remove, --purge clean images)
+./install-plugin.sh --all     # Install 12 managed plugins
+./run-all-tests.sh            # Full test suite
+```
+
+## Troubleshooting
+
+```bash
+# Plugin not showing in WebUI
+./stop.sh -r && ./start.sh
+
+# Private tracker download fails
+python3 webui-bridge.py
+
+# Merge service not responding
+podman logs qbittorrent-proxy
+
+# Sync updated source to container
+podman cp download-proxy/src/. qbittorrent-proxy:/config/download-proxy/src/
+podman restart qbittorrent-proxy
+```
+
+## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [📘 User Manual](docs/USER_MANUAL.md) | Complete usage guide |
-| [📗 Plugin Status](PLUGIN_STATUS.md) | Compatibility matrix |
-| [📙 Troubleshooting](docs/PLUGIN_TROUBLESHOOTING.md) | Debug guide |
-| [📕 Fork Summary](FORK_SUMMARY.md) | Architecture & fixes |
+| [User Manual](docs/USER_MANUAL.md) | Complete usage guide |
+| [Plugin Status](PLUGIN_STATUS.md) | Compatibility matrix |
+| [Troubleshooting](docs/PLUGIN_TROUBLESHOOTING.md) | Debug guide |
+| [Fork Summary](FORK_SUMMARY.md) | Architecture & fixes |
+| [Changelog](CHANGELOG.md) | Version history |
 
-## 🔧 Configuration
-
-### For Private Trackers
-
-Edit `.env`:
-
-```bash
-# RuTracker
-RUTRACKER_USERNAME=your_username
-RUTRACKER_PASSWORD=your_password
-
-# Kinozal
-KINOZAL_USERNAME=your_username
-KINOZAL_PASSWORD=your_password
-
-# NNMClub (get cookies from browser)
-NNMCLUB_COOKIES="uid=123456; pass=abc..."
-```
-
-## 🎓 How It Works
-
-### The Problem (Fixed)
-
-```
-WebUI Default Behavior:
-WebUI → qBittorrent API → Direct Download → ❌ Fails for private trackers
-
-Why: WebUI bypasses nova2dl.py which handles authentication
-```
-
-### The Solution
-
-```
-With WebUI Bridge:
-WebUI → Bridge → nova2dl.py → Authenticated Download → ✅ Works!
-```
-
-The `webui-bridge.py` proxy intercepts download requests and routes private tracker downloads through `nova2dl.py` with proper authentication.
-
-## 🐳 Docker/Podman Support
-
-```bash
-# Using Podman (recommended on Linux)
-podman-compose up -d
-
-# Using Docker
-docker compose up -d
-
-# View logs
-podman logs -f qbittorrent
-```
-
-## 🧰 Automation
-
-### Setup Script
-
-```bash
-./setup.sh    # One-time setup
-```
-
-Does:
-- ✅ Check prerequisites
-- ✅ Create directories
-- ✅ Install 12 plugins
-- ✅ Set permissions
-- ✅ Start container
-
-### Test Script
-
-```bash
-./run-all-tests.sh    # Run all tests
-```
-
-Tests:
-- ✅ Plugin structure
-- ✅ Search functionality
-- ✅ Download functionality
-- ✅ Column data validation
-
-## 📦 What's Included
-
-### Plugins (12)
-
-```
-plugins/
-├── eztv.py              # TV shows
-├── jackett.py           # Meta search
-├── limetorrents.py      # Verified torrents
-├── piratebay.py         # Most popular
-├── rutracker.py         # Russian (private)
-├── rutor.py             # Russian (public)
-├── kinozal.py           # Movies/TV (private)
-├── nnmclub.py           # General (private)
-├── solidtorrents.py     # Fast search
-├── torlock.py           # No fakes
-├── torrentproject.py    # Comprehensive
-└── torrentscsv.py       # Open database
-```
-
-### Support Files
-
-```
-plugins/
-├── helpers.py           # Helper functions
-├── nova2.py            # Search engine core
-├── novaprinter.py      # Output formatting
-└── socks.py            # Proxy support
-```
-
-### Tests (100% Coverage)
-
-```
-tests/
-├── comprehensive_test.py       # Full test suite
-├── test_all_plugins.py         # Plugin validation
-├── final_verification.py       # Final checks
-└── test_plugin_integration.py  # Integration tests
-```
-
-## 🐛 Troubleshooting
-
-### Issue: Plugin not showing in WebUI
-
-```bash
-# Restart container
-./restart.sh
-
-# Hard refresh browser (Ctrl+Shift+R)
-```
-
-### Issue: Private tracker download fails
-
-```bash
-# Solution 1: Start WebUI Bridge
-python3 webui-bridge.py
-
-# Solution 2: Use Desktop App
-./install-plugin.sh --local --all
-
-# Solution 3: Check credentials
-cat .env
-```
-
-### Issue: Tests fail
-
-```bash
-# Check container is running
-podman ps
-
-# View logs
-podman logs qbittorrent
-
-# Full reset
-./stop.sh -r
-./setup.sh
-```
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create feature branch: `git checkout -b feature-name`
 3. Make changes
-4. **Run tests**: `./run-all-tests.sh` (must pass 100%)
-5. Commit: `git commit -am 'Add feature'`
-6. Push: `git push origin feature-name`
-7. Submit Pull Request
+4. Run tests: `./run-all-tests.sh`
+5. Commit and push: `git push origin feature-name`
+6. Submit Pull Request
 
-## 📜 License
+## License
 
-Apache 2.0 - See [LICENSE](LICENSE)
-
-## 🙏 Credits
-
-- **qBittorrent Team** - Original software
-- **Plugin Authors** - Various search plugins
-- **This Fork** - Fixes and enhancements
-
-## 📞 Support
-
-- 📖 **Documentation**: See `docs/` folder
-- 🧪 **Tests**: Run `./run-all-tests.sh`
-- 🐛 **Issues**: Report on GitHub
-- 💬 **Discussions**: GitHub Discussions
+Apache 2.0 — See [LICENSE](LICENSE)
 
 ---
 
-**Status**: ✅ Production Ready  
-**Version**: 2.0.0  
-**Last Updated**: March 2025
-
-</div>
+**Version**: 3.0.0
+**Last Updated**: April 2026

@@ -142,6 +142,13 @@ def get_credentials() -> tuple[str, str]:
     return username, password
 ```
 
+### Python (Merge Service)
+
+- FastAPI with async handlers
+- `aiohttp` for outbound HTTP requests
+- `sys.path` setup for test imports using `importlib.util`
+- No comments in code (project convention)
+
 ### YAML/Docker Compose
 
 - Use 2-space indentation
@@ -155,6 +162,11 @@ def get_credentials() -> tuple[str, str]:
 - Update USER_MANUAL.md for user-facing changes
 - Update AGENTS.md for development changes
 - Use clear, concise language
+
+Merge service source files to document:
+- `download-proxy/src/merge_service/search.py` — search orchestration and tracker parsing
+- `download-proxy/src/api/routes.py` — API endpoint definitions
+- `download-proxy/src/api/__init__.py` — API module setup
 
 ## Testing
 
@@ -181,6 +193,14 @@ Always run tests before committing:
 | All | `./test.sh --all` | All validation tests |
 | Plugin | `./test.sh --plugin` | Plugin configuration |
 | Full | `./test.sh --full` | Complete test suite |
+
+### Merge Service Tests
+
+Run the merge service test suite:
+
+```bash
+python3 -m pytest tests/unit/merge_service/ tests/integration/test_merge_api.py -v --import-mode=importlib
+```
 
 ### Adding Tests
 

@@ -1,5 +1,46 @@
 # qBittorrent Search Plugin Fixes - Summary
 
+## Merge Search Service (v3.0)
+
+Branch: `001-merge-search-trackers` | 6 commits | 119 tests passing
+
+### RuTracker HTML Parsing Fixed
+- Correct regex patterns ported from working `plugins/rutracker.py` plugin
+- Proper cookie/session handling for authenticated requests
+- Returns up to 50 results per search query
+
+### Kinozal HTML Parsing Fixed
+- Correct regex patterns for search results extraction
+- Login flow implemented with form-based authentication
+- `cp1251` encoding handling for Cyrillic content
+- Cyrillic-to-Latin title translation for deduplication
+
+### NNMClub HTML Parsing Fixed
+- Correct regex patterns for forum-based torrent listings
+- Cookie-based authentication (`nnmclub_cookies` env var)
+- `cp1251` encoding handling
+- Requires valid credentials to return results
+
+### New Infrastructure
+- **FastAPI service** on port **8086** — unified merge search across trackers
+- **CORS middleware** — allows cross-origin requests from dashboard UI
+- **Singleton orchestrator pattern** — single `SearchOrchestrator` instance manages all tracker clients
+- **Download proxy** — intercepts tracker URLs and fetches with auth cookies for authenticated downloads
+- **Quality detection** — classifies results as UHD 4K, 2160p, 1080p, 720p, 480p, or SD
+- **Tiered deduplication** — merges duplicate results across trackers, preferring higher-quality sources
+- **SSE streaming** — Server-Sent Events for real-time search result delivery
+- **Hook system** — JSON-persisted hooks for post-search actions
+- **UI dashboard** — live dashboard at `http://localhost:8086/`
+
+### Key Source Files
+| File | Purpose |
+|------|---------|
+| `download-proxy/src/merge_service/search.py` | Tracker parsing, deduplication, quality detection |
+| `download-proxy/src/api/routes.py` | FastAPI route definitions |
+| `download-proxy/src/api/__init__.py` | API module initialization |
+
+---
+
 ## What Was Fixed
 
 ### 1. Plugin Installation Script (`install-plugin.sh`)

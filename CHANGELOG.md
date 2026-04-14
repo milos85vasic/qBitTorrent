@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Merge Search Service
+- **FastAPI-based Merge Search Service** running on port 8086 inside the qbittorrent-proxy container
+- **Multi-tracker search** with results from RuTracker, Kinozal, NNMClub — 50 real results from RuTracker
+- **Download proxy** for authenticated tracker downloads — intercepts tracker URLs, fetches with auth cookies, uploads as .torrent to qBittorrent
+- **SSE streaming** for real-time search results via `GET /api/v1/search/stream/{id}`
+- **Dark theme dashboard** at `http://localhost:8086/`
+- **Hook system** with JSON persistence — `GET/POST/DELETE /api/v1/hooks`
+- **Quality detection** automatically tags results as UHD 4K, Full HD, HD, SD
+- **Tiered deduplication** — exact hash match → name+size → fuzzy similarity
+- **Metadata enrichment** via OMDb, TMDB, TVMaze, AniList, MusicBrainz, OpenLibrary
+- **Tracker validation** with HTTP and UDP scrape support
+- **Search scheduling** with persistence across restarts
+- **Stats endpoint** at `GET /api/v1/stats`
+
+#### API Endpoints
+- `POST /api/v1/search` — Search across multiple trackers
+- `GET /api/v1/search/stream/{id}` — SSE stream of search results
+- `POST /api/v1/download` — Download via authenticated proxy
+- `GET /api/v1/downloads/active` — List active downloads
+- `GET /api/v1/hooks` — List hooks
+- `POST /api/v1/hooks` — Create hook
+- `DELETE /api/v1/hooks` — Delete hook
+- `GET /health` — Health check
+- `GET /api/v1/stats` — Service statistics
+
+#### Testing
+- **119 unit/integration tests passing** covering:
+  - HTML parsers for RuTracker, Kinozal, NNMClub
+  - API endpoint validation
+  - Quality detection (UHD 4K, Full HD, HD, SD)
+  - Tiered deduplication engine
+  - Hook creation, persistence, and execution
+  - Tracker validator (HTTP + UDP)
+  - Metadata enricher (multiple providers)
+
+#### Source Structure
+- `download-proxy/src/api/` — FastAPI application, routes, hooks, streaming
+- `download-proxy/src/merge_service/` — Core logic (search orchestrator, deduplicator, enricher, validator, scheduler, hooks)
+- `download-proxy/src/ui/templates/dashboard.html` — Dark theme dashboard
+
+### Changed
+
+- `docker-compose.yml` now exposes port 8086 (`MERGE_SERVICE_PORT`) from download-proxy container
+- Kinozal and NNMClub HTML parsing fixed for current site layouts
+- Branch: `001-merge-search-trackers` — 6 commits, all pushed to origin
+
+### Note
+
+- Kinozal and NNMClub parsing is fixed but requires valid credentials in `.env` for live testing
+- RuTracker may require CAPTCHA solve for login; cookies expire periodically
+
 ## [1.2.0] - 2025-03-11
 
 ### Critical Changes - WebUI Compatibility
@@ -143,5 +196,6 @@ All plugins now return **magnet links** by default for full WebUI download compa
 - RuTracker plugin integration
 - Environment variable configuration
 
-[Unreleased]: https://github.com/milos85vasic/qBitTorrent/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/milos85vasic/qBitTorrent/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/milos85vasic/qBitTorrent/compare/v1.0.0...v1.2.0
 [1.0.0]: https://github.com/milos85vasic/qBitTorrent/releases/tag/v1.0.0

@@ -75,3 +75,9 @@ incomplete/
 # Podman/Docker volumes (if using local volumes)
 volumes/
 config/download-proxy/src/hooks.json
+
+# Ruff cache
+.ruff_cache/
+
+# Download-proxy runtime files
+config/download-proxy/hooks.json

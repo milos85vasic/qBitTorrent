@@ -1,5 +1,39 @@
 # Issues and TODOs - qBittorrent Search Plugins
 
+## Merge Search Service
+
+**Branch:** `001-merge-search-trackers` | **Status:** All 75 spec tasks complete | **Tests:** 119 passing
+
+### Feature Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| RuTracker parser | ✅ Working | 50 results per query, auth + CAPTCHA handling |
+| Kinozal parser | ✅ Fixed parsing | Needs valid credentials |
+| NNMClub parser | ✅ Fixed parsing | Needs valid cookies |
+| Download proxy | ✅ Working | Intercepts tracker URLs, fetches with auth |
+| Quality detection | ✅ Working | UHD 4K → SD classification |
+| Tiered deduplication | ✅ Working | Cross-tracker result merging |
+| SSE streaming | ✅ Working | Real-time result delivery |
+| Hook system | ✅ Working | JSON-persisted hooks |
+| UI dashboard | ✅ Working | `http://localhost:8086/` |
+
+### Known Issues
+
+- **Kinozal / NNMClub** — parsing works but requires valid credentials in `.env`
+- **RuTracker CAPTCHA** — may require browser-solved CAPTCHA to establish session
+- **No CI pipeline** — all testing is local via `pytest`
+
+### Key Files
+
+- `download-proxy/src/merge_service/search.py` — core search orchestration
+- `download-proxy/src/api/routes.py` — API endpoints
+- `download-proxy/src/api/__init__.py` — API module
+- `tests/unit/merge_service/` — unit tests
+- `tests/integration/test_merge_api.py` — integration tests
+
+---
+
 ## Summary
 
 | Category | Count | Status |

@@ -7,16 +7,95 @@
 
 ## Architecture
 
-Two-container setup via `docker-compose.yml`:
+Two-container setup via `docker-compose.yml` (both `network_mode: host`):
 
-- **qbittorrent** (`lscr.io/linuxserver/qbittorrent:latest`) — the app, WebUI on port **18085**
-- **download-proxy** (`python:3.12-alpine`) — proxies downloads, exposes port **8085** to the host
+| Container | Image | Ports | Purpose |
+|-----------|-------|-------|---------|
+| **qbittorrent** | `lscr.io/linuxserver/qbittorrent:latest` | 18085 | qBittorrent WebUI |
+| **qbittorrent-proxy** | `python:3.12-alpine` | 8085, 8086 | Download proxy + Merge Search Service |
 
-Users access `http://localhost:8085` (proxy), which forwards to qBittorrent on 18085.
+**Port map:**
 
-`webui-bridge.py` is a **separate host process** (port **8666**) that enables private tracker downloads in WebUI. It is NOT one of the containers — run it manually: `python3 webui-bridge.py`.
+| Port | Service | Where |
+|------|---------|-------|
+| 18085 | qBittorrent WebUI | qbittorrent container |
+| 8085 | Download proxy | qbittorrent-proxy container |
+| 8086 | Merge Search Service (FastAPI) | qbittorrent-proxy container |
+| 8666 | webui-bridge | Host process (run manually) |
+
+Users access `http://localhost:8085` (proxy → qBittorrent on 18085).
+Merge Search dashboard at `http://localhost:8086/`.
+`webui-bridge.py` is a **separate host process** — run manually: `python3 webui-bridge.py`.
 
 Container runtime is **auto-detected** (podman preferred over docker) in all shell scripts.
+
+## Merge Search Service
+
+FastAPI application in `download-proxy/src/api/`. Runs inside the qbittorrent-proxy container on port 8086.
+
+### Source Structure
+
+```
+download-proxy/src/
+├── api/                          # FastAPI application layer
+│   ├── __init__.py               # App factory, lifespan, health check, stats endpoint
+│   ├── routes.py                 # Search, download, streaming endpoints
+│   ├── hooks.py                  # Webhook CRUD with JSON file persistence
+│   └── streaming.py              # SSE streaming for real-time results
+├── merge_service/                # Core business logic
+│   ├── __init__.py
+│   ├── search.py                 # SearchOrchestrator, data models (ContentType, QualityTier, TorrentResult)
+│   ├── deduplicator.py           # Tiered dedup: exact hash → name+size → fuzzy similarity
+│   ├── enricher.py               # Metadata enrichment (OMDb, TMDB, TVMaze, AniList, MusicBrainz, OpenLibrary)
+│   ├── validator.py              # Tracker validation via HTTP and UDP scrape
+│   ├── hooks.py                  # Hook execution engine
+│   └── scheduler.py              # Scheduled search with persistence
+├── config/
+│   └── __init__.py               # Configuration module
+└── ui/
+    ├── __init__.py
+    └── templates/dashboard.html  # Dark theme search dashboard
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `download-proxy/src/api/__init__.py` | FastAPI app, lifespan (init SearchOrchestrator + TrackerValidator), health, stats, dashboard routes |
+| `download-proxy/src/api/routes.py` | `POST /search`, `GET /search/stream/{id}`, `POST /download`, `GET /downloads/active` |
+| `download-proxy/src/api/hooks.py` | `GET/POST/DELETE /hooks` — JSON file at `/config/download-proxy/hooks.json` |
+| `download-proxy/src/merge_service/search.py` | `SearchOrchestrator` class, `ContentType`/`QualityTier` enums, `TorrentResult` dataclass |
+| `download-proxy/src/merge_service/deduplicator.py` | Tiered deduplication engine |
+| `download-proxy/src/merge_service/enricher.py` | Multi-provider metadata enrichment |
+| `download-proxy/src/merge_service/validator.py` | `TrackerValidator` — HTTP and UDP scrape |
+
+### Syncing Code to Container
+
+After editing `download-proxy/src/`, sync to the running container:
+
+```bash
+podman cp download-proxy/src/. qbittorrent-proxy:/config/download-proxy/src/ && podman restart qbittorrent-proxy
+```
+
+The `download-proxy` volume mount (`./download-proxy:/config/download-proxy`) should pick up changes, but a restart is needed to reload the Python modules.
+
+### Merge Service Tests
+
+```bash
+python3 -m pytest tests/unit/merge_service/ tests/integration/test_merge_api.py -v --import-mode=importlib
+```
+
+Test files:
+
+| Test File | What It Tests |
+|-----------|---------------|
+| `tests/unit/merge_service/test_html_parsers.py` | RuTracker, Kinozal, NNMClub HTML parsing |
+| `tests/unit/merge_service/test_quality_detection.py` | UHD 4K, Full HD, HD, SD detection |
+| `tests/unit/merge_service/test_deduplicator.py` | Hash, name+size, fuzzy dedup tiers |
+| `tests/unit/merge_service/test_hooks.py` | Hook creation, persistence, execution |
+| `tests/unit/merge_service/test_validator.py` | Tracker HTTP and UDP scrape validation |
+| `tests/unit/merge_service/test_enricher.py` | Metadata enrichment from multiple providers |
+| `tests/integration/test_merge_api.py` | Full API endpoint integration tests |
 
 ## Key Commands
 
@@ -34,6 +113,7 @@ Container runtime is **auto-detected** (podman preferred over docker) in all she
 ./test.sh                     # Quick validation (flags: --all, --quick, --plugin, --full, --container)
 python3 -m py_compile plugins/*.py   # Syntax check all plugins
 bash -n start.sh stop.sh test.sh install-plugin.sh  # Bash syntax check
+python3 -m pytest tests/unit/merge_service/ tests/integration/test_merge_api.py -v --import-mode=importlib
 ```
 
 There is **no CI pipeline, no linter config, no type checking**. `ruff` is used informally (`.ruff_cache/` exists) but has no config file. The only validation is `bash -n` and `py_compile`.
@@ -73,6 +153,12 @@ Loaded in priority order (first wins): shell env → `./.env` → `~/.qbit.env` 
 
 Key variables: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD`, `NNMCLUB_COOKIES`, `IPTORRENTS_USERNAME/PASSWORD`, `QBITTORRENT_DATA_DIR` (default `/mnt/DATA`), `PUID/PGID` (default `1000`).
 
+Merge service also uses: `MERGE_SERVICE_PORT` (default 8086), `PROXY_PORT` (default 8085).
+
+### Credentials for Merge Service Trackers
+
+`KINOZAL_USERNAME/PASSWORD` and `NNMCLUB_COOKIES` must be in `.env` for the merge service to authenticate with those trackers. These are passed through from `docker-compose.yml` to the qbittorrent-proxy container.
+
 ## Code Conventions
 
 - **Bash**: `set -euo pipefail`, `[[ ]]` conditionals, quoted variables, `snake_case` functions, `UPPER_CASE` constants, 4-space indent. Scripts use shared color-print helpers (`print_info`, `print_success`, `print_warning`, `print_error`).
@@ -82,8 +168,12 @@ Key variables: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD`, `NNMC
 
 - `run-all-tests.sh` hardcodes **podman** commands — will fail on docker-only systems.
 - Private tracker tests need valid credentials in `.env` and sometimes a browser-solved CAPTCHA (RuTracker).
+- **RuTracker login may fail with CAPTCHA** — cookies expire periodically. Re-authenticate via browser if needed.
+- **Kinozal/NNMClub need credentials in `.env`** — `KINOZAL_USERNAME/PASSWORD` and `NNMCLUB_COOKIES` are required for live testing.
 - `.ruff_cache/` is **not in `.gitignore`** — it should be.
 - Several empty root files exist (`CONFIG`, `SCRIPT`, `EOF`) — do not remove, they may be referenced.
 - `webui-bridge.py` default port is 8666, not 8085 or 18085.
 - The proxy container runs `start-proxy.sh` which installs `requests` at startup.
 - Plugin install destination: `config/qBittorrent/nova3/engines/` (not `plugins/`).
+- The merge service hooks file is at `/config/download-proxy/hooks.json` inside the container.
+- `start-proxy.sh` currently only starts the download proxy, not the merge service. The merge service may need a separate startup command or the start script needs updating.
