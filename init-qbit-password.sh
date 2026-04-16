@@ -18,63 +18,53 @@ echo "[init] Checking for existing password or setting up..."
 # Get current temp password from logs (if any)
 temp_pass=$(podman logs qbittorrent 2>&1 | grep -oP 'temporary password is provided for this session: \K\w+' | tail -1 || true)
 
-if [[ -z "$temp_pass" ]]; then
-    echo "[init] No temp password found - checking if password is already set..."
-    # Try to login with default - if it works, we're done
-    result=$(curl -s -X POST http://localhost:7185/api/v2/auth/login \
-        -d "username=admin" -d "password=admin")
-    if [[ "$result" == "Ok." ]]; then
-        echo "[init] Password already set to 'admin'"
-        exit 0
-    fi
-    echo "[init] Login failed, trying other methods..."
-    # Try empty password (for fresh setup)
-    result=$(curl -s -X POST http://localhost:7185/api/v2/auth/login \
-        -d "username=admin" -d "password=")
-    if [[ "$result" == "Ok." ]]; then
-        echo "[init] Got empty temp password, setting to 'admin'..."
-        # Set password via API - need to use proper JSON format
-        curl -s -X POST http://localhost:7185/api/v2/app/setPreferences \
-            -H "Content-Type: application/json" \
-            -d '{"json":"{\"web_ui_password\":\"admin\"}"}'
-        
+local cookie_jar="/tmp/qbit_init_cookies.txt"
+    local target_pass="admin"
+
+    if [[ -z "$temp_pass" ]]; then
+        echo "[init] No temp password found - trying empty password..."
         result=$(curl -s -X POST http://localhost:7185/api/v2/auth/login \
-            -d "username=admin" -d "password=admin")
+            -d "username=admin" -d "password=")
         if [[ "$result" == "Ok." ]]; then
-            echo "[init] SUCCESS - Password set to 'admin'"
+            temp_pass=""
         else
-            echo "[init] Warning: Could not verify password was set"
-        fi
-    fi
-else
-    echo "[init] Found temp password: $temp_pass"
-    # Login with temp password
-    result=$(curl -s -X POST http://localhost:7185/api/v2/auth/login \
-        -d "username=admin" -d "password=$temp_pass")
-    
-    if [[ "$result" == "Ok." ]]; then
-        echo "[init] Logged in with temp, setting password to 'admin'..."
-        
-        # Try setting password using proper API call (multiple formats)
-        curl -s -X POST http://localhost:7185/api/v2/app/setPreferences \
-            -d "json={\"web_ui_password\":\"admin\"}" || true
-        curl -s -X POST http://localhost:7185/api/v2/app/setPreferences \
-            --data-urlencode "json={\"web_ui_password\":\"admin\"}" || true
-        
-        # Logout and test
-        curl -s -X POST http://localhost:7185/api/v2/auth/logout || true
-        
-        result=$(curl -s -X POST http://localhost:7185/api/v2/auth/login \
-            -d "username=admin" -d "password=admin")
-        
-        if [[ "$result" == "Ok." ]]; then
-            echo "[init] SUCCESS - Password set to 'admin'"
-        else
-            echo "[init] WARNING: Password setting may have failed"
+            echo "[init] Could not determine temp password"
+            exit 1
         fi
     else
-        echo "[init] Could not login with temp password"
+        echo "[init] Found temp password: $temp_pass"
     fi
-fi
+
+    # Login and save session cookie
+    result=$(curl -s -X POST http://localhost:7185/api/v2/auth/login \
+        -d "username=admin" -d "password=$temp_pass" \
+        -c "$cookie_jar")
+    
+    if [[ "$result" != "Ok." ]]; then
+        echo "[init] Login failed: $result"
+        exit 1
+    fi
+    
+    echo "[init] Logged in, setting password to '$target_pass'..."
+    
+    # Set the password using form-urlencoded with cookie session
+    curl -s -X POST http://localhost:7185/api/v2/app/setPreferences \
+        -b "$cookie_jar" \
+        --data-urlencode "json={\"web_ui_password\":\"$target_pass\"}" \
+        -w "\nHTTP: %{http_code}\n"
+    
+    # Verify it worked
+    curl -s -X POST http://localhost:7185/api/v2/auth/logout || true
+    rm -f "$cookie_jar"
+    
+    result=$(curl -s -X POST http://localhost:7185/api/v2/auth/login \
+        -d "username=admin" -d "password=$target_pass")
+    
+    if [[ "$result" == "Ok." ]]; then
+        echo "[init] SUCCESS - Password set to '$target_pass'"
+    else
+        echo "[init] WARNING: Password set may have failed"
+        exit 1
+    fi
 
 echo "[init] Done"
