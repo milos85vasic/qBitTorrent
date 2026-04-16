@@ -471,7 +471,13 @@
                     if (r.metadata.genres && r.metadata.genres.length) html += ' &middot; ' + r.metadata.genres.slice(0,3).join(', ');
                     html += '</span>';
                 }
-html += '</td>' +
+                html += '</td>' +
+                    '<td><span class="type-badge ' + typeClass + '">' + escapeHtml(contentType) + '</span></td>' +
+                    '<td>' + escapeHtml(r.size) + '</td>' +
+                    '<td>' + r.seeds + '</td>' +
+                    '<td>' + r.leechers + '</td>' +
+                    '<td><span class="quality-badge ' + qClass + '">' + escapeHtml(q) + '</span></td>' +
+                    '<td>' + trackerHtml + '</td>' +
                     '<td><div class="btn-group">' +
                     '<button class="download-btn btn-magnet" onclick="doMagnet(' + i + ')" title="Get Magnet Link">Magnet</button>' +
                     '<button class="download-btn btn-schedule" onclick="doSchedule(' + i + ')" title="Send to qBittorrent">qBit</button>' +
