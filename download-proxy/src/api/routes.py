@@ -12,6 +12,7 @@ import urllib.parse
 import aiohttp
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
