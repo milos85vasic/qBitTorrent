@@ -341,15 +341,27 @@
                 '</tr></thead><tbody>';
             results.forEach(function(r, i) {
                 var sources = r.sources || [];
-                var sourceTracker = sources.length > 1;
                 var trackerHtml = '';
-                if (sourceTracker) {
-                    trackerHtml = '<span class="merged-indicator"><span class="merge-icon">&#x2697;</span>Merged<span class="merged-count">' + sources.length + '</span></span>';
+                if (sources && sources.length > 0) {
+                    var counts = {};
                     sources.forEach(function(s) {
-                        var isFree = s.tracker && s.tracker.indexOf('[free]') !== -1;
-                        var tagClass = isFree ? 'tracker-tag freeleech' : 'tracker-tag';
-                        trackerHtml += '<span class="' + tagClass + '">' + escapeHtml(s.tracker) + '</span>';
+                        var t = s.tracker || 'unknown';
+                        counts[t] = (counts[t] || 0) + 1;
                     });
+                    var names = Object.keys(counts);
+                    if (names.length > 1 || sources.length > 1) {
+                        trackerHtml = '<span class="merged-indicator"><span class="merge-icon">&#x2697;</span>Merged</span>';
+                        names.forEach(function(t) {
+                            var isFree = t.indexOf('[free]') !== -1;
+                            var tagClass = isFree ? 'tracker-tag freeleech' : 'tracker-tag';
+                            trackerHtml += '<span class="' + tagClass + '">' + escapeHtml(t) + ' (x' + counts[t] + ')</span>';
+                        });
+                    } else {
+                        var t = r.tracker || 'unknown';
+                        var isFree = t.indexOf('[free]') !== -1;
+                        var tagClass = isFree ? 'tracker-tag freeleech' : 'tracker-tag';
+                        trackerHtml = '<span class="' + tagClass + '">' + escapeHtml(t) + '</span>';
+                    }
                 } else {
                     var t = r.tracker || 'unknown';
                     var isFree = t.indexOf('[free]') !== -1;
