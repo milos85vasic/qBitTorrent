@@ -241,6 +241,9 @@ class TestContentTypeDetection:
             ("Name Season 1 Episode 5", "tv"),
             ("TV Show Episode 3", "tv"),
             ("Series.S02E10.720p", "tv"),
+            ("Highlander Seasons 1 - 6 Complete", "tv"),
+            ("Show Seasons 1-3", "tv"),
+            ("Title Season 2 Complete", "tv"),
         ]
         for name, expected in test_cases:
             identity = CanonicalIdentity(title=name)

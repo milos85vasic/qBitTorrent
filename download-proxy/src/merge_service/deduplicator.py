@@ -337,7 +337,11 @@ class Deduplicator:
             return
 
         # Priority 2: TV SHOW - episode patterns early (very specific)
-        if re.search(r"[sS]\d+[eE]\d+", n) or re.search(r"\b(season|episode)\s*\d+\b", n):
+        if (
+            re.search(r"[sS]\d+[eE]\d+", n)
+            or re.search(r"\b(seasons?)\s*[\d\-]+\b", n)
+            or re.search(r"\b(episode)\s*[\d\-]+\b", n)
+        ):
             identity.content_type = ContentType.TV_SHOW
             return
 

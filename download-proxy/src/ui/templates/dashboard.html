@@ -18,6 +18,8 @@
         .search-form button { padding: 12px 24px; background: #e94560; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
         .search-form button:hover { background: #c73652; }
         .search-form button:disabled { background: #555; cursor: not-allowed; }
+        .search-form button.btn-abort { background: #dc3545; }
+        .search-form button.btn-abort:hover { background: #b02a37; }
         #search-status { color: #888; font-size: 14px; margin-top: 5px; }
         .results-table { width: 100%; border-collapse: collapse; }
         .results-table th, .results-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #0f3460; font-size: 13px; }
@@ -295,6 +297,8 @@
         var _sortColumn = 'seeds';
         var _sortDirection = 'desc';
         var _config = null;
+        var _searchAbortController = null;
+        var _isSearching = false;
 
         async function loadConfig() {
             try {
@@ -384,23 +388,46 @@
             return div.innerHTML;
         }
 
+        function resetSearchButton() {
+            var btn = document.getElementById('search-btn');
+            btn.disabled = false;
+            btn.textContent = 'Search';
+            btn.classList.remove('btn-abort');
+            _isSearching = false;
+            _searchAbortController = null;
+        }
+
         function doSearch(e) {
             e.preventDefault();
-            var query = document.getElementById('search-query').value;
             var btn = document.getElementById('search-btn');
             var status = document.getElementById('search-status');
-            btn.disabled = true;
+
+            if (_isSearching && _searchAbortController) {
+                _searchAbortController.abort();
+                resetSearchButton();
+                status.textContent = 'Search cancelled.';
+                return;
+            }
+
+            var query = document.getElementById('search-query').value;
             status.innerHTML = '<span class="spinner"></span>Searching...';
+            btn.textContent = 'Abort';
+            btn.disabled = false;
+            btn.classList.add('btn-abort');
+            _isSearching = true;
+
+            _searchAbortController = new AbortController();
 
             fetch('/api/v1/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: query })
+                body: JSON.stringify({ query: query }),
+                signal: _searchAbortController.signal
             })
             .then(function(r) {
                 if (r.status === 403) {
                     return r.json().then(function(data) {
-                        btn.disabled = false;
+                        resetSearchButton();
                         if (data.status === 'captcha_required') {
                             status.innerHTML = '<span style="color:#dc3545">RuTracker CAPTCHA required. <a href="#" onclick="openCaptchaModal(); return false;" style="color:#e94560">Solve CAPTCHA</a></span>';
                         }
@@ -411,7 +438,7 @@
             })
             .then(function(data) {
                 if (!data) return;
-                btn.disabled = false;
+                resetSearchButton();
                 if (data.results && data.results.length > 0) {
                     status.textContent = 'Found ' + data.total_results + ' results (' + data.merged_results + ' merged) from ' + data.trackers_searched.join(', ');
                     renderResults(data.results);
@@ -422,7 +449,11 @@
                 loadStats();
             })
             .catch(function(err) {
-                btn.disabled = false;
+                if (err.name === 'AbortError') {
+                    status.textContent = 'Search cancelled.';
+                    return;
+                }
+                resetSearchButton();
                 if (err.message && err.message.indexOf('Failed to fetch') !== -1) {
                     status.innerHTML = '<span style="color:#dc3545">Service unavailable. Please ensure the container is running.</span>';
                 } else {

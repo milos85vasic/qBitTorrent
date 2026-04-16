@@ -257,5 +257,80 @@ class TestButtonFixes:
         print(f"\nY Single doDownload function (count={count})")
 
 
+class TestAbortSearch:
+    """Tests for the search abort functionality."""
+
+    def test_abort_controller_variable_exists(self):
+        """_searchAbortController should be defined."""
+        html = requests.get(BASE_URL).text
+        assert "_searchAbortController" in html
+        assert "_isSearching" in html
+        print("\nY Abort controller variables defined")
+
+    def test_abort_css_class_exists(self):
+        """btn-abort CSS class should be defined."""
+        html = requests.get(BASE_URL).text
+        assert ".btn-abort" in html
+        assert "btn-abort" in html
+        print("\nY Abort button CSS class defined")
+
+    def test_abort_uses_AbortController(self):
+        """doSearch should use AbortController for cancellation."""
+        html = requests.get(BASE_URL).text
+        assert "new AbortController()" in html
+        assert ".abort()" in html
+        assert "AbortError" in html
+        print("\nY AbortController used in doSearch")
+
+    def test_button_text_changes_to_abort(self):
+        """Button text should change to Abort during search."""
+        html = requests.get(BASE_URL).text
+        assert "'Abort'" in html
+        assert "btn-abort" in html
+        print("\nY Button text changes to Abort")
+
+    def test_resetSearchButton_function_exists(self):
+        """resetSearchButton helper should exist."""
+        html = requests.get(BASE_URL).text
+        assert "function resetSearchButton(" in html
+        assert "resetSearchButton()" in html
+        print("\nY resetSearchButton function defined")
+
+    def test_search_signal_passed_to_fetch(self):
+        """AbortController signal should be passed to fetch."""
+        html = requests.get(BASE_URL).text
+        assert "signal:" in html or "signal :" in html
+        print("\nY Abort signal passed to fetch")
+
+    def test_button_not_disabled_during_search(self):
+        """Button should NOT be disabled during search (so it can be clicked to abort)."""
+        html = requests.get(BASE_URL).text
+        # During search, btn.disabled = false so user can click abort
+        assert "btn.disabled = false" in html
+        print("\nY Button stays enabled during search for abort")
+
+    def test_cancelled_status_message(self):
+        """Cancelled search should show appropriate status."""
+        html = requests.get(BASE_URL).text
+        assert "cancelled" in html.lower()
+        print("\nY Cancelled status message present")
+
+    def test_search_returns_to_normal_after_abort(self):
+        """After abort, button should return to Search state."""
+        html = requests.get(BASE_URL).text
+        # resetSearchButton sets text back to Search and removes btn-abort
+        assert "'Search'" in html
+        assert "classList.remove" in html or "removeClass" in html
+        print("\nY Button resets to Search after abort")
+
+    def test_search_returns_to_normal_on_error(self):
+        """On search error, button should reset via resetSearchButton."""
+        html = requests.get(BASE_URL).text
+        # Error handler should call resetSearchButton
+        error_block = html[html.index("catch(function(err)") :]
+        assert "resetSearchButton()" in error_block[:500]
+        print("\nY Button resets on error")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

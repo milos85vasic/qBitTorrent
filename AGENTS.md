@@ -108,6 +108,15 @@ Test files:
 | `tests/unit/test_streaming.py` | SSE streaming handler tests |
 | `tests/unit/test_config.py` | Config env loading and fallback tests |
 | `tests/integration/test_merge_api.py` | Full API endpoint integration tests |
+| `tests/integration/test_button_functions.py` | UI button tests: Magnet, qBit, Download, Abort search |
+
+## Dashboard Features
+
+### Search/Abort Toggle
+The Search button toggles to an Abort button during active searches using `AbortController`. Clicking Abort cancels the in-flight fetch request and resets the button back to Search. The button also resets on search completion, error, or CAPTCHA redirect. CSS class `.btn-abort` turns the button red during search.
+
+### Content Type Detection
+`_detect_content_type()` in `deduplicator.py` detects: movie, tv, music, game, anime, software, audiobook, ebook. TV detection covers patterns like `S01E05`, `Season 1`, `Seasons 1-6`, `Seasons 1 - 6 Complete`, `Episode 3`. No hardcoded titles — only dynamic patterns (release groups, platforms, file formats, genre markers).
 
 ## Key Commands
 
