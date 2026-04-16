@@ -103,6 +103,15 @@ async def dashboard():
     }
 
 
+@app.get("/theme.css")
+async def theme_css():
+    theme_path = os.path.join(os.path.dirname(__file__), "..", "ui", "templates", "theme.css")
+    theme_path = os.path.normpath(theme_path)
+    if os.path.isfile(theme_path):
+        return FileResponse(theme_path, media_type="text/css")
+    return {"error": "Theme not found"}
+
+
 @app.get("/api/v1/stats")
 async def stats():
     orch = app.state.search_orchestrator if hasattr(app.state, "search_orchestrator") else None

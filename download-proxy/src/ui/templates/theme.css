@@ -1,0 +1,79 @@
+:root {
+    --theme-bg-primary: #1a1a2e;
+    --theme-bg-secondary: #16213e;
+    --theme-bg-tertiary: #0f3460;
+    --theme-border: #0f3460;
+
+    --theme-text-primary: #e0e0e0;
+    --theme-text-secondary: #888;
+    --theme-text-muted: #555;
+
+    --theme-accent: #e94560;
+    --theme-accent-hover: #c73652;
+    --theme-accent-light: #ff6b6b;
+
+    --theme-success: #28a745;
+    --theme-success-bg: #218838;
+    --theme-warning: #ffc107;
+    --theme-warning-bg: #856404;
+    --theme-danger: #dc3545;
+    --theme-danger-bg: #b02a37;
+
+    --theme-info: #17a2b8;
+    --theme-info-bg: #138496;
+
+    --theme-purple: #6f42c1;
+    --theme-purple-hover: #5a32a3;
+    --theme-orange: #fd7e14;
+    --theme-orange-hover: #e96b02;
+
+    --theme-merged: #9c27b0;
+
+    --theme-quality-uhd: #ff6b35;
+    --theme-quality-fullhd: #4fc3f7;
+    --theme-quality-hd: #81c784;
+    --theme-quality-sd: #888;
+
+    --theme-type-movie: #e91e63;
+    --theme-type-tv: #2196f3;
+    --theme-type-anime: #ff9800;
+    --theme-type-audiobook: #9c27b0;
+    --theme-type-music: #4caf50;
+    --theme-type-software: #00bcd4;
+    --theme-type-game: #f44336;
+    --theme-type-ebook: #795548;
+
+    --theme-freeleech: #28a745;
+
+    --theme-radius-sm: 3px;
+    --theme-radius-md: 4px;
+    --theme-radius-lg: 6px;
+    --theme-radius-xl: 8px;
+    --theme-radius-round: 12px;
+
+    --theme-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --theme-font-size-xs: 10px;
+    --theme-font-size-sm: 11px;
+    --theme-font-size-md: 12px;
+    --theme-font-size-base: 13px;
+    --theme-font-size-lg: 14px;
+    --theme-font-size-xl: 16px;
+    --theme-font-size-2xl: 18px;
+    --theme-font-size-3xl: 24px;
+
+    --theme-spacing-xs: 4px;
+    --theme-spacing-sm: 8px;
+    --theme-spacing-md: 12px;
+    --theme-spacing-lg: 15px;
+    --theme-spacing-xl: 20px;
+    --theme-spacing-2xl: 30px;
+
+    --theme-shadow: rgba(0, 0, 0, 0.3);
+    --theme-overlay: rgba(0, 0, 0, 0.7);
+
+    --theme-transition: 0.2s ease;
+    --theme-transition-slow: 0.3s;
+
+    --theme-z-dropdown: 100;
+    --theme-z-modal: 1000;
+}

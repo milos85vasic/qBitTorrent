@@ -419,5 +419,31 @@ class TestButtonUI:
         print("\nY doDownload handles auth_failed")
 
 
+class TestTheme:
+    """Tests for shared theme configuration."""
+
+    def test_theme_css_is_loaded(self):
+        """Theme CSS file should be loaded in dashboard."""
+        html = requests.get(BASE_URL).text
+        assert "theme.css" in html
+        print("\nY Theme CSS is loaded")
+
+    def test_theme_defines_colors(self):
+        """Theme should define all color variables."""
+        r = requests.get(f"{BASE_URL}/theme.css")
+        assert r.status_code == 200
+        css = r.text
+        assert "--theme-accent:" in css
+        assert "--theme-bg-primary:" in css
+        assert "--theme-text-primary:" in css
+        print("\nY Theme defines colors")
+
+    def test_dashboard_uses_theme_variables(self):
+        """Dashboard should use theme CSS variables."""
+        html = requests.get(BASE_URL).text
+        assert "var(--theme-" in html
+        print("\nY Dashboard uses theme variables")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
