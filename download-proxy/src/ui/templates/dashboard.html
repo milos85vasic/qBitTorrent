@@ -419,14 +419,14 @@
         }
 
         function renderResults(results) {
-            var html = '<table class="results-table"><thead><tr>' +
-                '<th class="' + getSortClass('name') + '" onclick="sortResults(\'name\')">Name<span class="sort-icon"></span></th>' +
-                '<th class="' + getSortClass('type') + '" onclick="sortResults(\'type\')">Type<span class="sort-icon"></span></th>' +
-                '<th class="' + getSortClass('size') + '" onclick="sortResults(\'size\')">Size<span class="sort-icon"></span></th>' +
-                '<th class="' + getSortClass('seeds') + '" onclick="sortResults(\'seeds\')">Seeds<span class="sort-icon"></span></th>' +
-                '<th class="' + getSortClass('leechers') + '" onclick="sortResults(\'leechers\')">Leechers<span class="sort-icon"></span></th>' +
-                '<th class="' + getSortClass('quality') + '" onclick="sortResults(\'quality\')">Quality<span class="sort-icon"></span></th>' +
-                '<th class="' + getSortClass('sources') + '" onclick="sortResults(\'sources\')">Sources<span class="sort-icon"></span></th>' +
+            var html = '<table class="results-table" id="results-table"><thead><tr>' +
+                '<th data-sort="name">Name<span class="sort-icon"></span></th>' +
+                '<th data-sort="type">Type<span class="sort-icon"></span></th>' +
+                '<th data-sort="size">Size<span class="sort-icon"></span></th>' +
+                '<th data-sort="seeds">Seeds<span class="sort-icon"></span></th>' +
+                '<th data-sort="leechers">Leechers<span class="sort-icon"></span></th>' +
+                '<th data-sort="quality">Quality<span class="sort-icon"></span></th>' +
+                '<th data-sort="sources">Sources<span class="sort-icon"></span></th>' +
                 '<th>Action</th>' +
                 '</tr></thead><tbody>';
             results.forEach(function(r, i) {
@@ -482,6 +482,12 @@ html += '</td>' +
             html += '</tbody></table>';
             document.getElementById('results-tab').innerHTML = html;
             _lastResults = results;
+            
+            document.querySelectorAll('#results-table th[data-sort]').forEach(function(th) {
+                th.onclick = function() { sortResults(th.dataset.sort); };
+                var col = th.dataset.sort;
+                th.className = _sortColumn === col ? 'sortable ' + _sortDirection : 'sortable';
+            });
         }
 
         function generateMagnet(results, index) {
