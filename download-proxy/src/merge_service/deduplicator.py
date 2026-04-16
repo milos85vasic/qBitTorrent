@@ -161,6 +161,9 @@ class Deduplicator:
             identity.episode = int(season_ep.group(2))
             identity.content_type = ContentType.TV_SHOW
 
+        # Detect content type from name
+        self._detect_content_type(identity, result.name)
+
         # Extract resolution
         resolution = re.search(r"(720p|1080p|2160p|4k|8k)", result.name, re.I)
         if resolution:
@@ -323,6 +326,142 @@ class Deduplicator:
             return False
 
         return True
+
+    def _detect_content_type(self, identity: CanonicalIdentity, name: str) -> None:
+        """Detect content type from torrent name with powerful pattern matching."""
+        n = name.lower()
+
+        # ANIME patterns (check early - anime has distinct markers)
+        if (
+            any(p in n for p in ["[anime", "anime.", " anime ", "ep ", "- anime", "nyaa"])
+            or re.search(r"\[.*?(720|1080)p.*\]", n)
+            or any(g in n for g in ["erai-", "subsplease", "horror subs", "akihito", "yami"])
+        ):
+            identity.content_type = ContentType.ANIME
+            return
+
+        # TV SHOW patterns
+        if (
+            re.search(r"[sS]\d{1,2}[eE]\d{1,2}", n)
+            or re.search(r"season\s*\d+", n)
+            or re.search(r"episode\s*\d+", n)
+            or any(p in n for p in [" tvrip", "tvtrip", "hdtv", "web-tv", "webrip-tv"])
+        ):
+            identity.content_type = ContentType.TV_SHOW
+            return
+
+        # GAME patterns
+        if any(
+            p in n
+            for p in [
+                "x版",
+                "xbox",
+                "playstation",
+                "ps3",
+                "ps4",
+                "ps5",
+                "ps2",
+                "wii",
+                "wiiu",
+                "switch",
+                "nintendo",
+                "pc game",
+                "rip-games",
+                "-game",
+                "games",
+                "repack",
+                "finale",
+                "flt",
+                "dota",
+                "csgo",
+            ]
+        ):
+            identity.content_type = ContentType.GAME
+            return
+
+        # SOFTWARE patterns
+        if any(
+            p in n
+            for p in [
+                "x86",
+                "x64",
+                "portable",
+                "full version",
+                "cracked",
+                "release",
+                ".exe",
+                "installer",
+                "patched",
+                "repack",
+            ]
+        ):
+            identity.content_type = ContentType.SOFTWARE
+            return
+
+        # AUDIOBOOK patterns
+        if re.search(r"audiobook", n) or re.search(r"audio.book", n):
+            identity.content_type = ContentType.AUDIOBOOK
+            return
+
+        # MUSIC patterns
+        if any(
+            p in n
+            for p in [
+                "mp3",
+                "flac",
+                "lossless",
+                "320kbps",
+                "bitrate",
+                "album",
+                "single",
+                "ost",
+                "soundtrack",
+                "cdrip",
+                "vinyl",
+                "remastered",
+            ]
+        ):
+            identity.content_type = ContentType.MUSIC
+            return
+
+        # EBOOK patterns
+        if any(
+            p in n
+            for p in ["ebook", "e-book", "epub", "mobi", "kindle", "pdf", "digital", "retail", "book", "non-fiction"]
+        ):
+            identity.content_type = ContentType.EBOOK
+            return
+
+        # MOVIE patterns (check late - most common)
+        if any(
+            p in n
+            for p in [
+                "bluray",
+                "blu-ray",
+                "web-dl",
+                "webrip",
+                "hdrip",
+                "dvdrip",
+                "brrip",
+                "xvid",
+                "x264",
+                "x265",
+                "hevc",
+                "h264",
+                "hdr",
+                "uhd",
+                "movie",
+                "film",
+                "dvdr",
+                "bdrip",
+                "bdrip",
+            ]
+        ):
+            identity.content_type = ContentType.MOVIE
+            return
+
+        # Default to unknown if nothing matches
+        identity.content_type = ContentType.UNKNOWN
 
     def set_canonical_identity(self, merged: MergedResult, identity: CanonicalIdentity):
         """Update the canonical identity for a merged result (after metadata enrichment)."""

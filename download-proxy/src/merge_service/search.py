@@ -10,12 +10,15 @@ from enum import Enum
 
 class ContentType(Enum):
     MOVIE = "movie"
-    TV_SHOW = "tv_show"
+    TV_SHOW = "tv"
+    ANIME = "anime"
     MUSIC = "music"
+    AUDIOBOOK = "audiobook"
     GAME = "game"
     SOFTWARE = "software"
-    BOOK = "book"
+    EBOOK = "ebook"
     OTHER = "other"
+    UNKNOWN = "unknown"
 
 
 class QualityTier(Enum):

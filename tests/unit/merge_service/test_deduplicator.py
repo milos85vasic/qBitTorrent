@@ -29,6 +29,8 @@ _search_spec.loader.exec_module(_search_mod)
 Deduplicator = _dedup_mod.Deduplicator
 MatchResult = _dedup_mod.MatchResult
 SearchResult = _search_mod.SearchResult
+ContentType = _search_mod.ContentType
+CanonicalIdentity = _search_mod.CanonicalIdentity
 
 
 class TestDeduplicator:
@@ -130,6 +132,68 @@ class TestMatchResult:
         assert result.confidence == 0.95
         assert result.tier == 3
         assert result.reason == "name+size match"
+
+
+class TestContentTypeDetection:
+    """Tests for content type detection from torrent names."""
+
+    @pytest.fixture
+    def dedup(self):
+        return Deduplicator()
+
+    def test_detect_movie_from_name(self, dedup):
+        """Detect movie type from common movie patterns."""
+        identity = CanonicalIdentity(title="Test")
+        dedup._detect_content_type(identity, "Movie.Title.2023.1080p.BluRay.x264")
+        assert identity.content_type.value == "movie"
+
+    def test_detect_tv_from_name(self, dedup):
+        """Detect TV show from S01E01 pattern."""
+        identity = CanonicalIdentity(title="Test")
+        dedup._detect_content_type(identity, "Show.Name.S01E05.720p.HDTV")
+        assert identity.content_type.value == "tv"
+
+    def test_detect_anime_from_name(self, dedup):
+        """Detect anime from anime-specific patterns."""
+        identity = CanonicalIdentity(title="Test")
+        dedup._detect_content_type(identity, "[Anime] Name [1080p]")
+        assert identity.content_type.value == "anime"
+
+    def test_detect_game_from_name(self, dedup):
+        """Detect game from game patterns."""
+        identity = CanonicalIdentity(title="Test")
+        dedup._detect_content_type(identity, "Game.Name-REPACK")
+        assert identity.content_type.value == "game"
+
+    def test_detect_software_from_name(self, dedup):
+        """Detect software from software patterns."""
+        identity = CanonicalIdentity(title="Test")
+        dedup._detect_content_type(identity, "Adobe.Photoshop.x64.Portable")
+        assert identity.content_type.value == "software"
+
+    def test_detect_music_from_name(self, dedup):
+        """Detect music from audio patterns."""
+        identity = CanonicalIdentity(title="Test")
+        dedup._detect_content_type(identity, "Artist.Album.FLAC")
+        assert identity.content_type.value == "music"
+
+    def test_detect_audiobook_from_name(self, dedup):
+        """Detect audiobook patterns."""
+        identity = CanonicalIdentity(title="Test")
+        dedup._detect_content_type(identity, "Title.Audiobook")
+        assert identity.content_type.value == "audiobook"
+
+    def test_detect_ebook_from_name(self, dedup):
+        """Detect ebook patterns."""
+        identity = CanonicalIdentity(title="Test")
+        dedup._detect_content_type(identity, "Title.Ebook.EPUB")
+        assert identity.content_type.value == "ebook"
+
+    def test_detect_unknown_fallback(self, dedup):
+        """Unknown when no pattern matches."""
+        identity = CanonicalIdentity(title="Test")
+        dedup._detect_content_type(identity, "Random.File.Name.v1.0")
+        assert identity.content_type.value == "unknown"
 
 
 class TestBestNameSelection:
