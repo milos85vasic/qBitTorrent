@@ -38,9 +38,7 @@ async def lifespan(app: FastAPI):
 
     app.state.scheduler = Scheduler()
     await app.state.scheduler.load()
-    app.state.scheduler.set_search_callback(
-        lambda q, c: app.state.search_orchestrator.search(query=q, category=c)
-    )
+    app.state.scheduler.set_search_callback(lambda q, c: app.state.search_orchestrator.search(query=q, category=c))
     await app.state.scheduler.start()
 
     logger.info("Merge Service API started")
@@ -71,9 +69,7 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500, content={"error": "Internal server error", "detail": str(exc)}
-    )
+    return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(exc)})
 
 
 @app.get("/health")
@@ -81,12 +77,22 @@ async def health_check():
     return {"status": "healthy", "service": "merge-search", "version": "1.0.0"}
 
 
+@app.get("/api/v1/config")
+async def get_config():
+    from config import Config
+
+    cfg = Config()
+    return {
+        "qbittorrent_url": cfg.qbittorrent_url,
+        "qbittorrent_port": cfg.qbittorrent_port,
+        "qbittorrent_host": cfg.qbittorrent_host,
+    }
+
+
 @app.get("/")
 @app.get("/dashboard")
 async def dashboard():
-    dashboard_path = os.path.join(
-        os.path.dirname(__file__), "..", "ui", "templates", "dashboard.html"
-    )
+    dashboard_path = os.path.join(os.path.dirname(__file__), "..", "ui", "templates", "dashboard.html")
     dashboard_path = os.path.normpath(dashboard_path)
     if os.path.isfile(dashboard_path):
         return FileResponse(dashboard_path)
@@ -99,11 +105,7 @@ async def dashboard():
 
 @app.get("/api/v1/stats")
 async def stats():
-    orch = (
-        app.state.search_orchestrator
-        if hasattr(app.state, "search_orchestrator")
-        else None
-    )
+    orch = app.state.search_orchestrator if hasattr(app.state, "search_orchestrator") else None
     active = 0
     completed = 0
     trackers = []
@@ -114,10 +116,7 @@ async def stats():
             elif meta.status in ("pending", "running"):
                 active += 1
         enabled_trackers = orch._get_enabled_trackers()
-        trackers = [
-            {"name": t.name, "url": t.url, "enabled": t.enabled}
-            for t in enabled_trackers
-        ]
+        trackers = [{"name": t.name, "url": t.url, "enabled": t.enabled} for t in enabled_trackers]
     return {
         "active_searches": active,
         "completed_searches": completed,

@@ -26,8 +26,23 @@
         .download-btn { padding: 6px 14px; background: #28a745; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
         .download-btn:hover { background: #218838; }
         .download-btn:disabled { background: #555; cursor: not-allowed; }
+        .download-btn.failed { background: #dc3545; }
+        .download-btn.failed:hover { background: #b02a37; }
+        .btn-group { display: flex; gap: 4px; }
+        .btn-group .btn { padding: 4px 8px; font-size: 11px; }
+        .btn-magnet { background: #6f42c1; }
+        .btn-magnet:hover { background: #5a32a3; }
+        .btn-schedule { background: #17a2b8; }
+        .btn-schedule:hover { background: #138496; }
+        .btn-save { background: #fd7e14; }
+        .btn-save:hover { background: #e96b02; }
         .delete-btn { padding: 6px 14px; background: #dc3545; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
         .delete-btn:hover { background: #b02a37; }
+        .sort-icon { margin-left: 4px; font-size: 10px; }
+        .sort-asc .sort-icon:after { content: ' ▲'; }
+        .sort-desc .sort-icon:after { content: ' ▼'; }
+        .results-table th.sortable { cursor: pointer; }
+        .results-table th.sortable:hover { color: #e94560; }
         .tabs { display: flex; border-bottom: 2px solid #0f3460; margin-bottom: 20px; flex-wrap: wrap; }
         .tab { padding: 12px 20px; cursor: pointer; border: none; background: none; font-size: 14px; color: #888; }
         .tab.active { border-bottom: 2px solid #e94560; color: #e94560; font-weight: 600; }
@@ -263,6 +278,64 @@
     <script>
         var _captchaToken = '';
         var _lastResults = null;
+        var _sortColumn = 'seeds';
+        var _sortDirection = 'desc';
+        var _config = null;
+
+        async function loadConfig() {
+            try {
+                var r = await fetch('/api/v1/config');
+                _config = await r.json();
+            } catch(e) { _config = { qbittorrent_url: 'http://localhost:7185' }; }
+        }
+        loadConfig();
+
+        function sortResults(col) {
+            if (_sortColumn === col) {
+                _sortDirection = _sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                _sortColumn = col;
+                _sortDirection = 'desc';
+            }
+            renderSortedResults();
+        }
+
+        function renderSortedResults() {
+            if (!_lastResults) return;
+            var sorted = _lastResults.slice();
+            sorted.sort(function(a, b) {
+                var av, bv;
+                switch(_sortColumn) {
+                    case 'name': av = a.name || ''; bv = b.name || ''; return _sortDirection === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av); break;
+                    case 'type': av = a.content_type || 'unknown'; bv = b.content_type || 'unknown'; return _sortDirection === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av); break;
+                    case 'size': av = parseSize(a.size); bv = parseSize(b.size); return _sortDirection === 'asc' ? av - bv : bv - av; break;
+                    case 'seeds': av = a.seeds || 0; bv = b.seeds || 0; return _sortDirection === 'asc' ? av - bv : bv - av; break;
+                    case 'leechers': av = a.leechers || 0; bv = b.leechers || 0; return _sortDirection === 'asc' ? av - bv : bv - av; break;
+                    case 'quality': av = a.quality || ''; bv = b.quality || ''; return _sortDirection === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av); break;
+                    case 'sources': av = (a.sources || []).length; bv = (b.sources || []).length; return _sortDirection === 'asc' ? av - bv : bv - av; break;
+                    default: return 0;
+                }
+            });
+            renderResults(sorted);
+        }
+
+        function parseSize(sizeStr) {
+            if (!sizeStr) return 0;
+            var m = sizeStr.match(/([\d.]+)\s*([KMGT]?B)/i);
+            if (!m) return 0;
+            var val = parseFloat(m[1]);
+            var unit = m[2].toUpperCase();
+            if (unit === 'KB' || unit === 'KIB') return val * 1024;
+            if (unit === 'MB' || unit === 'MIB') return val * 1024 * 1024;
+            if (unit === 'GB' || unit === 'GIB') return val * 1024 * 1024 * 1024;
+            if (unit === 'TB' || unit === 'TIB') return val * 1024 * 1024 * 1024 * 1024;
+            return val;
+        }
+
+        function getSortClass(col) {
+            if (_sortColumn !== col) return 'sortable';
+            return 'sortable ' + _sortDirection;
+        }
 
         function switchTab(name, el) {
             document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
@@ -347,7 +420,14 @@
 
         function renderResults(results) {
             var html = '<table class="results-table"><thead><tr>' +
-                '<th>Name</th><th>Type</th><th>Size</th><th>Seeds</th><th>Leechers</th><th>Quality</th><th>Sources</th><th>Action</th>' +
+                '<th class="' + getSortClass('name') + '" onclick="sortResults(\'name\')">Name<span class="sort-icon"></span></th>' +
+                '<th class="' + getSortClass('type') + '" onclick="sortResults(\'type\')">Type<span class="sort-icon"></span></th>' +
+                '<th class="' + getSortClass('size') + '" onclick="sortResults(\'size\')">Size<span class="sort-icon"></span></th>' +
+                '<th class="' + getSortClass('seeds') + '" onclick="sortResults(\'seeds\')">Seeds<span class="sort-icon"></span></th>' +
+                '<th class="' + getSortClass('leechers') + '" onclick="sortResults(\'leechers\')">Leechers<span class="sort-icon"></span></th>' +
+                '<th class="' + getSortClass('quality') + '" onclick="sortResults(\'quality\')">Quality<span class="sort-icon"></span></th>' +
+                '<th class="' + getSortClass('sources') + '" onclick="sortResults(\'sources\')">Sources<span class="sort-icon"></span></th>' +
+                '<th>Action</th>' +
                 '</tr></thead><tbody>';
             results.forEach(function(r, i) {
                 var sources = r.sources || [];
@@ -391,19 +471,117 @@
                     if (r.metadata.genres && r.metadata.genres.length) html += ' &middot; ' + r.metadata.genres.slice(0,3).join(', ');
                     html += '</span>';
                 }
-                html += '</td>' +
-                    '<td><span class="type-badge ' + typeClass + '">' + escapeHtml(contentType) + '</span></td>' +
-                    '<td>' + escapeHtml(r.size) + '</td>' +
-                    '<td>' + r.seeds + '</td>' +
-                    '<td>' + r.leechers + '</td>' +
-                    '<td><span class="quality-badge ' + qClass + '">' + escapeHtml(q) + '</span></td>' +
-                    '<td>' + trackerHtml + '</td>' +
-                    '<td><button class="download-btn" onclick="doDownload(' + i + ')">Download</button></td>' +
+html += '</td>' +
+                    '<td><div class="btn-group">' +
+                    '<button class="download-btn btn-magnet" onclick="doMagnet(' + i + ')" title="Get Magnet Link">Magnet</button>' +
+                    '<button class="download-btn btn-schedule" onclick="doSchedule(' + i + ')" title="Send to qBittorrent">qBit</button>' +
+                    '<button class="download-btn" onclick="doDownload(' + i + ')">+</button>' +
+                    '</div></td>' +
                     '</tr>';
             });
             html += '</tbody></table>';
             document.getElementById('results-tab').innerHTML = html;
             _lastResults = results;
+        }
+
+        function generateMagnet(results, index) {
+            var r = results[index];
+            var name = r.name || 'download';
+            var dn = encodeURIComponent(name);
+            var urls = r.download_urls || [];
+            var hashes = [];
+            urls.forEach(function(url) {
+                var m = url.match(/btih:([a-f0-9]{32}|a-f0-9]{40})/i);
+                if (m) hashes.push(m[1]);
+            });
+            if (hashes.length === 0 && r.name) {
+                var hash = r.name.substring(0, 32).replace(/[^a-f0-9]/gi, '');
+                if (hash.length >= 32) hashes.push(hash);
+            }
+            var xt = hashes.map(function(h) { return 'xt=urn:btih:' + h; }).join('&');
+            return 'magnet:?dn=' + dn + (xt ? '&' + xt : '&tr=udp://tracker.opentrackr.org:1337');
+        }
+
+        function doMagnet(index) {
+            var magnet = generateMagnet(_lastResults, index);
+            navigator.clipboard.writeText(magnet).then(function() {
+                alert('Magnet link copied to clipboard!');
+            }).catch(function() {
+                prompt('Copy this magnet link:', magnet);
+            });
+        }
+
+        function doSchedule(index) {
+            if (!_config || !_config.qbittorrent_url) {
+                alert('qBittorrent not configured');
+                return;
+            }
+            var r = _lastResults[index];
+            var sources = r.sources || [];
+            if (!sources.length) {
+                alert('No sources to add');
+                return;
+            }
+            var urls = r.download_urls || [];
+            if (urls.length === 0) {
+                alert('No download URLs available');
+                return;
+            }
+            var qbitUrl = _config.qbittorrent_url;
+            fetch('/api/v1/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ result_id: String(index), download_urls: urls })
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                if (data.status === 'initiated' || (data.results && data.results.some(function(x) { return x.status === 'added'; }))) {
+                    alert('Sent to qBittorrent at ' + qbitUrl);
+                } else {
+                    alert('Failed to send to qBittorrent: ' + JSON.stringify(data).substring(0, 200));
+                }
+            })
+            .catch(function(e) { alert('Error: ' + e.message); });
+        }
+
+        function doDownload(index) {
+            var results = _lastResults;
+            if (!results || !results[index]) return;
+            var r = results[index];
+            var btn = event.target;
+            var originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+
+            fetch('/api/v1/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ result_id: String(index), download_urls: r.download_urls })
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                if (data.status === 'initiated') {
+                    btn.textContent = 'Added';
+                    btn.classList.remove('failed');
+                } else {
+                    btn.textContent = 'Failed';
+                    btn.classList.add('failed');
+                    var retry = confirm('Add failed. Retry?');
+                    if (retry) {
+                        btn.disabled = false;
+                        doDownload(index);
+                    }
+                }
+            })
+            .catch(function(e) {
+                btn.textContent = 'Error';
+                btn.classList.add('failed');
+                var retry = confirm('Error: ' + e.message + '. Retry?');
+                if (retry) {
+                    btn.disabled = false;
+                    doDownload(index);
+                }
+            });
         }
 
         function doDownload(index) {

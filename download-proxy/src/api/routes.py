@@ -8,6 +8,7 @@ import sys
 import re
 import os
 import json
+import urllib.parse
 from typing import Optional, List
 from datetime import datetime
 
@@ -472,6 +473,39 @@ async def initiate_download(request: DownloadRequest, req: Request):
         "added_count": added_count,
         "results": results,
     }
+
+
+@router.post("/magnet")
+async def generate_magnet(request: Request):
+    from pydantic import BaseModel
+
+    class MagnetRequest(BaseModel):
+        result_id: str
+        download_urls: List[str]
+
+    try:
+        data = await request.json()
+        req = MagnetRequest(**data)
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid request"})
+
+    urls = req.download_urls
+    hashes = []
+    for url in urls:
+        m = re.search(r"btih:([a-f0-9]{32}|[a-f0-9]{40})", url, re.I)
+        if m:
+            hashes.append(m.group(1))
+
+    name = req.result_id or "download"
+    dn = urllib.parse.quote(name)
+    xt = "&".join(f"xt=urn:btih:{h}" for h in hashes) if hashes else ""
+    magnet = (
+        f"magnet:?dn={dn}"
+        + (f"&{xt}" if xt else "")
+        + "&tr=udp://tracker.opentrackr.org:1337&tr=udp://tracker.leechers.org:6969"
+    )
+
+    return {"magnet": magnet, "hashes": hashes}
 
 
 __all__ = ["router"]
