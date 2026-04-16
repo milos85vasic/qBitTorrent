@@ -331,31 +331,30 @@ class Deduplicator:
         """Detect content type from torrent name using dynamic patterns only."""
         n = name.lower()
 
-        # Priority 1: GENRE pattern first (e.g., "(Hard Rock)", "[Metal]", "(Electronic)")
-        if re.search(
-            r"\([^)]\w+\s*(rock|pop|metal|jazz|blues|folk|hip.?hop|electronic|dance|classical)\)", n
-        ) or re.search(r"\[(metal|rock|pop|electronic|jazz)\]", n):
-            identity.content_type = ContentType.MUSIC
+        # Priority 1: ANIME - category markers early
+        if re.search(r"\[anime\]", n):
+            identity.content_type = ContentType.ANIME
             return
 
-        # Priority 2: AUDIO FORMAT - check BEFORE movie (very strong music signal)
-        if re.search(r"\b(mp3|flac|ogg|opus|aac|wav|aiff)\b", n) or re.search(
-            r"\b(lossless|320kbps|256kbps|128kbps|v0|vbr|cbr)\b", n
-        ):
-            identity.content_type = ContentType.MUSIC
-            return
-
-        # Priority 3: AUDIOBOOK/BOOK signals
-        if re.search(r"\baudiobook\b", n) or re.search(r"\b(epub|mobi|pdf)\b.*book", n):
-            identity.content_type = ContentType.AUDIOBOOK
-            return
-
-        # Priority 4: TV SHOW - episode patterns (very specific)
-        if re.search(r"[sS]\d+[eE]\d+", n):
+        # Priority 2: TV SHOW - episode patterns early (very specific)
+        if re.search(r"[sS]\d+[eE]\d+", n) or re.search(r"\b(season|episode)\s*\d+\b", n):
             identity.content_type = ContentType.TV_SHOW
             return
 
-        # Priority 5: GAME - release groups, platforms, specific formats
+        # Priority 3: GENRE in parentheses/brackets (music)
+        if re.search(
+            r"\([^)]*\b(rock|pop|metal|jazz|blues|folk|hip.?hop|electronic|dance|classical|hard.?rock|indie|rap|soul|r&b|country|techno|trance|house|dubstep|ambient)\b",
+            n,
+        ) or re.search(r"\[(metal|rock|pop|electronic|jazz|indie)\]", n):
+            identity.content_type = ContentType.MUSIC
+            return
+
+        # Priority 4: AUDIOBOOK signals
+        if re.search(r"\baudiobook\b", n):
+            identity.content_type = ContentType.AUDIOBOOK
+            return
+
+        # Priority 5: GAME - release groups, platforms
         if any(
             p in n
             for p in [
@@ -383,16 +382,21 @@ class Deduplicator:
             identity.content_type = ContentType.SOFTWARE
             return
 
-        # Priority 7: VIDEO FORMAT - movie/TV (check late)
-        if re.search(
-            r"\b(bluray|blu-ray|web-?dl|webrip|h?drip|dvdrip|bdrip|x264|x265|hevc|hdr|4k|2160p|1080p|720p)\b", n
-        ):
+        # Priority 7: VIDEO FORMAT - movie/TV (bluray, web-dl, etc.)
+        if re.search(r"\b(bluray|blu-ray|bdremux|web-?dl|webrip|h?drip|dvdrip|bdrip|x264|x265|hevc|hdr)\b", n):
             identity.content_type = ContentType.MOVIE
             return
 
-        # Priority 8: ANIME category markers
-        if re.search(r"\[anime\]", n) or re.search(r"\[(\d+)(p|m)\]", n):
-            identity.content_type = ContentType.ANIME
+        # Priority 7b: VIDEO RESOLUTION - standalone (implies movie/TV)
+        if re.search(r"\b(720p|1080p|2160p|4k)\b", n):
+            identity.content_type = ContentType.MOVIE
+            return
+
+        # Priority 8: AUDIO FORMAT - music
+        if re.search(r"\b(mp3|flac|ogg|opus|aac|wav|aiff)\b", n) or re.search(
+            r"\b(lossless|320kbps|256kbps|128kbps|v0|vbr|cbr)\b", n
+        ):
+            identity.content_type = ContentType.MUSIC
             return
 
         # Priority 9: OST/Soundtrack (music)

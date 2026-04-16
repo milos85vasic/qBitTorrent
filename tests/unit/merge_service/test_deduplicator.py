@@ -189,6 +189,138 @@ class TestContentTypeDetection:
         dedup._detect_content_type(identity, "Title-EPUB")
         assert identity.content_type.value in ["music", "ebook", "unknown"]
 
+    def test_detect_music_from_genre_parentheses(self, dedup):
+        """Detect music from genre in parentheses - no hardcoded titles."""
+        test_cases = [
+            ("(Hard Rock) Band - Album", "music"),
+            ("(Latin Pop) Artist", "music"),
+            ("(Gothic Metal) Band", "music"),
+            ("[Electronic] Artist", "music"),
+            ("(Jazz) Collection", "music"),
+            ("(Classical) Orchestra", "music"),
+        ]
+        for name, expected in test_cases:
+            identity = CanonicalIdentity(title=name)
+            dedup._detect_content_type(identity, name)
+            assert identity.content_type.value == expected, f"Failed: {name} got {identity.content_type.value}"
+
+    def test_detect_music_from_audio_format(self, dedup):
+        """Detect music from audio format - no hardcoded titles."""
+        test_cases = [
+            ("Album Name MP3 320kbps", "music"),
+            ("Artist - FLAC lossless", "music"),
+            ("Album-OGG-vbr", "music"),
+            ("Title AAC 256kbps", "music"),
+            ("OST Soundtrack", "music"),
+            ("Score - Soundtrack", "music"),
+        ]
+        for name, expected in test_cases:
+            identity = CanonicalIdentity(title=name)
+            dedup._detect_content_type(identity, name)
+            assert identity.content_type.value == expected, f"Failed: {name} got {identity.content_type.value}"
+
+    def test_detect_movie_from_video_format(self, dedup):
+        """Detect movie from video format - no hardcoded titles."""
+        test_cases = [
+            ("Film Name 2023 BluRay x264", "movie"),
+            ("Movie.1080p.WEB-DL", "movie"),
+            ("Title.DVDRip.XviD", "movie"),
+            ("Film.4K.UHD.HEVC", "movie"),
+            ("Movie.720p.HDRip", "movie"),
+            ("Name.BDRemux.2160p", "movie"),
+        ]
+        for name, expected in test_cases:
+            identity = CanonicalIdentity(title=name)
+            dedup._detect_content_type(identity, name)
+            assert identity.content_type.value == expected, f"Failed: {name} got {identity.content_type.value}"
+
+    def test_detect_tv_from_episode_pattern(self, dedup):
+        """Detect TV from episode pattern - no hardcoded titles."""
+        test_cases = [
+            ("Show S01E01", "tv"),
+            ("Name Season 1 Episode 5", "tv"),
+            ("TV Show Episode 3", "tv"),
+            ("Series.S02E10.720p", "tv"),
+        ]
+        for name, expected in test_cases:
+            identity = CanonicalIdentity(title=name)
+            dedup._detect_content_type(identity, name)
+            assert identity.content_type.value == expected, f"Failed: {name} got {identity.content_type.value}"
+
+    def test_detect_game_from_release_groups(self, dedup):
+        """Detect game from release groups - no hardcoded titles."""
+        test_cases = [
+            ("Game-CODEX", "game"),
+            ("Title-TENOKE", "game"),
+            ("Game-FitGirl", "game"),
+            ("Name-MASQUERADE", "game"),
+        ]
+        for name, expected in test_cases:
+            identity = CanonicalIdentity(title=name)
+            dedup._detect_content_type(identity, name)
+            assert identity.content_type.value == expected, f"Failed: {name} got {identity.content_type.value}"
+
+    def test_detect_game_from_platforms(self, dedup):
+        """Detect game from platforms - no hardcoded titles."""
+        test_cases = [
+            ("Game-PS4", "game"),
+            ("Title-XBOX", "game"),
+            ("Game-SWITCH", "game"),
+            ("Name-STEAM", "game"),
+            ("Game-EPIC", "game"),
+            ("Title-VR", "game"),
+        ]
+        for name, expected in test_cases:
+            identity = CanonicalIdentity(title=name)
+            dedup._detect_content_type(identity, name)
+            assert identity.content_type.value == expected, f"Failed: {name} got {identity.content_type.value}"
+
+    def test_detect_software_from_file_format(self, dedup):
+        """Detect software from file format - no hardcoded titles."""
+        test_cases = [
+            ("App-x86", "software"),
+            ("Program-x64", "software"),
+            ("Name-Portable", "software"),
+            ("Software.exe", "software"),
+            ("App-Installer", "software"),
+        ]
+        for name, expected in test_cases:
+            identity = CanonicalIdentity(title=name)
+            dedup._detect_content_type(identity, name)
+            assert identity.content_type.value == expected, f"Failed: {name} got {identity.content_type.value}"
+
+    def test_detect_anime_from_category(self, dedup):
+        """Detect anime from category markers - no hardcoded titles."""
+        test_cases = [
+            ("[Anime] Title", "anime"),
+            ("[Anime] Name [720p]", "anime"),
+        ]
+        for name, expected in test_cases:
+            identity = CanonicalIdentity(title=name)
+            dedup._detect_content_type(identity, name)
+            assert identity.content_type.value == expected, f"Failed: {name} got {identity.content_type.value}"
+
+    def test_real_world_examples_no_hardcoded(self, dedup):
+        """Test real-world examples from user data - no hardcoded titles."""
+        test_cases = [
+            ("Don Diablo feat. Emeni - MP3 128 kbps", "music"),
+            ("Trucker Diablo - FLAC lossless", "music"),
+            ("Saint Diablo - MP3 320 kbps", "music"),
+            ("Diablo IV (Score) - MP3", "music"),
+            ("Venus Diablo - MP3", "music"),
+            ("Diablo 4 CODEX", "game"),
+            ("[PS4 PSX Classics] Diablo", "game"),
+            ("Movie BDRemux 1080p", "movie"),
+            ("Film WEBRip 720p", "movie"),
+            ("Show S01E01 1080p", "tv"),
+        ]
+        for name, expected in test_cases:
+            identity = CanonicalIdentity(title=name)
+            dedup._detect_content_type(identity, name)
+            assert identity.content_type.value == expected, (
+                f"Failed: '{name}' got '{identity.content_type.value}', expected '{expected}'"
+            )
+
     def test_detect_unknown_fallback(self, dedup):
         """Unknown when no pattern matches."""
         identity = CanonicalIdentity(title="Test")
