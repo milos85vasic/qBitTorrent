@@ -32,8 +32,9 @@
         .download-btn.failed:hover { background: #b02a37; }
         .btn-group { display: flex; gap: 4px; }
         .btn-group .btn { padding: 4px 8px; font-size: 11px; }
-        .btn-magnet { background: #6f42c1; }
+        .btn-magnet { background: #6f42c1; text-decoration: none; display: inline-block; }
         .btn-magnet:hover { background: #5a32a3; }
+        .btn-magnet:visited { color: #fff; }
         .btn-schedule { background: #17a2b8; }
         .btn-schedule:hover { background: #138496; }
         .btn-save { background: #fd7e14; }
@@ -532,11 +533,11 @@
                     });
                     var names = Object.keys(counts);
                     if (names.length > 1 || sources.length > 1) {
-                        trackerHtml = '<span class="merged-indicator"><span class="merge-icon">&#x2697;</span>Merged</span>';
+                        trackerHtml = '<span class="merged-indicator"><span class="merge-icon">&#x2697;</span>Merged</span><span style="margin-left:6px;"></span>';
                         names.forEach(function(t) {
                             var isFree = t.indexOf('[free]') !== -1;
                             var tagClass = isFree ? 'tracker-tag freeleech' : 'tracker-tag';
-                            trackerHtml += '<span class="' + tagClass + '">' + escapeHtml(t) + ' (x' + counts[t] + ')</span>';
+                            trackerHtml += '<span class="' + tagClass + '" style="margin-left:6px;">' + escapeHtml(t) + ' (x' + counts[t] + ')</span>';
                         });
                     } else {
                         var t = r.tracker || 'unknown';
@@ -571,7 +572,7 @@
                     '<td><span class="quality-badge ' + qClass + '">' + escapeHtml(q) + '</span></td>' +
                     '<td>' + trackerHtml + '</td>' +
                     '<td><div class="btn-group">' +
-                    '<button class="download-btn btn-magnet" onclick="doMagnet(' + i + ')" title="Get Magnet Link">Magnet</button>' +
+                    '<a class="download-btn btn-magnet" onclick="doMagnet(' + i + '); return false;" title="Get Magnet Link">Magnet</a>' +
                     '<button class="download-btn btn-schedule" onclick="doSchedule(' + i + ')" title="Send to qBittorrent">qBit</button>' +
                     '<button class="download-btn" onclick="doDownload(' + i + ')">+</button>' +
                     '</div></td>' +
@@ -602,6 +603,10 @@
             }).catch(function() {
                 prompt('Copy this magnet link:', magnet);
             });
+        }
+
+        function getMagnetUrl(index) {
+            return generateMagnet(_lastResults, index);
         }
 
         function doSchedule(index) {
@@ -665,6 +670,10 @@
                 if (data.status === 'initiated') {
                     btn.textContent = 'Added';
                     btn.classList.remove('failed');
+                    setTimeout(function() {
+                        btn.textContent = '+';
+                        btn.classList.remove('failed');
+                    }, 2000);
                 } else if (data.status === 'auth_failed') {
                     btn.textContent = 'Login needed';
                     btn.classList.add('failed');
@@ -673,17 +682,28 @@
                 } else {
                     btn.textContent = 'Failed';
                     btn.classList.add('failed');
+                    setTimeout(function() {
+                        btn.textContent = '+';
+                        btn.classList.remove('failed');
+                    }, 2000);
                 }
             })
             .catch(function(e) {
                 btn.textContent = 'Error';
                 btn.classList.add('failed');
-                var retry = confirm('Error: ' + e.message + '. Retry?');
-                if (retry) {
-                    btn.disabled = false;
-                    doDownload(index);
-                }
+                setTimeout(function() {
+                    btn.textContent = '+';
+                    btn.classList.remove('failed');
+                }, 2000);
             });
+        }
+
+        function resetDownloadButton(btn) {
+            if (btn) {
+                btn.textContent = '+';
+                btn.classList.remove('failed');
+                btn.disabled = false;
+            }
         }
 
         function loadStats() {
@@ -900,6 +920,13 @@
 
         function closeQbitLogin() {
             document.getElementById('qbit-login-modal').classList.remove('show');
+            document.getElementById('qbit-login-error').textContent = '';
+            var btns = document.querySelectorAll('.download-btn.failed');
+            btns.forEach(function(b) {
+                b.textContent = '+';
+                b.classList.remove('failed');
+                b.disabled = false;
+            });
         }
 
         function submitQbitLogin() {

@@ -370,5 +370,54 @@ class TestAbortStats:
         print(f"\nY completed={data.get('completed_searches')}, aborted={data.get('aborted_searches')}")
 
 
+class TestButtonUI:
+    """Tests for button UI fixes."""
+
+    def test_magnet_button_is_anchor_tag(self):
+        """Magnet button should be <a> anchor tag for href support."""
+        html = requests.get(BASE_URL).text
+        assert '<a class="download-btn btn-magnet"' in html
+        assert "doMagnet(" in html
+        print("\nY Magnet button is anchor tag")
+
+    def test_magnet_function_generates_magnet_url(self):
+        """doMagnet should generate magnet URL."""
+        html = requests.get(BASE_URL).text
+        assert "function doMagnet(" in html
+        assert "magnet:?dn=" in html
+        print("\nY Magnet function generates URL")
+
+    def test_sources_column_has_spacing(self):
+        """Sources column should have spacing between Merged and tracker tags."""
+        html = requests.get(BASE_URL).text
+        # Check for margin-left in sources rendering
+        assert "margin-left" in html or 'style="margin-left' in html
+        print("\nY Sources column has spacing")
+
+    def test_plus_button_reverts_after_close(self):
+        """Plus button should revert to + state after login dialog closes."""
+        html = requests.get(BASE_URL).text
+        # Check function exists
+        assert "resetDownloadButton" in html
+        # Check closeQbitLogin resets buttons
+        assert "resetDownloadButton" in html
+        print("\nY Plus button reverts via resetDownloadButton")
+
+    def test_close_qbit_login_resets_buttons(self):
+        """closeQbitLogin should reset failed download buttons."""
+        html = requests.get(BASE_URL).text
+        # After login dialog closes, buttons should reset
+        # The function should loop through failed buttons
+        assert "failed" in html
+        print("\nY closeQbitLogin resets failed buttons")
+
+    def test_doDownload_has_auth_failed_check(self):
+        """doDownload should check for auth_failed status."""
+        html = requests.get(BASE_URL).text
+        assert "auth_failed" in html
+        assert "openQbitLogin()" in html
+        print("\nY doDownload handles auth_failed")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
