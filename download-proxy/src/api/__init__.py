@@ -79,11 +79,11 @@ async def health_check():
 
 @app.get("/api/v1/config")
 async def get_config():
-    from config import Config
+    from config import get_config as load_config
 
-    cfg = Config()
+    cfg = load_config()
     return {
-        "qbittorrent_url": cfg.qbittorrent_url,
+        "qbittorrent_url": f"http://{cfg.qbittorrent_host}:{cfg.qbittorrent_port}",
         "qbittorrent_port": cfg.qbittorrent_port,
         "qbittorrent_host": cfg.qbittorrent_host,
     }
