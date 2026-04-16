@@ -328,142 +328,82 @@ class Deduplicator:
         return True
 
     def _detect_content_type(self, identity: CanonicalIdentity, name: str) -> None:
-        """Detect content type from torrent name with powerful pattern matching."""
+        """Detect content type from torrent name using dynamic patterns only."""
         n = name.lower()
 
-        # ANIME patterns (check early - anime has distinct markers)
-        if (
-            any(p in n for p in ["[anime", "anime.", " anime ", "ep ", "- anime", "nyaa"])
-            or re.search(r"\[.*?(720|1080)p.*\]", n)
-            or any(g in n for g in ["erai-", "subsplease", "horror subs", "akihito", "yami"])
-        ):
-            identity.content_type = ContentType.ANIME
+        # Priority 1: GENRE pattern first (e.g., "(Hard Rock)", "[Metal]", "(Electronic)")
+        if re.search(
+            r"\([^)]\w+\s*(rock|pop|metal|jazz|blues|folk|hip.?hop|electronic|dance|classical)\)", n
+        ) or re.search(r"\[(metal|rock|pop|electronic|jazz)\]", n):
+            identity.content_type = ContentType.MUSIC
             return
 
-        # TV SHOW patterns
-        if (
-            re.search(r"[sS]\d{1,2}[eE]\d{1,2}", n)
-            or re.search(r"season\s*\d+", n)
-            or re.search(r"episode\s*\d+", n)
-            or any(p in n for p in [" tvrip", "tvtrip", "hdtv", "web-tv", "webrip-tv"])
-        ):
-            identity.content_type = ContentType.TV_SHOW
-            return
-
-        # GAME patterns - release groups and platforms (NOT specific titles)
-        release_groups = ["codex", "tenoke", "fitgirl", "masquerade", "rail", "hog", "flame", "dmg"]
-        platforms = ["xbox", "playstation", "ps3", "ps4", "ps5", "nintendo", "switch", "steam", "epic"]
-        formats = ["vr", "denuvo", "drm-free"]
-
-        if any(p in n for p in release_groups + platforms + formats):
-            identity.content_type = ContentType.GAME
-            return
-
-        # Generic patterns: "Game", "Edition", genre+game
-        if re.search(r"\b(game|edition|remaster|definitive)\b", n, re.I) or re.search(
-            r"\b(rpg|fps|moba|roguelike|simulation)\b.*\b(game|edition)\b", n, re.I
-        ):
-            identity.content_type = ContentType.GAME
-            return
-
-        # Check for common game name endings/prefixes and release group patterns
-        if re.search(r"\b(game|edition|complete|remaster|definitive)\b", n, re.I):
-            identity.content_type = ContentType.GAME
-            return
-
-        # Check for genre+game pattern (e.g., "RPG Game", "Action Adventure")
-        if re.search(r"\b(rpg|fps|moba|roguelike|roguelike|simulation|strategy)\b.*game", n, re.I) or re.search(
-            r"game.*\b(rpg|fps|moba|simulation|strategy)\b", n, re.I
-        ):
-            identity.content_type = ContentType.GAME
-            return
-            return
-
-        # SOFTWARE patterns
-        if any(
-            p in n
-            for p in [
-                "x86",
-                "x64",
-                "portable",
-                "full version",
-                "cracked",
-                "release",
-                ".exe",
-                "installer",
-                "patched",
-                "repack",
-            ]
-        ):
-            identity.content_type = ContentType.SOFTWARE
-            return
-
-        # AUDIOBOOK patterns
-        if re.search(r"audiobook", n) or re.search(r"audio.book", n):
-            identity.content_type = ContentType.AUDIOBOOK
-            return
-
-        # MUSIC patterns
-        if any(
-            p in n
-            for p in [
-                "mp3",
-                "flac",
-                "lossless",
-                "320kbps",
-                "bitrate",
-                "album",
-                "single",
-                "ost",
-                "soundtrack",
-                "cdrip",
-                "vinyl",
-                "remastered",
-            ]
+        # Priority 2: AUDIO FORMAT - check BEFORE movie (very strong music signal)
+        if re.search(r"\b(mp3|flac|ogg|opus|aac|wav|aiff)\b", n) or re.search(
+            r"\b(lossless|320kbps|256kbps|128kbps|v0|vbr|cbr)\b", n
         ):
             identity.content_type = ContentType.MUSIC
             return
 
-        # EBOOK patterns
-        if any(
-            p in n
-            for p in ["ebook", "e-book", "epub", "mobi", "kindle", "pdf", "digital", "retail", "book", "non-fiction"]
-        ):
-            identity.content_type = ContentType.EBOOK
+        # Priority 3: AUDIOBOOK/BOOK signals
+        if re.search(r"\baudiobook\b", n) or re.search(r"\b(epub|mobi|pdf)\b.*book", n):
+            identity.content_type = ContentType.AUDIOBOOK
             return
 
-        # MOVIE patterns (check late - most common)
+        # Priority 4: TV SHOW - episode patterns (very specific)
+        if re.search(r"[sS]\d+[eE]\d+", n):
+            identity.content_type = ContentType.TV_SHOW
+            return
+
+        # Priority 5: GAME - release groups, platforms, specific formats
         if any(
             p in n
             for p in [
-                "bluray",
-                "blu-ray",
-                "web-dl",
-                "webrip",
-                "hdrip",
-                "dvdrip",
-                "brrip",
-                "xvid",
-                "x264",
-                "x265",
-                "hevc",
-                "h264",
-                "hdr",
-                "uhd",
-                "movie",
-                "film",
-                "dvdr",
-                "bdrip",
-                "bdrip",
+                "codex",
+                "tenoke",
+                "fitgirl",
+                "masquerade",
+                "xbox",
+                "playstation",
+                "ps3",
+                "ps4",
+                "ps5",
+                "nintendo",
+                "switch",
+                "steam",
+                "epic",
+                "vr",
             ]
+        ):
+            identity.content_type = ContentType.GAME
+            return
+
+        # Priority 6: SOFTWARE - file format
+        if re.search(r"\b(x86|x64|portable|\.exe|installer)\b", n):
+            identity.content_type = ContentType.SOFTWARE
+            return
+
+        # Priority 7: VIDEO FORMAT - movie/TV (check late)
+        if re.search(
+            r"\b(bluray|blu-ray|web-?dl|webrip|h?drip|dvdrip|bdrip|x264|x265|hevc|hdr|4k|2160p|1080p|720p)\b", n
         ):
             identity.content_type = ContentType.MOVIE
             return
 
-        # Default to unknown if nothing matches
+        # Priority 8: ANIME category markers
+        if re.search(r"\[anime\]", n) or re.search(r"\[(\d+)(p|m)\]", n):
+            identity.content_type = ContentType.ANIME
+            return
+
+        # Priority 9: OST/Soundtrack (music)
+        if re.search(r"\b(ost|soundtrack|score)\b", n):
+            identity.content_type = ContentType.MUSIC
+            return
+
+        # Default: unknown
         identity.content_type = ContentType.UNKNOWN
 
-    def set_canonical_identity(self, merged: MergedResult, identity: CanonicalIdentity):
+    def set_canonical_identity(self, merged: "MergedResult", identity: CanonicalIdentity):
         """Update the canonical identity for a merged result (after metadata enrichment)."""
         merged.canonical_identity = identity
 
