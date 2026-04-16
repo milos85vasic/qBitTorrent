@@ -396,6 +396,7 @@
             btn.classList.remove('btn-abort');
             _isSearching = false;
             _searchAbortController = null;
+            _searchId = null;
         }
 
         function doSearch(e) {
@@ -423,6 +424,18 @@
 
             _searchAbortController = new AbortController();
 
+            var searchTimeout = setTimeout(function() {
+                if (_isSearching) {
+                    _searchAbortController.abort();
+                    if (_searchId) {
+                        fetch('/api/v1/search/' + _searchId + '/abort', { method: 'POST' }).catch(function() {});
+                        _searchId = null;
+                    }
+                    resetSearchButton();
+                    status.textContent = 'Search timed out after 60s - click Abort to cancel manually.';
+                }
+            }, 60000);
+
             fetch('/api/v1/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -430,6 +443,7 @@
                 signal: _searchAbortController.signal
             })
             .then(function(r) {
+                clearTimeout(searchTimeout);
                 if (r.status === 403) {
                     return r.json().then(function(data) {
                         resetSearchButton();
@@ -442,6 +456,7 @@
                 return r.json();
             })
             .then(function(data) {
+                clearTimeout(searchTimeout);
                 if (!data) return;
                 _searchId = data.search_id;
                 resetSearchButton();
@@ -455,6 +470,7 @@
                 loadStats();
             })
             .catch(function(err) {
+                clearTimeout(searchTimeout);
                 if (err.name === 'AbortError') {
                     status.textContent = 'Search cancelled.';
                     return;
