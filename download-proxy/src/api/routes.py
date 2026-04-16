@@ -49,6 +49,7 @@ class SearchResultResponse(BaseModel):
     leechers: int
     download_urls: List[str]
     quality: Optional[str] = None
+    content_type: Optional[str] = None
     desc_link: Optional[str] = None
     tracker: Optional[str] = None
     sources: List[dict] = Field(default_factory=list)
@@ -118,7 +119,7 @@ def _detect_quality(name: str, size: str) -> str:
     return "unknown"
 
 
-def _to_response(r) -> SearchResultResponse:
+def _to_response(r, content_type: Optional[str] = None) -> SearchResultResponse:
     return SearchResultResponse(
         name=r.name,
         size=r.size,
@@ -126,6 +127,7 @@ def _to_response(r) -> SearchResultResponse:
         leechers=r.leechers,
         download_urls=[r.link],
         quality=_detect_quality(r.name, r.size),
+        content_type=content_type,
         desc_link=r.desc_link,
         tracker=r.tracker,
         sources=[{"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers}],
@@ -155,7 +157,12 @@ async def search(request: SearchRequest, req: Request):
         best = m.original_results[0] if m.original_results else None
         if not best:
             continue
-        resp = _to_response(best)
+        content_type = (
+            m.canonical_identity.content_type.value
+            if m.canonical_identity and m.canonical_identity.content_type
+            else None
+        )
+        resp = _to_response(best, content_type=content_type)
         resp.sources = [{"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers} for r in m.original_results]
         resp.download_urls = list(dict.fromkeys(r.link for r in m.original_results))
         resp.seeds = m.total_seeds

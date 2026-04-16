@@ -380,7 +380,7 @@
                 }
                 var q = r.quality || 'unknown';
                 var qClass = q.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
-                var contentType = r.metadata && r.metadata.content_type ? r.metadata.content_type : 'unknown';
+                var contentType = r.content_type || (r.metadata && r.metadata.content_type) || 'unknown';
                 var typeClass = contentType.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
                 html += '<tr>' +
                     '<td>' + escapeHtml(r.name);
