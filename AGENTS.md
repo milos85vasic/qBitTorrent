@@ -201,3 +201,20 @@ Merge service also uses: `MERGE_SERVICE_PORT` (default 7187), `PROXY_PORT` (defa
 - The merge service hooks file is at `/config/download-proxy/hooks.json` inside the container.
 - `start-proxy.sh` starts both the download proxy and the merge service (dual-thread via `main.py`).
 - `ci.sh` is **manual only** — never auto-triggered by Git hooks or remote CI. Run it yourself before releases.
+
+## Dashboard Features
+
+### Theme System
+All colors defined in `theme.css` using CSS custom properties (`--theme-*`). Dashboard loads theme.css and uses `var(--theme-*)` variables for visual consistency.
+
+### Search/Abort Toggle
+Search button toggles to Abort button during active searches using `AbortController`. Clicking Abort cancels the in-flight fetch request and resets button.
+
+### Content Type Detection
+`_detect_content_type()` in `deduplicator.py` detects: movie, tv, music, game, anime, software, audiobook, ebook using dynamic patterns (release groups, platforms, file formats, genre markers).
+
+### qBittorrent Authentication
+- Login modal accessible via "qBit" button click
+- "Remember me" checkbox saves credentials to `/config/download-proxy/qbittorrent_creds.json`
+- API routes load saved credentials first, fallback to env vars (`QBITTORRENT_USER`, `QBITTORRENT_PASS`)
+- First-time setup: use `init-qbit-password.sh` to set initial password
