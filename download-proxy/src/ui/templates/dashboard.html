@@ -57,6 +57,16 @@
         .quality-badge.hd { background: #81c784; color: #111; }
         .quality-badge.sd { background: #888; color: #fff; }
         .quality-badge.unknown { background: #555; color: #ccc; }
+        .type-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; margin-left: 6px; }
+        .type-badge.movie { background: #e91e63; color: #fff; }
+        .type-badge.tv { background: #2196f3; color: #fff; }
+        .type-badge.anime { background: #ff9800; color: #fff; }
+        .type-badge.audiobook { background: #9c27b0; color: #fff; }
+        .type-badge.music { background: #4caf50; color: #fff; }
+        .type-badge.software { background: #00bcd4; color: #fff; }
+        .type-badge.game { background: #f44336; color: #fff; }
+        .type-badgeebook { background: #795548; color: #fff; }
+        .type-badge.unknown { background: #555; color: #ccc; }
         .merged-indicator { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #9c27b0; color: #fff; margin-left: 6px; }
         .merged-indicator .merge-icon { font-size: 12px; }
         .merged-count { background: rgba(255,255,255,0.2); padding: 1px 5px; border-radius: 3px; margin-left: 2px; }
@@ -337,7 +347,7 @@
 
         function renderResults(results) {
             var html = '<table class="results-table"><thead><tr>' +
-                '<th>Name</th><th>Size</th><th>Seeds</th><th>Leechers</th><th>Quality</th><th>Sources</th><th>Action</th>' +
+                '<th>Name</th><th>Type</th><th>Size</th><th>Seeds</th><th>Leechers</th><th>Quality</th><th>Sources</th><th>Action</th>' +
                 '</tr></thead><tbody>';
             results.forEach(function(r, i) {
                 var sources = r.sources || [];
@@ -370,6 +380,8 @@
                 }
                 var q = r.quality || 'unknown';
                 var qClass = q.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
+                var contentType = r.metadata && r.metadata.content_type ? r.metadata.content_type : 'unknown';
+                var typeClass = contentType.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
                 html += '<tr>' +
                     '<td>' + escapeHtml(r.name);
                 if (r.metadata && r.metadata.poster_url) {
@@ -380,6 +392,7 @@
                     html += '</span>';
                 }
                 html += '</td>' +
+                    '<td><span class="type-badge ' + typeClass + '">' + escapeHtml(contentType) + '</span></td>' +
                     '<td>' + escapeHtml(r.size) + '</td>' +
                     '<td>' + r.seeds + '</td>' +
                     '<td>' + r.leechers + '</td>' +
