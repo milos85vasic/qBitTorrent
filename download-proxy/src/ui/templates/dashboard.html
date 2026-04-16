@@ -57,6 +57,47 @@
         .quality-badge.hd { background: #81c784; color: #111; }
         .quality-badge.sd { background: #888; color: #fff; }
         .quality-badge.unknown { background: #555; color: #ccc; }
+        .merged-indicator { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #9c27b0; color: #fff; margin-left: 6px; }
+        .merged-indicator .merge-icon { font-size: 12px; }
+        .merged-count { background: rgba(255,255,255,0.2); padding: 1px 5px; border-radius: 3px; margin-left: 2px; }
+        @media (max-width: 768px) {
+            .container { padding: 12px; }
+            header { padding: 15px; flex-direction: column; align-items: flex-start; }
+            h1 { font-size: 20px; }
+            .card { padding: 15px; margin-bottom: 15px; }
+            .stats-bar { gap: 10px; }
+            .stat-item { padding: 10px 14px; flex: 1; min-width: 80px; }
+            .stat-item .stat-value { font-size: 20px; }
+            .search-form { flex-direction: column; }
+            .search-form input { font-size: 16px; padding: 14px; }
+            .search-form button { width: 100%; }
+            .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .tab { padding: 10px 14px; white-space: nowrap; font-size: 13px; }
+            .results-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .results-table th, .results-table td { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+            .results-table th:first-child, .results-table td:first-child { position: sticky; left: 0; background: #16213e; z-index: 1; }
+            .results-table td:first-child { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+            .download-btn, .delete-btn { padding: 8px 12px; font-size: 12px; }
+            .inline-form { flex-wrap: wrap; }
+            .inline-form input, .inline-form select { flex: 1; min-width: 80px; }
+            .modal { padding: 20px; }
+            .auth-chip { font-size: 11px; padding: 3px 8px; }
+        }
+        @media (max-width: 480px) {
+            .container { padding: 8px; }
+            header { padding: 12px; }
+            h1 { font-size: 18px; }
+            .card { padding: 12px; margin-bottom: 12px; }
+            .stat-item { min-width: 70px; padding: 8px 10px; }
+            .stat-item .stat-value { font-size: 18px; }
+            .stat-item .stat-label { font-size: 10px; }
+            .tab { padding: 8px 12px; font-size: 12px; }
+            .meta-line { font-size: 10px; }
+            .poster-thumb { display: none; }
+            .tracker-tag { font-size: 10px; padding: 1px 5px; }
+            .quality-badge { font-size: 9px; padding: 1px 4px; }
+            .merged-indicator { font-size: 10px; padding: 2px 6px; }
+        }
         .progress-bar { width: 100%; height: 6px; background: #1a1a2e; border-radius: 3px; overflow: hidden; }
         .progress-bar .fill { height: 100%; background: #e94560; border-radius: 3px; transition: width 0.3s; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -296,10 +337,25 @@
 
         function renderResults(results) {
             var html = '<table class="results-table"><thead><tr>' +
-                '<th>Name</th><th>Size</th><th>Seeds</th><th>Leechers</th><th>Quality</th><th>Tracker</th><th>Action</th>' +
+                '<th>Name</th><th>Size</th><th>Seeds</th><th>Leechers</th><th>Quality</th><th>Sources</th><th>Action</th>' +
                 '</tr></thead><tbody>';
             results.forEach(function(r, i) {
-                var trackerClass = r.tracker && r.tracker.indexOf('[free]') !== -1 ? 'tracker-tag freeleech' : 'tracker-tag';
+                var sources = r.sources || [];
+                var sourceTracker = sources.length > 1;
+                var trackerHtml = '';
+                if (sourceTracker) {
+                    trackerHtml = '<span class="merged-indicator"><span class="merge-icon">&#x2697;</span>Merged<span class="merged-count">' + sources.length + '</span></span>';
+                    sources.forEach(function(s) {
+                        var isFree = s.tracker && s.tracker.indexOf('[free]') !== -1;
+                        var tagClass = isFree ? 'tracker-tag freeleech' : 'tracker-tag';
+                        trackerHtml += '<span class="' + tagClass + '">' + escapeHtml(s.tracker) + '</span>';
+                    });
+                } else {
+                    var t = r.tracker || 'unknown';
+                    var isFree = t.indexOf('[free]') !== -1;
+                    var tagClass = isFree ? 'tracker-tag freeleech' : 'tracker-tag';
+                    trackerHtml = '<span class="' + tagClass + '">' + escapeHtml(t) + '</span>';
+                }
                 var q = r.quality || 'unknown';
                 var qClass = q.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
                 html += '<tr>' +
@@ -316,7 +372,7 @@
                     '<td>' + r.seeds + '</td>' +
                     '<td>' + r.leechers + '</td>' +
                     '<td><span class="quality-badge ' + qClass + '">' + escapeHtml(q) + '</span></td>' +
-                    '<td><span class="' + trackerClass + '">' + escapeHtml(r.tracker || 'unknown') + '</span></td>' +
+                    '<td>' + trackerHtml + '</td>' +
                     '<td><button class="download-btn" onclick="doDownload(' + i + ')">Download</button></td>' +
                     '</tr>';
             });
