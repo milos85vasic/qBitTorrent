@@ -406,6 +406,7 @@
 
             if (_isSearching && _searchAbortController) {
                 _searchAbortController.abort();
+                _isSearching = false;
                 if (_searchId) {
                     fetch('/api/v1/search/' + _searchId + '/abort', { method: 'POST' }).catch(function() {});
                     _searchId = null;
@@ -427,6 +428,7 @@
             var searchTimeout = setTimeout(function() {
                 if (_isSearching) {
                     _searchAbortController.abort();
+                    _isSearching = false;
                     if (_searchId) {
                         fetch('/api/v1/search/' + _searchId + '/abort', { method: 'POST' }).catch(function() {});
                         _searchId = null;
@@ -459,15 +461,38 @@
                 clearTimeout(searchTimeout);
                 if (!data) return;
                 _searchId = data.search_id;
-                resetSearchButton();
-                if (data.results && data.results.length > 0) {
-                    status.textContent = 'Found ' + data.total_results + ' results (' + data.merged_results + ' merged) from ' + data.trackers_searched.join(', ');
-                    renderResults(data.results);
-                } else {
-                    status.textContent = 'No results found.';
-                    document.getElementById('results-tab').innerHTML = '<p class="empty-state">No results found for "' + escapeHtml(query) + '"</p>';
+
+                function pollResults() {
+                    if (!_searchId || !_isSearching) return;
+                    fetch('/api/v1/search/' + _searchId)
+                    .then(function(r) { return r.json(); })
+                    .then(function(resp) {
+                        if (resp.status === 'completed' || resp.status === 'failed') {
+                            resetSearchButton();
+                            if (resp.results && resp.results.length > 0) {
+                                status.textContent = 'Found ' + resp.total_results + ' results (' + resp.merged_results + ' merged) from ' + resp.trackers_searched.join(', ');
+                                renderResults(resp.results);
+                            } else {
+                                status.textContent = 'No results found.';
+                                document.getElementById('results-tab').innerHTML = '<p class="empty-state">No results found for "' + escapeHtml(query) + '"</p>';
+                            }
+                            loadStats();
+                        } else if (resp.results && resp.results.length > 0) {
+                            status.innerHTML = '<span class="spinner"></span>Found ' + resp.total_results + ' results... (' + resp.merged_results + ' merged)';
+                            renderResults(resp.results);
+                            if (_isSearching) setTimeout(pollResults, 2000);
+                        } else {
+                            if (_isSearching) setTimeout(pollResults, 2000);
+                        }
+                    })
+                    .catch(function() { if (_isSearching) setTimeout(pollResults, 2000); });
                 }
-                loadStats();
+
+                if (_isSearching) {
+                    pollResults();
+                } else {
+                    resetSearchButton();
+                }
             })
             .catch(function(err) {
                 clearTimeout(searchTimeout);

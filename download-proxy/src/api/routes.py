@@ -253,11 +253,27 @@ async def get_search(search_id: str, req: Request):
     metadata = orch.get_search_status(search_id)
     if metadata is None:
         raise HTTPException(status_code=404, detail="Search not found")
+    result_resp = []
+    stored = orch._last_merged_results.get(search_id)
+    if stored:
+        merged, all_results = stored
+        for m in merged[:50]:
+            best = m.original_results[0] if m.original_results else None
+            if best:
+                ct = m.canonical_identity.content_type.value if m.canonical_identity else None
+                r = _to_response(best, ct)
+                r.sources = [
+                    {"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers} for r in m.original_results
+                ]
+                r.download_urls = list(dict.fromkeys(lnk for lnk in (r.link for r in m.original_results)))
+                r.seeds = m.total_seeds
+                r.leechers = m.total_leechers
+                result_resp.append(r)
     return SearchResponse(
         search_id=metadata.search_id,
         query=metadata.query,
         status=metadata.status,
-        results=[],
+        results=result_resp,
         total_results=metadata.total_results,
         merged_results=metadata.merged_results,
         trackers_searched=metadata.trackers_searched,
