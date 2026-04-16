@@ -350,74 +350,30 @@ class Deduplicator:
             identity.content_type = ContentType.TV_SHOW
             return
 
-        # GAME patterns
-        if any(
-            p in n
-            for p in [
-                "x版",
-                "xbox",
-                "playstation",
-                "ps3",
-                "ps4",
-                "ps5",
-                "ps2",
-                "wii",
-                "wiiu",
-                "switch",
-                "nintendo",
-                "nds",
-                "pc game",
-                "rip-games",
-                "-game",
-                "games",
-                "repack",
-                "finale",
-                "flt",
-                "dota",
-                "csgo",
-                "diablo",
-                "starcraft",
-                "warcraft",
-                "gog",
-                "codex",
-                "tenoke",
-                "hog",
-                "rail",
-                "fitgirl",
-                "masquerade",
-                "roleplaying",
-                "rpg",
-                "fps",
-                "moba",
-                "strategy game",
-                "simgame",
-                "steam",
-                "epic games",
-                "origin",
-                "uplay",
-                "battle.net",
-                "galaxy",
-                "gamers",
-                "game release",
-                "game rip",
-                "full game",
-                "baldur",
-                "skyrim",
-                "fallout",
-                "elden",
-                "witcher",
-                "cyberpunk",
-                "resident evil",
-                "street fighter",
-                "mortal kombat",
-                "zelda",
-                "mario",
-                "pokemon",
-                "call of duty",
-                "cod mw",
-                "gta",
-                "minecraft",
-            ]
+        # GAME patterns - release groups and platforms (NOT specific titles)
+        release_groups = ["codex", "tenoke", "fitgirl", "masquerade", "rail", "hog", "flame", "dmg"]
+        platforms = ["xbox", "playstation", "ps3", "ps4", "ps5", "nintendo", "switch", "steam", "epic"]
+        formats = ["vr", "denuvo", "drm-free"]
+
+        if any(p in n for p in release_groups + platforms + formats):
+            identity.content_type = ContentType.GAME
+            return
+
+        # Generic patterns: "Game", "Edition", genre+game
+        if re.search(r"\b(game|edition|remaster|definitive)\b", n, re.I) or re.search(
+            r"\b(rpg|fps|moba|roguelike|simulation)\b.*\b(game|edition)\b", n, re.I
+        ):
+            identity.content_type = ContentType.GAME
+            return
+
+        # Check for common game name endings/prefixes and release group patterns
+        if re.search(r"\b(game|edition|complete|remaster|definitive)\b", n, re.I):
+            identity.content_type = ContentType.GAME
+            return
+
+        # Check for genre+game pattern (e.g., "RPG Game", "Action Adventure")
+        if re.search(r"\b(rpg|fps|moba|roguelike|roguelike|simulation|strategy)\b.*game", n, re.I) or re.search(
+            r"game.*\b(rpg|fps|moba|simulation|strategy)\b", n, re.I
         ):
             identity.content_type = ContentType.GAME
             return
