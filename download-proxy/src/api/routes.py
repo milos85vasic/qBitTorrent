@@ -9,15 +9,8 @@ import re
 import os
 import json
 import urllib.parse
-from typing import Optional, List
-from datetime import datetime
-
-_src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
+import aiohttp
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -364,13 +357,9 @@ async def auth_qbittorrent(request: Request):
                         version = await vresp.text() if vresp.status == 200 else "unknown"
 
                     if req.save:
-                        import os
-
                         creds_dir = "/config/download-proxy"
                         os.makedirs(creds_dir, exist_ok=True)
                         with open(f"{creds_dir}/qbittorrent_creds.json", "w") as f:
-                            import json
-
                             json.dump({"username": req.username, "password": req.password}, f)
 
                     return {

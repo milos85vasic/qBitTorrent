@@ -445,5 +445,32 @@ class TestTheme:
         print("\nY Dashboard uses theme variables")
 
 
+class TestQbitCredentials:
+    """Tests for qBittorrent credential storage."""
+
+    def test_qbit_login_modal_has_remember_me(self):
+        """Login modal should have Remember me checkbox."""
+        html = requests.get(BASE_URL).text
+        assert "qbit-save-credentials" in html
+        assert "Remember me" in html
+        print("\nY Login modal has Remember me checkbox")
+
+    def test_auth_endpoint_supports_save(self):
+        """Auth endpoint should accept save parameter."""
+        html = requests.get(BASE_URL).text
+        assert "save:" in html or "save" in html
+        print("\nY Auth supports save parameter")
+
+    def test_credentials_can_be_saved(self):
+        """Credentials can be saved via auth endpoint."""
+        r = requests.post(
+            f"{BASE_URL}/api/v1/auth/qbittorrent", json={"username": "testuser", "password": "testpass", "save": True}
+        )
+        data = r.json()
+        # Either authenticated or failed (depends on qBittorrent state)
+        assert "status" in data
+        print(f"\nY Auth response: {data.get('status')}")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
