@@ -266,6 +266,16 @@ async def get_search(search_id: str, req: Request):
     )
 
 
+@router.post("/search/{search_id}/abort")
+async def abort_search(search_id: str, req: Request):
+    """Mark a search as aborted so it won't be counted as completed."""
+    orch = _get_orchestrator(req)
+    if search_id in orch._active_searches:
+        orch._active_searches[search_id].status = "aborted"
+        return {"search_id": search_id, "status": "aborted"}
+    return {"search_id": search_id, "status": "not_found"}
+
+
 @router.get("/downloads/active")
 async def get_active_downloads():
     import aiohttp

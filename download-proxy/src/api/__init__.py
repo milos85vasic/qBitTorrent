@@ -108,11 +108,14 @@ async def stats():
     orch = app.state.search_orchestrator if hasattr(app.state, "search_orchestrator") else None
     active = 0
     completed = 0
+    aborted = 0
     trackers = []
     if orch is not None:
         for sid, meta in orch._active_searches.items():
             if meta.status == "completed":
                 completed += 1
+            elif meta.status == "aborted":
+                aborted += 1
             elif meta.status in ("pending", "running"):
                 active += 1
         enabled_trackers = orch._get_enabled_trackers()
@@ -120,7 +123,8 @@ async def stats():
     return {
         "active_searches": active,
         "completed_searches": completed,
-        "total_searches": active + completed,
+        "aborted_searches": aborted,
+        "total_searches": active + completed + aborted,
         "trackers": trackers,
         "trackers_count": len(trackers),
     }

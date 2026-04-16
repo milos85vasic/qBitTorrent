@@ -298,6 +298,7 @@
         var _sortDirection = 'desc';
         var _config = null;
         var _searchAbortController = null;
+        var _searchId = null;
         var _isSearching = false;
 
         async function loadConfig() {
@@ -404,6 +405,10 @@
 
             if (_isSearching && _searchAbortController) {
                 _searchAbortController.abort();
+                if (_searchId) {
+                    fetch('/api/v1/search/' + _searchId + '/abort', { method: 'POST' }).catch(function() {});
+                    _searchId = null;
+                }
                 resetSearchButton();
                 status.textContent = 'Search cancelled.';
                 return;
@@ -438,6 +443,7 @@
             })
             .then(function(data) {
                 if (!data) return;
+                _searchId = data.search_id;
                 resetSearchButton();
                 if (data.results && data.results.length > 0) {
                     status.textContent = 'Found ' + data.total_results + ' results (' + data.merged_results + ' merged) from ' + data.trackers_searched.join(', ');
