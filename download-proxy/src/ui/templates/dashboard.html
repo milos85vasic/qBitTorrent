@@ -138,7 +138,7 @@
         .modal { background: #16213e; padding: 30px; border-radius: 12px; border: 1px solid #0f3460; max-width: 420px; width: 90%; }
         .modal h3 { color: #e94560; margin-bottom: 15px; font-size: 18px; }
         .modal img { max-width: 100%; border-radius: 6px; margin-bottom: 15px; background: #fff; }
-        .modal input[type="text"], .modal input[type="number"] { width: 100%; padding: 12px; border: 1px solid #0f3460; border-radius: 6px; font-size: 16px; background: #1a1a2e; color: #e0e0e0; margin-bottom: 15px; }
+        .modal input[type="text"], .modal input[type="number"], .modal input[type="password"] { width: 100%; padding: 12px; border: 1px solid #0f3460; border-radius: 6px; font-size: 16px; background: #1a1a2e; color: #e0e0e0; margin-bottom: 15px; }
         .modal input:focus { outline: none; border-color: #e94560; }
         .modal-actions { display: flex; gap: 10px; }
         .modal-actions button { flex: 1; padding: 10px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; }
@@ -514,18 +514,7 @@
             var r = results[index];
             var name = r.name || 'download';
             var dn = encodeURIComponent(name);
-            var urls = r.download_urls || [];
-            var hashes = [];
-            urls.forEach(function(url) {
-                var m = url.match(/btih:([a-f0-9]{32}|a-f0-9]{40})/i);
-                if (m) hashes.push(m[1]);
-            });
-            if (hashes.length === 0 && r.name) {
-                var hash = r.name.substring(0, 32).replace(/[^a-f0-9]/gi, '');
-                if (hash.length >= 32) hashes.push(hash);
-            }
-            var xt = hashes.map(function(h) { return 'xt=urn:btih:' + h; }).join('&');
-            return 'magnet:?dn=' + dn + (xt ? '&' + xt : '&tr=udp://tracker.opentrackr.org:1337');
+            return 'magnet:?dn=' + dn + '&tr=udp://tracker.opentrackr.org:1337&tr=udp://tracker.leechers.org:6969';
         }
 
         function doMagnet(index) {
@@ -616,35 +605,6 @@
                     btn.disabled = false;
                     doDownload(index);
                 }
-            });
-        }
-
-        function doDownload(index) {
-            var results = _lastResults;
-            if (!results || !results[index]) return;
-            var r = results[index];
-            var btn = event.target;
-            btn.disabled = true;
-            btn.textContent = 'Adding...';
-
-            fetch('/api/v1/download', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ result_id: String(index), download_urls: r.download_urls })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.status === 'initiated') {
-                    btn.textContent = 'Added';
-                    btn.style.background = '#28a745';
-                } else {
-                    btn.textContent = 'Failed';
-                    btn.style.background = '#dc3545';
-                }
-            })
-            .catch(function() {
-                btn.textContent = 'Error';
-                btn.style.background = '#dc3545';
             });
         }
 

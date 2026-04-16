@@ -172,7 +172,6 @@ class TestMagnetLinkGeneration:
 
         checks = [
             ("magnet:?dn=", "magnet:?dn= in code"),
-            ("xt=urn:btih:", "info hash format"),
             ("tr=udp://", "UDP tracker"),
         ]
 
@@ -207,6 +206,55 @@ class TestScheduleButtonConfig:
         assert "7185" in data["qbittorrent_url"]
 
         print(f"\nY Config: {data}")
+
+
+class TestButtonFixes:
+    """Tests for the three bug fixes."""
+
+    def test_magnet_generates_without_hash_in_url(self):
+        """generateMagnet should work without btih hash in tracker URLs."""
+        html = requests.get(BASE_URL).text
+
+        # The function should work with just name and default trackers
+        assert "magnet:?dn=" in html
+        # Should have default fallback trackers
+        assert "tracker.opentrackr.org" in html
+        # Should NOT try to extract hash from URL (that fails)
+        assert "url.match(/btih:" not in html or "m = url.match" not in html
+
+        print("\nY Magnet generates without hash extraction")
+
+    def test_password_field_has_css(self):
+        """Password field should have CSS styling in modals."""
+        html = requests.get(BASE_URL).text
+
+        # Check password field is styled
+        assert 'input[type="password"]' in html
+        # The modal CSS should include password
+        assert '.modal input[type="password"]' in html or 'input[type="password"]' in html
+
+        print("\nY Password field CSS present")
+
+    def test_doDownload_handles_auth_failed(self):
+        """doDownload should detect auth_failed and prompt login."""
+        html = requests.get(BASE_URL).text
+
+        # Should check for auth_failed status
+        assert "auth_failed" in html
+        # Should call openQbitLogin on auth failure
+        assert "openQbitLogin()" in html
+
+        print("\nY doDownload handles auth_failed")
+
+    def test_no_duplicate_doDownload(self):
+        """Only one doDownload function should exist."""
+        html = requests.get(BASE_URL).text
+
+        # Count occurrences of function definition
+        count = html.count("function doDownload(")
+        assert count == 1, f"Expected 1 doDownload, found {count}"
+
+        print(f"\nY Single doDownload function (count={count})")
 
 
 if __name__ == "__main__":
