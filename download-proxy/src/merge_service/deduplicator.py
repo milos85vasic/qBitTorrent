@@ -78,6 +78,10 @@ class Deduplicator:
                 else:
                     remaining.append(result)
 
+            # After collecting all sources, update to best name
+            if len(merged.original_results) > 1:
+                self._update_to_best_name(merged)
+
             unmatched = remaining
             self._merged_groups.append(merged)
 
@@ -89,6 +93,57 @@ class Deduplicator:
         merged = MergedResult(canonical_identity=identity, download_urls=[seed.link])
         merged.add_source(seed)
         return merged
+
+    def _score_name(self, name: str) -> int:
+        """Score a name to determine quality (higher = better).
+
+        Criteria:
+        - Has resolution (1080p, 720p, 2160p, 4k)
+        - Has format (BluRay, WEB-DL, HDRip, DVDRip)
+        - Has codec (x264, x265, HEVC)
+        - Has year
+        - Has release group
+        - Not excessively stripped (has spaces)
+        """
+        score = 0
+        name_lower = name.lower()
+
+        # Resolution
+        if any(r in name_lower for r in ["2160p", "4k", "1080p", "720p", "480p"]):
+            score += 10
+
+        # Format
+        if any(f in name_lower for f in ["bluray", "blu-ray", "web-dl", "webrip", "hdrip", "dvdrip", "brrip"]):
+            score += 8
+
+        # Codec
+        if any(c in name_lower for c in ["x265", "hevc", "x264", "h264", "av1"]):
+            score += 6
+
+        # Year
+        if any(y in name for y in ["2024", "2023", "2022", "2021", "2020", "2019", "2018"]):
+            score += 5
+
+        # Release group (usually at end after dash)
+        if "-" in name and not name.startswith("-"):
+            score += 4
+
+        # Has spaces (not stripped)
+        if " " in name:
+            score += 3
+
+        return score
+
+    def _update_to_best_name(self, merged: "MergedResult") -> None:
+        """Update merged result to use best name from sources."""
+        if not merged.original_results:
+            return
+
+        best_result = max(merged.original_results, key=lambda r: self._score_name(r.name))
+
+        if best_result.name != merged.original_results[0].name:
+            new_identity = self._extract_identity_from_result(best_result)
+            merged.canonical_identity = new_identity
 
     def _extract_identity_from_result(self, result: SearchResult) -> CanonicalIdentity:
         """Extract canonical identity from a search result."""
