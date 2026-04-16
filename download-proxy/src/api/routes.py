@@ -308,6 +308,51 @@ async def get_active_downloads():
     return {"downloads": [], "count": 0, "error": "unavailable"}
 
 
+@router.post("/auth/qbittorrent")
+async def auth_qbittorrent(request: Request):
+    import aiohttp
+    from pydantic import BaseModel
+
+    class QBitLoginRequest(BaseModel):
+        username: str = "admin"
+        password: str = "admin"
+
+    try:
+        data = await request.json()
+        req = QBitLoginRequest(**data)
+    except Exception:
+        req = QBitLoginRequest()
+
+    qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:7185")
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{qbit_url}/api/v2/auth/login",
+                data={"username": req.username, "password": req.password},
+            ) as resp:
+                if resp.status == 200:
+                    cookies = resp.cookies
+                    async with session.get(f"{qbit_url}/api/v2/app/version", cookies=cookies) as vresp:
+                        version = await vresp.text() if vresp.status == 200 else "unknown"
+                    return {
+                        "status": "authenticated",
+                        "version": version,
+                        "message": "Login successful",
+                    }
+                else:
+                    return {
+                        "status": "failed",
+                        "error": "Invalid credentials",
+                    }
+    except Exception as e:
+        logger.error(f"qBittorrent auth error: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+        }
+
+
 TRACKER_DOMAINS = (
     "rutracker.org",
     "rutracker.nl",

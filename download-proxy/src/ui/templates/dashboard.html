@@ -275,6 +275,20 @@
         </div>
     </div>
 
+    <div id="qbit-login-modal" class="modal-overlay">
+        <div class="modal">
+            <h3>Login to qBittorrent</h3>
+            <p style="color:#888;font-size:13px;margin-bottom:15px;">Enter your qBittorrent WebUI credentials to enable downloads.</p>
+            <input type="text" id="qbit-username" placeholder="Username" value="admin">
+            <input type="password" id="qbit-password" placeholder="Password">
+            <div class="error-msg" id="qbit-login-error"></div>
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeQbitLogin()">Cancel</button>
+                <button class="submit-btn" id="qbit-login-submit" onclick="submitQbitLogin()">Login</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         var _captchaToken = '';
         var _lastResults = null;
@@ -525,7 +539,7 @@
 
         function doSchedule(index) {
             if (!_config || !_config.qbittorrent_url) {
-                alert('qBittorrent not configured');
+                openQbitLogin();
                 return;
             }
             var r = _lastResults[index];
@@ -547,13 +561,22 @@
             })
             .then(function(resp) { return resp.json(); })
             .then(function(data) {
-                if (data.status === 'initiated' || (data.results && data.results.some(function(x) { return x.status === 'added'; }))) {
+                if (data.status === 'initiated') {
                     alert('Sent to qBittorrent at ' + qbitUrl);
+                } else if (data.status === 'auth_failed' || (data.results && data.results.some(function(x) { return x.status === 'auth_failed'; }))) {
+                    alert('qBittorrent login required. Click OK to login.');
+                    openQbitLogin();
                 } else {
                     alert('Failed to send to qBittorrent: ' + JSON.stringify(data).substring(0, 200));
                 }
             })
-            .catch(function(e) { alert('Error: ' + e.message); });
+            .catch(function(e) { 
+                if (e.message && e.message.indexOf('auth') !== -1) {
+                    openQbitLogin();
+                } else {
+                    alert('Error: ' + e.message); 
+                }
+            });
         }
 
         function doDownload(index) {
@@ -575,14 +598,14 @@
                 if (data.status === 'initiated') {
                     btn.textContent = 'Added';
                     btn.classList.remove('failed');
+                } else if (data.status === 'auth_failed') {
+                    btn.textContent = 'Login needed';
+                    btn.classList.add('failed');
+                    var login = confirm('qBittorrent login required. Open login form?');
+                    if (login) openQbitLogin();
                 } else {
                     btn.textContent = 'Failed';
                     btn.classList.add('failed');
-                    var retry = confirm('Add failed. Retry?');
-                    if (retry) {
-                        btn.disabled = false;
-                        doDownload(index);
-                    }
                 }
             })
             .catch(function(e) {
@@ -831,6 +854,47 @@
 
         function closeCaptchaModal() {
             document.getElementById('captcha-modal').classList.remove('show');
+        }
+
+        function openQbitLogin() {
+            document.getElementById('qbit-login-modal').classList.add('show');
+        }
+
+        function closeQbitLogin() {
+            document.getElementById('qbit-login-modal').classList.remove('show');
+        }
+
+        function submitQbitLogin() {
+            var username = document.getElementById('qbit-username').value.trim();
+            var password = document.getElementById('qbit-password').value;
+            if (!username || !password) {
+                document.getElementById('qbit-login-error').textContent = 'Please enter username and password';
+                return;
+            }
+            var btn = document.getElementById('qbit-login-submit');
+            btn.disabled = true;
+            btn.textContent = 'Logging in...';
+            fetch('/api/v1/auth/qbittorrent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, password: password })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.disabled = false;
+                btn.textContent = 'Login';
+                if (data.status === 'authenticated') {
+                    closeQbitLogin();
+                    alert('Successfully logged in to qBittorrent!');
+                } else {
+                    document.getElementById('qbit-login-error').textContent = data.error || 'Login failed';
+                }
+            })
+            .catch(function(e) {
+                btn.disabled = false;
+                btn.textContent = 'Login';
+                document.getElementById('qbit-login-error').textContent = 'Error: ' + e.message;
+            });
         }
 
         function submitCaptcha() {

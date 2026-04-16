@@ -52,3 +52,25 @@ class TestStatsEndpoint:
     def test_stats_endpoint(self):
         response = client.get("/api/v1/stats")
         assert response.status_code == 200
+
+
+class TestQBitAuthEndpoint:
+    def test_qbittorrent_auth_endpoint_exists(self):
+        response = client.post("/api/v1/auth/qbittorrent", json={"username": "admin", "password": "admin"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+
+    def test_qbittorrent_login_modal_in_html(self):
+        response = client.get("/dashboard")
+        html = response.text
+        assert "qbit-login-modal" in html
+        assert 'id="qbit-username"' in html
+        assert 'id="qbit-password"' in html
+
+    def test_qbittorrent_login_functions_defined(self):
+        response = client.get("/dashboard")
+        html = response.text
+        assert "function openQbitLogin()" in html
+        assert "function closeQbitLogin()" in html
+        assert "function submitQbitLogin()" in html
