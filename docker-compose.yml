@@ -15,8 +15,7 @@ services:
     volumes:
       - ./config:/config
       - ${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/downloads
-      - ./.env:/config/.env:ro
-      - ./tmp:/shared-tmp  # Shared temp for torrent files
+      - ./tmp:/shared-tmp
     network_mode: host
     restart: unless-stopped
     healthcheck:
@@ -50,8 +49,7 @@ services:
     volumes:
       - ./config:/config
       - ./download-proxy:/config/download-proxy
-      - ./.env:/config/.env:ro
-      - ./tmp:/shared-tmp  # Shared temp for torrent files
+      - ./tmp:/shared-tmp
       - ./start-proxy.sh:/start-proxy.sh:ro
     working_dir: /config/qBittorrent/nova3/engines
     command: /start-proxy.sh

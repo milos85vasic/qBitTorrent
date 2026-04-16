@@ -297,8 +297,8 @@ async def get_active_downloads():
     import aiohttp
 
     qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:7185")
-    qbit_user = os.getenv("QBITTORRENT_USER", "admin")
-    qbit_pass = os.getenv("QBITTORRENT_PASS", "admin")
+    qbit_user = _get_qbit_username()
+    qbit_pass = _get_qbit_password()
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -342,6 +342,7 @@ async def auth_qbittorrent(request: Request):
     class QBitLoginRequest(BaseModel):
         username: str = "admin"
         password: str = "admin"
+        save: bool = False
 
     try:
         data = await request.json()
@@ -361,6 +362,17 @@ async def auth_qbittorrent(request: Request):
                     cookies = resp.cookies
                     async with session.get(f"{qbit_url}/api/v2/app/version", cookies=cookies) as vresp:
                         version = await vresp.text() if vresp.status == 200 else "unknown"
+
+                    if req.save:
+                        import os
+
+                        creds_dir = "/config/download-proxy"
+                        os.makedirs(creds_dir, exist_ok=True)
+                        with open(f"{creds_dir}/qbittorrent_creds.json", "w") as f:
+                            import json
+
+                            json.dump({"username": req.username, "password": req.password}, f)
+
                     return {
                         "status": "authenticated",
                         "version": version,
@@ -377,6 +389,34 @@ async def auth_qbittorrent(request: Request):
             "status": "error",
             "error": str(e),
         }
+
+
+def _load_saved_qbit_credentials():
+    import os
+    import json
+
+    creds_file = "/config/download-proxy/qbittorrent_creds.json"
+    if os.path.isfile(creds_file):
+        try:
+            with open(creds_file, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+
+def _get_qbit_password():
+    saved = _load_saved_qbit_credentials()
+    if saved:
+        return saved.get("password", os.getenv("QBITTORRENT_PASS", "admin"))
+    return os.getenv("QBITTORRENT_PASS", "admin")
+
+
+def _get_qbit_username():
+    saved = _load_saved_qbit_credentials()
+    if saved:
+        return saved.get("username", os.getenv("QBITTORRENT_USER", "admin"))
+    return os.getenv("QBITTORRENT_USER", "admin")
 
 
 TRACKER_DOMAINS = (
@@ -429,8 +469,8 @@ async def initiate_download(request: DownloadRequest, req: Request):
         },
     )
     qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:7185")
-    qbit_user = os.getenv("QBITTORRENT_USER", "admin")
-    qbit_pass = os.getenv("QBITTORRENT_PASS", "admin")
+    qbit_user = _get_qbit_username()
+    qbit_pass = _get_qbit_password()
 
     results = []
 

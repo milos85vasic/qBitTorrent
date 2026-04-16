@@ -285,6 +285,10 @@
             <p style="color:#888;font-size:13px;margin-bottom:15px;">Enter your qBittorrent WebUI credentials to enable downloads.</p>
             <input type="text" id="qbit-username" placeholder="Username" value="admin">
             <input type="password" id="qbit-password" placeholder="Password">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+                <input type="checkbox" id="qbit-save-credentials" style="width:auto;">
+                <label for="qbit-save-credentials" style="font-size:12px;color:#888;">Remember me</label>
+            </div>
             <div class="error-msg" id="qbit-login-error"></div>
             <div class="modal-actions">
                 <button class="cancel-btn" onclick="closeQbitLogin()">Cancel</button>
@@ -933,6 +937,7 @@
         function submitQbitLogin() {
             var username = document.getElementById('qbit-username').value.trim();
             var password = document.getElementById('qbit-password').value;
+            var saveCredentials = document.getElementById('qbit-save-credentials') ? document.getElementById('qbit-save-credentials').checked : false;
             if (!username || !password) {
                 document.getElementById('qbit-login-error').textContent = 'Please enter username and password';
                 return;
@@ -943,7 +948,7 @@
             fetch('/api/v1/auth/qbittorrent', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: username, password: password })
+                body: JSON.stringify({ username: username, password: password, save: saveCredentials })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -951,7 +956,7 @@
                 btn.textContent = 'Login';
                 if (data.status === 'authenticated') {
                     closeQbitLogin();
-                    alert('Successfully logged in to qBittorrent!');
+                    alert('Successfully logged in to qBittorrent!' + (saveCredentials ? ' Credentials saved.' : ''));
                 } else {
                     document.getElementById('qbit-login-error').textContent = data.error || 'Login failed';
                 }
