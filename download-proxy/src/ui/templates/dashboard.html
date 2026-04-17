@@ -297,6 +297,19 @@
         </div>
     </div>
 
+    <div id="magnet-dialog" class="modal-overlay">
+        <div class="modal">
+            <h3>Magnet Link</h3>
+            <p style="color:#888;font-size:13px;margin-bottom:15px;">Share or open this magnet link in your torrent client.</p>
+            <textarea id="magnet-link-text" readonly style="width:100%;height:80px;padding:10px;background:#222;border:1px solid #444;color:#fff;font-family:monospace;font-size:12px;border-radius:4px;resize:none;margin-bottom:15px;" onclick="this.select()"></textarea>
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeMagnetDialog()">Close</button>
+                <button class="submit-btn" id="magnet-copy-btn" onclick="copyMagnetLink()">Copy</button>
+                <a id="magnet-open-btn" class="submit-btn" href="#" style="background:var(--theme-purple);text-decoration:none;display:inline-block;" onclick="openMagnetClient()">Open</a>
+            </div>
+        </div>
+    </div>
+
     <script>
         var _captchaToken = '';
         var _lastResults = null;
@@ -609,6 +622,19 @@
             
             var magnet = generateMagnet(_lastResults, index);
             
+            // Show dialog with magnet link
+            document.getElementById('magnet-link-text').value = magnet;
+            document.getElementById('magnet-open-btn').href = magnet;
+            document.getElementById('magnet-dialog').classList.add('show');
+        }
+        
+        function closeMagnetDialog() {
+            document.getElementById('magnet-dialog').classList.remove('show');
+        }
+        
+        function copyMagnetLink() {
+            var magnet = document.getElementById('magnet-link-text').value;
+            
             // Use fallback for clipboard - works in all browsers including Yandex
             var textArea = document.createElement('textarea');
             textArea.value = magnet;
@@ -629,9 +655,17 @@
             
             if (success) {
                 alert('Magnet link copied to clipboard!');
+                closeMagnetDialog();
             } else {
                 prompt('Copy this magnet link:', magnet);
             }
+        }
+        
+        function openMagnetClient() {
+            // On mobile, clicking the link will open the default torrent app
+            // The href is already set to the magnet URI
+            // Just close dialog after a moment
+            setTimeout(closeMagnetDialog, 500);
         }
 
         function getMagnetUrl(index) {
