@@ -29,12 +29,17 @@ class TestUIValidation:
     @pytest.fixture(autouse=True)
     def setup(self):
         self.base_url = BASE_URL
+        try:
+            r = requests.get(f"{self.base_url}/health", timeout=5)
+            r.raise_for_status()
+        except (requests.ConnectionError, requests.Timeout):
+            pytest.skip("Merge service not available")
 
     def search(self, query):
-        return requests.post(f"{self.base_url}/api/v1/search", json={"query": query, "limit": 5}).json()
+        return requests.post(f"{self.base_url}/api/v1/search", json={"query": query, "limit": 5}, timeout=10).json()
 
     def test_dashboard_accessible(self):
-        r = requests.get(f"{self.base_url}/")
+        r = requests.get(f"{self.base_url}/", timeout=5)
         assert r.status_code == 200
         assert "results-table" in r.text
         print(f"✓ Dashboard loads")
@@ -55,27 +60,27 @@ class TestUIValidation:
         print(f"✓ All required fields present")
 
     def test_ui_columns_sorted(self):
-        r = requests.get(f"{self.base_url}/").text
+        r = requests.get(f"{self.base_url}/", timeout=5).text
         cols = ["name", "type", "size", "seeds", "leechers", "quality", "sources"]
         for c in cols:
             assert f'data-sort="{c}"' in r
         print(f"✓ All 7 sortable columns present")
 
     def test_buttons_present(self):
-        r = requests.get(f"{self.base_url}/").text
+        r = requests.get(f"{self.base_url}/", timeout=5).text
         assert "btn-magnet" in r
         assert "btn-schedule" in r
         assert 'onclick="doMagnet(' in r
         print(f"✓ All 3 buttons present")
 
     def test_sorting_functions(self):
-        r = requests.get(f"{self.base_url}/").text
+        r = requests.get(f"{self.base_url}/", timeout=5).text
         assert "function sortResults(" in r
         assert "function renderSortedResults(" in r
         print(f"✓ Sorting functions defined")
 
     def test_config_endpoint(self):
-        data = requests.get(f"{self.base_url}/api/v1/config").json()
+        data = requests.get(f"{self.base_url}/api/v1/config", timeout=5).json()
         assert data["qbittorrent_port"] == 7185
         print(f"✓ Config returns {data}")
 

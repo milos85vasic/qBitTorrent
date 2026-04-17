@@ -129,6 +129,7 @@ class TestSearchByIdEndpoint:
     def test_get_unknown_search_returns_404(self, mock_get_orch, client):
         orch = MagicMock()
         orch.get_search_status.return_value = None
+        orch._last_merged_results = {}
         mock_get_orch.return_value = orch
 
         resp = client.get("/api/v1/search/nonexistent-id")
@@ -147,6 +148,7 @@ class TestSearchByIdEndpoint:
         meta.started_at = datetime(2025, 1, 1, 12, 0, 0)
         meta.completed_at = datetime(2025, 1, 1, 12, 0, 5)
         orch.get_search_status.return_value = meta
+        orch._last_merged_results = {}
         mock_get_orch.return_value = orch
 
         resp = client.get("/api/v1/search/known-id")
@@ -258,3 +260,108 @@ class TestHooksEndpoint:
             assert del_resp.status_code == 200
 
         assert client.get("/api/v1/hooks").json()["count"] == 0
+
+
+class TestAbortSearchEndpoint:
+    @patch("api.routes._get_orchestrator")
+    def test_abort_existing_search(self, mock_get_orch, client):
+        orch = MagicMock()
+        orch._active_searches = {"search-123": MagicMock(status="running")}
+        mock_get_orch.return_value = orch
+
+        resp = client.post("/api/v1/search/search-123/abort")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["search_id"] == "search-123"
+        assert data["status"] == "aborted"
+        assert orch._active_searches["search-123"].status == "aborted"
+
+    @patch("api.routes._get_orchestrator")
+    def test_abort_unknown_search(self, mock_get_orch, client):
+        orch = MagicMock()
+        orch._active_searches = {}
+        mock_get_orch.return_value = orch
+
+        resp = client.post("/api/v1/search/nonexistent/abort")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["search_id"] == "nonexistent"
+        assert data["status"] == "not_found"
+
+
+class TestMagnetEndpoint:
+    def test_generate_magnet_with_hash(self, client):
+        resp = client.post(
+            "/api/v1/magnet",
+            json={
+                "result_id": "Test Movie",
+                "download_urls": ["magnet:?xt=urn:btih:abc123def4567890abc123def4567890"],
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "magnet" in data
+        assert "abc123def4567890abc123def4567890" in data["magnet"]
+        assert data["hashes"] == ["abc123def4567890abc123def4567890"]
+
+    def test_generate_magnet_without_hash(self, client):
+        resp = client.post(
+            "/api/v1/magnet",
+            json={
+                "result_id": "Test Movie",
+                "download_urls": ["https://example.com/file.torrent"],
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "magnet" in data
+        assert data["hashes"] == []
+
+    def test_generate_magnet_invalid_request(self, client):
+        resp = client.post("/api/v1/magnet", data="not-json")
+        assert resp.status_code == 400
+
+
+class TestDownloadEndpoint:
+    @patch("api.routes._get_orchestrator")
+    @patch("api.routes.aiohttp.ClientSession")
+    def test_download_auth_failed(self, mock_session_cls, mock_get_orch, client):
+        orch = MagicMock()
+        mock_get_orch.return_value = orch
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        mock_resp = MagicMock()
+        mock_resp.status = 403
+        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        resp = client.post(
+            "/api/v1/download",
+            json={"result_id": "test-1", "download_urls": ["https://example.com/file.torrent"]},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "auth_failed"
+
+
+class TestActiveDownloadsEndpoint:
+    @patch("api.routes.aiohttp.ClientSession")
+    def test_active_downloads_auth_failed(self, mock_session_cls, client):
+        mock_session = MagicMock()
+        mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        mock_resp = MagicMock()
+        mock_resp.status = 403
+        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        resp = client.get("/api/v1/downloads/active")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["downloads"] == []
+        assert data["count"] == 0
+        assert "error" in data

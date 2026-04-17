@@ -103,10 +103,10 @@ class TestScheduler:
 
     def test_save_and_load(self, scheduler, tmp_path_file):
         scheduler.add_scheduled_search("test", "ubuntu", interval_minutes=120)
-        asyncio.get_event_loop().run_until_complete(scheduler.save())
+        asyncio.run(scheduler.save())
 
         scheduler2 = Scheduler(config_path=tmp_path_file)
-        asyncio.get_event_loop().run_until_complete(scheduler2.load())
+        asyncio.run(scheduler2.load())
         searches = scheduler2.get_all_scheduled_searches()
         assert len(searches) == 1
         assert searches[0].name == "test"
@@ -114,16 +114,16 @@ class TestScheduler:
         assert searches[0].interval_minutes == 120
 
     def test_start_and_stop(self, scheduler):
-        asyncio.get_event_loop().run_until_complete(scheduler.start())
+        asyncio.run(scheduler.start())
         assert scheduler._running is True
-        asyncio.get_event_loop().run_until_complete(scheduler.stop())
+        asyncio.run(scheduler.stop())
         assert scheduler._running is False
 
     def test_double_start(self, scheduler):
-        asyncio.get_event_loop().run_until_complete(scheduler.start())
-        asyncio.get_event_loop().run_until_complete(scheduler.start())
+        asyncio.run(scheduler.start())
+        asyncio.run(scheduler.start())
         assert scheduler._running is True
-        asyncio.get_event_loop().run_until_complete(scheduler.stop())
+        asyncio.run(scheduler.stop())
 
     def test_callback(self, scheduler):
         called = []

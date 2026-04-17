@@ -65,7 +65,7 @@ class TestTrackerValidator:
         """Test session cleanup."""
         import asyncio
 
-        asyncio.get_event_loop().run_until_complete(validator.close())
+        asyncio.run(validator.close())
         assert True
 
 

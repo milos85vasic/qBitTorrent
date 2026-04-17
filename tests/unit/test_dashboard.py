@@ -1,9 +1,12 @@
 import sys
 import os
-import pytest
+import importlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 
+# Work around pytest importlib mode creating namespace package for 'api'
+if "api" in sys.modules and not getattr(sys.modules.get("api"), "__file__", None):
+    del sys.modules["api"]
 
 from api import app
 from fastapi.testclient import TestClient

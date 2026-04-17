@@ -81,9 +81,7 @@ class TestMetadataEnricher:
         """Test resolve returns a result or None gracefully."""
         import asyncio
 
-        result = asyncio.get_event_loop().run_until_complete(
-            enricher.resolve("Test Movie")
-        )
+        result = asyncio.run(enricher.resolve("Test Movie"))
         assert result is None or hasattr(result, "source")
 
 

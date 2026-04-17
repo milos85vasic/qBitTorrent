@@ -39,7 +39,7 @@ class TestSSEHandler:
                 return None
 
         gen = SSEHandler.search_results_stream("bad-id", FakeOrchestrator())
-        events = asyncio.get_event_loop().run_until_complete(self._collect(gen))
+        events = asyncio.run(self._collect(gen))
         assert len(events) == 2
         assert '"error"' in events[1]
 
@@ -58,13 +58,13 @@ class TestSSEHandler:
                 return FakeMeta()
 
         gen = SSEHandler.search_results_stream("sid", FakeOrchestrator(), poll_interval=0)
-        events = asyncio.get_event_loop().run_until_complete(self._collect(gen))
+        events = asyncio.run(self._collect(gen))
         assert any("search_start" in e for e in events)
         assert any("search_complete" in e for e in events)
 
     def test_download_progress_stream_not_found(self):
         gen = SSEHandler.download_progress_stream("dl-id", lambda x: None, poll_interval=0)
-        events = asyncio.get_event_loop().run_until_complete(self._collect(gen))
+        events = asyncio.run(self._collect(gen))
         assert len(events) == 2
         assert any("download_start" in e for e in events)
         assert any("download_complete" in e for e in events)
@@ -80,7 +80,7 @@ class TestSSEHandler:
             return {"progress": 50, "complete": False}
 
         gen = SSEHandler.download_progress_stream("dl-id", get_progress, poll_interval=0)
-        events = asyncio.get_event_loop().run_until_complete(self._collect(gen))
+        events = asyncio.run(self._collect(gen))
         assert len(events) >= 2
 
     def test_create_streaming_response(self):
@@ -143,7 +143,7 @@ class TestRealTimeStreaming:
                 return [FakeResult()]
 
         gen = SSEHandler.search_results_stream("sid", FakeOrchestrator(), poll_interval=0)
-        events = asyncio.get_event_loop().run_until_complete(self._collect_limit(gen))
+        events = asyncio.run(self._collect_limit(gen))
         has_result_found = any("result_found" in e for e in events)
         assert has_result_found, "Should emit result_found event with individual result data"
 
@@ -180,7 +180,7 @@ class TestRealTimeStreaming:
                 return [FakeResult()]
 
         gen = SSEHandler.search_results_stream("sid", FakeOrchestrator(), poll_interval=0)
-        events = asyncio.get_event_loop().run_until_complete(self._collect_limit(gen))
+        events = asyncio.run(self._collect_limit(gen))
         result_events = [e for e in events if "result_found" in e]
         assert len(result_events) > 0, "Should have result_found event"
         assert "Awesome Film" in result_events[0], "Result should contain name"
@@ -211,7 +211,7 @@ class TestRealTimeStreaming:
                 return []
 
         gen = SSEHandler.search_results_stream("sid", FakeOrchestrator(), poll_interval=0)
-        events = asyncio.get_event_loop().run_until_complete(self._collect_limit(gen))
+        events = asyncio.run(self._collect_limit(gen))
         update_events = [e for e in events if "results_update" in e]
         assert len(update_events) > 0, "Should have results_update events"
         has_trackers = any("rutracker" in e or "kinozal" in e for e in update_events)
