@@ -381,8 +381,23 @@ class Deduplicator:
             identity.content_type = ContentType.GAME
             return
 
-        # Priority 6: SOFTWARE - file format
-        if re.search(r"\b(x86|x64|portable|\.exe|installer)\b", n):
+        # Priority 6: SOFTWARE - file format and OS markers
+        if re.search(r"\b(x86|x64|portable|\.exe|installer|iso|dmg|appimage|snap|flatpak|pkg|deb|rpm|msi)\b", n):
+            identity.content_type = ContentType.SOFTWARE
+            return
+
+        # Priority 6b: SOFTWARE - OS / distribution names
+        if re.search(r"\b(ubuntu|debian|fedora|arch linux|linux mint|opensuse|centos|redhat|gentoo|slackware|kali|manjaro|pop!_os|elementary)\b", n):
+            identity.content_type = ContentType.SOFTWARE
+            return
+
+        # Priority 6c: SOFTWARE - general software terms (when combined with version/year patterns)
+        if re.search(r"\b(workstation|browser|server|distro|distribution|ide|sdk|debugger|compiler|vm|virtual|emulator|antivirus|firewall|vpn|proxy|database|framework|library)\b", n):
+            identity.content_type = ContentType.SOFTWARE
+            return
+
+        # Priority 6d: SOFTWARE - multi-platform indicators
+        if re.search(r"\((win(dows)?\s*[,/]?\s*mac\s*[,/]?\s*linux|windows\s*[,/]?\s*linux|win/mac|mac/linux)\)", n):
             identity.content_type = ContentType.SOFTWARE
             return
 

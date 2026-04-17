@@ -373,15 +373,38 @@
             if (!_lastResults) return;
             var sorted = _lastResults.slice();
             sorted.sort(function(a, b) {
-                var av, bv;
+                var av, bv, cmp;
                 switch(_sortColumn) {
-                    case 'name': av = a.name || ''; bv = b.name || ''; return _sortDirection === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av); break;
-                    case 'type': av = a.content_type || 'unknown'; bv = b.content_type || 'unknown'; return _sortDirection === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av); break;
-                    case 'size': av = parseSize(a.size); bv = parseSize(b.size); return _sortDirection === 'asc' ? av - bv : bv - av; break;
-                    case 'seeds': av = a.seeds || 0; bv = b.seeds || 0; return _sortDirection === 'asc' ? av - bv : bv - av; break;
-                    case 'leechers': av = a.leechers || 0; bv = b.leechers || 0; return _sortDirection === 'asc' ? av - bv : bv - av; break;
-                    case 'quality': av = a.quality || ''; bv = b.quality || ''; return _sortDirection === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av); break;
-                    case 'sources': av = (a.sources || []).length; bv = (b.sources || []).length; return _sortDirection === 'asc' ? av - bv : bv - av; break;
+                    case 'name':
+                        av = (a.name || '').toLowerCase();
+                        bv = (b.name || '').toLowerCase();
+                        cmp = av < bv ? -1 : (av > bv ? 1 : 0);
+                        return _sortDirection === 'asc' ? cmp : -cmp;
+                    case 'type':
+                        av = a.content_type || 'unknown';
+                        bv = b.content_type || 'unknown';
+                        // Unknown always goes to the end
+                        if (av === 'unknown' && bv !== 'unknown') return 1;
+                        if (bv === 'unknown' && av !== 'unknown') return -1;
+                        cmp = av < bv ? -1 : (av > bv ? 1 : 0);
+                        return _sortDirection === 'asc' ? cmp : -cmp;
+                    case 'size':
+                        av = parseSize(a.size); bv = parseSize(b.size);
+                        return _sortDirection === 'asc' ? av - bv : bv - av;
+                    case 'seeds':
+                        av = a.seeds || 0; bv = b.seeds || 0;
+                        return _sortDirection === 'asc' ? av - bv : bv - av;
+                    case 'leechers':
+                        av = a.leechers || 0; bv = b.leechers || 0;
+                        return _sortDirection === 'asc' ? av - bv : bv - av;
+                    case 'quality':
+                        // Quality weight: uhd_4k=5, full_hd=4, hd=3, sd=2, unknown=1
+                        var qw = {uhd_4k: 5, full_hd: 4, hd: 3, sd: 2, unknown: 1};
+                        av = qw[a.quality] || 1; bv = qw[b.quality] || 1;
+                        return _sortDirection === 'asc' ? av - bv : bv - av;
+                    case 'sources':
+                        av = (a.sources || []).length; bv = (b.sources || []).length;
+                        return _sortDirection === 'asc' ? av - bv : bv - av;
                     default: return 0;
                 }
             });
@@ -828,7 +851,7 @@
                     '<td><div class="btn-group">' +
                     '<a class="download-btn btn-magnet" onclick="doMagnet(' + i + '); return false;" title="Get Magnet Link">Magnet</a>' +
                     '<button class="download-btn btn-schedule" onclick="doSchedule(' + i + ')" title="Send to qBittorrent">qBit</button>' +
-                    '<button class="download-btn" onclick="doDownload(' + i + ')" title="Download">+</button>' +
+                    '<button class="download-btn" onclick="doDownloadTorrent(' + i + ')" title="Download .torrent">+</button>' +
                     '</div></td>' +
                     '</tr>';
             });
@@ -1053,6 +1076,61 @@
                 setTimeout(function() {
                     btn.textContent = '+';
                     btn.classList.remove('failed');
+                }, 2000);
+            });
+        }
+
+        function doDownloadTorrent(index) {
+            if (!_lastResults || !_lastResults[index]) {
+                alert('Error: No results available. Search first.');
+                return;
+            }
+            var r = _lastResults[index];
+            var btn = event.target;
+            var originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'DL...';
+
+            fetch('/api/v1/download/file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ result_id: String(index), download_urls: r.download_urls })
+            })
+            .then(function(resp) {
+                if (!resp.ok) {
+                    throw new Error('Download failed: ' + resp.status);
+                }
+                var disposition = resp.headers.get('content-disposition');
+                var filename = 'download.torrent';
+                if (disposition && disposition.indexOf('filename=') !== -1) {
+                    var match = disposition.match(/filename="?([^"]+)"?/);
+                    if (match) filename = match[1];
+                }
+                return resp.blob().then(function(blob) {
+                    var url = window.URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                });
+            })
+            .then(function() {
+                btn.textContent = 'Done';
+                setTimeout(function() {
+                    btn.textContent = '+';
+                    btn.disabled = false;
+                }, 2000);
+            })
+            .catch(function(e) {
+                btn.textContent = 'Err';
+                btn.classList.add('failed');
+                setTimeout(function() {
+                    btn.textContent = '+';
+                    btn.classList.remove('failed');
+                    btn.disabled = false;
                 }, 2000);
             });
         }

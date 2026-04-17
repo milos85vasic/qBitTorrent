@@ -464,7 +464,8 @@ class SearchOrchestrator:
             base_url = os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org").split(",")[0].strip()
             search_url = f"{base_url}/forum/tracker.php?{urlencode({'nm': query, 'fo': 1})}"
 
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     f"{base_url}/forum/login.php",
                     data={
@@ -579,7 +580,8 @@ class SearchOrchestrator:
 
         try:
             base_url = os.getenv("KINOZAL_MIRRORS", "https://kinozal.tv").split(",")[0].strip()
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 login_data = urlencode({"username": username, "password": password}, encoding="cp1251")
                 async with session.post(
                     f"{base_url}/takelogin.php",
@@ -674,7 +676,8 @@ class SearchOrchestrator:
 
         try:
             base_url = os.getenv("NNMCLUB_MIRRORS", "https://nnm-club.me").split(",")[0].strip()
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     f"{base_url}/forum/tracker.php?{urlencode({'nm': query, 'f': '-1'})}",
                     cookies=cookie_jar,
@@ -749,7 +752,8 @@ class SearchOrchestrator:
             "books": "35",
         }
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     f"{base_url}/do-login.php",
                     data={"username": username, "password": password},

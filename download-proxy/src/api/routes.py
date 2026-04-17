@@ -580,6 +580,63 @@ async def initiate_download(request: DownloadRequest, req: Request):
     }
 
 
+@router.post("/download/file")
+async def download_torrent_file(request: DownloadRequest, req: Request):
+    """Download the first available .torrent file from the result's URLs."""
+    import tempfile
+    import aiohttp
+
+    orch = _get_orchestrator(req)
+
+    for url in request.download_urls[:5]:
+        try:
+            tracker = _is_tracker_url(url)
+            if tracker:
+                torrent_data = await orch.fetch_torrent(tracker, url)
+                if torrent_data:
+                    from fastapi.responses import StreamingResponse
+                    from io import BytesIO
+
+                    return StreamingResponse(
+                        BytesIO(torrent_data),
+                        media_type="application/x-bittorrent",
+                        headers={
+                            "Content-Disposition": f'attachment; filename="{tracker}_{request.result_id}.torrent"'
+                        },
+                    )
+            elif url.startswith("magnet:"):
+                # For magnet links, return as a .magnet text file
+                from fastapi.responses import PlainTextResponse
+                return PlainTextResponse(
+                    url,
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{request.result_id}.magnet"',
+                        "Content-Type": "text/plain; charset=utf-8",
+                    },
+                )
+            else:
+                # Try to fetch direct URL
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                        if resp.status == 200:
+                            data = await resp.read()
+                            from fastapi.responses import StreamingResponse
+                            from io import BytesIO
+
+                            filename = url.split("/")[-1] or f"{request.result_id}.torrent"
+                            return StreamingResponse(
+                                BytesIO(data),
+                                media_type="application/x-bittorrent",
+                                headers={
+                                    "Content-Disposition": f'attachment; filename="{filename}"'
+                                },
+                            )
+        except Exception:
+            continue
+
+    raise HTTPException(status_code=404, detail="No downloadable torrent file found")
+
+
 @router.post("/magnet")
 async def generate_magnet(request: Request):
     from pydantic import BaseModel
