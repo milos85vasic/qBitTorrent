@@ -964,7 +964,7 @@
                 }
                 var html = '<table class="results-table"><thead><tr>' +
                     '<th>Name</th><th>Size</th><th>Progress</th><th>Speed</th><th>ETA</th><th>State</th>' +
-                    '</tr></thead><tbody>';
+'</tr></thead><tbody id="results-body">';
                 downloads.forEach(function(d) {
                     var stateClass = d.state || 'unknown';
                     if (stateClass === 'stalledDL' || stateClass === 'forcedDL' || stateClass === 'downloading') stateClass = 'downloading';
