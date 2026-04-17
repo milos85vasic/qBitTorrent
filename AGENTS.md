@@ -226,3 +226,10 @@ Search button toggles to Abort button during active searches using `AbortControl
 - "Remember me" checkbox saves credentials to `/config/download-proxy/qbittorrent_creds.json`
 - API routes load saved credentials first, fallback to env vars (`QBITTORRENT_USER`, `QBITTORRENT_PASS`)
 - First-time setup: use `init-qbit-password.sh` to set initial password
+
+### Magnet Dialog
+Click "Magnet" button to open a dialog with:
+- **Text area** showing the magnet link (click to select all)
+- **Copy button** - copies magnet link to clipboard using fallback method (works in Yandex browser)
+- **Open button** - triggers mobile torrent app via `href="magnet:..."` - works on mobile devices to open default torrent client
+- Uses `execCommand('copy')` fallback instead of `navigator.clipboard` for browser compatibility
