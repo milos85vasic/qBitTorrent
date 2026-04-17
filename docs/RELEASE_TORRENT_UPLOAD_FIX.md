@@ -206,7 +206,7 @@ To manually verify:
 python3 tests/test_torrent_file_upload.py
 
 # Run all existing test suites
-./tests/run_tests.sh
+./run-all-tests.sh
 
 # Quick validation
 ./test.sh

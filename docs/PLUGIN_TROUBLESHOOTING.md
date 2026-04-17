@@ -132,7 +132,7 @@ sleep 5
 ### Run All Tests
 ```bash
 # Test plugin installation and structure
-python3 tests/test_all_plugins.py
+python3 -m pytest tests/unit/ --import-mode=importlib
 
 # Test download functionality
 python3 tests/test_download_comprehensive.py
@@ -355,7 +355,7 @@ RUTOR_PROXY_HTTPS=https://proxy:8080
 
 If you're still having issues:
 
-1. Run the test suite: `python3 tests/test_all_plugins.py`
+1. Run the test suite: `python3 -m pytest tests/unit/ --import-mode=importlib`
 2. Check container logs: `podman logs qbittorrent`
 3. Enable debug logging in plugins
 4. Check qBittorrent's official documentation: https://wiki.qbittorrent.org/

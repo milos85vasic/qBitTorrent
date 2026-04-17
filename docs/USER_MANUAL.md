@@ -388,9 +388,9 @@ podman system prune -f
 ./run-all-tests.sh
 
 # Individual tests
-python3 tests/comprehensive_test.py
+python3 -m pytest tests/unit/ tests/e2e/ --import-mode=importlib
 python3 tests/final_verification.py
-python3 tests/test_all_plugins.py
+python3 -m pytest tests/unit/ --import-mode=importlib
 ```
 
 ### Test Results

@@ -261,7 +261,7 @@ copy plugins\rutracker.png %LOCALAPPDATA%\qBittorrent\nova3\engines\
 
 ```bash
 # Test all plugins
-./tests/run_tests.sh --suite plugins
+./run-all-tests.sh --suite plugins
 
 # Test specific plugin
 python3 tests/test_plugin_download_fix.py --run

@@ -29,8 +29,8 @@ jobs:
 
       - name: Python syntax check
         run: |
-          python3 -m py_compile plugins/*.py 2>&1 || true
-          python3 -m py_compile download-proxy/src/**/*.py 2>&1 || true
+          find plugins -name '*.py' -exec python3 -m py_compile {} + 2>&1 || true
+          find download-proxy/src -name '*.py' -exec python3 -m py_compile {} + 2>&1 || true
 
   unit-tests:
     runs-on: ubuntu-latest
@@ -49,11 +49,15 @@ jobs:
 
       - name: Run unit tests
         run: |
-          python3 -m pytest tests/unit/merge_service/ -v --import-mode=importlib
+          python3 -m pytest tests/unit/ -v --import-mode=importlib
+
+      - name: Run e2e tests
+        run: |
+          python3 -m pytest tests/e2e/ -v --import-mode=importlib
 
       - name: Run integration tests (mocked)
         run: |
-          python3 -m pytest tests/integration/test_merge_api.py -v --import-mode=importlib
+          python3 -m pytest tests/integration/test_merge_api.py tests/integration/test_button_functions.py tests/integration/test_magnet_dialog.py tests/integration/test_auth_state_ui.py -v --import-mode=importlib
 
   docker-check:
     runs-on: ubuntu-latest

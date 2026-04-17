@@ -18,16 +18,16 @@ Located in the project root, provides quick validation:
 ./test.sh --container  # Container status only
 ```
 
-### run_tests.sh (Comprehensive Tests)
+### run-all-tests.sh (Comprehensive Tests)
 
-Located in `tests/` directory, provides detailed testing:
+Located in the project root, provides detailed testing:
 
 ```bash
-./tests/run_tests.sh              # Run all test suites
-./tests/run_tests.sh --quick      # Quick validation only
-./tests/run_tests.sh --list       # List available suites
-./tests/run_tests.sh --suite NAME # Run specific suite
-./tests/run_tests.sh --ci         # CI mode (no colors)
+./run-all-tests.sh              # Run all test suites
+./run-all-tests.sh --quick      # Quick validation only
+./run-all-tests.sh --list       # List available suites
+./run-all-tests.sh --suite NAME # Run specific suite
+./run-all-tests.sh --ci         # CI mode (no colors)
 ```
 
 ## Test Suites
@@ -105,7 +105,7 @@ Always run tests before committing:
 ./test.sh
 
 # Full validation
-./tests/run_tests.sh
+./run-all-tests.sh
 ```
 
 ### Continuous Integration
@@ -113,7 +113,7 @@ Always run tests before committing:
 For CI/CD pipelines:
 
 ```bash
-./tests/run_tests.sh --ci
+./run-all-tests.sh --ci
 ```
 
 ## Test Results
@@ -134,7 +134,7 @@ Final summary shows:
 
 To add new tests to the comprehensive suite:
 
-1. Create a new test function in `run_tests.sh`
+1. Create a new test function in `run-all-tests.sh`
 2. Follow the naming convention: `test_<category>()`
 3. Use assertion functions: `assert_*`
 4. Call `test_pass()` or `test_fail()` appropriately

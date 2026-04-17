@@ -88,60 +88,43 @@ fi
 
 print_success "Container is running"
 
-# Test Suite 1: Comprehensive Plugin Test
+# Test Suite 1: Syntax Validation
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 2/7: Comprehensive Plugin Test (12 plugins)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-
-run_test "Plugin Structure, Search, Download, Columns" \
-    "python3 tests/comprehensive_test.py"
-
-# Test Suite 2: Unit Tests
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 3/7: Unit Tests"
+echo "STEP 2/5: Syntax Validation"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-run_test "Plugin Unit Tests" \
-    "python3 tests/test_all_plugins.py"
+run_test "Python Syntax Check" \
+    "find . -name '*.py' -not -path '*/__pycache__/*' -not -path '*/.git/*' -not -path '*/venv/*' -not -path '*/node_modules/*' -exec python3 -m py_compile {} +"
 
-# Test Suite 3: Integration Tests
+run_test "Bash Syntax Check" \
+    "for f in *.sh; do bash -n \"\$f\"; done"
+
+# Test Suite 2: Unit + E2E Tests
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 4/7: Integration Tests"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-
-run_test "Plugin Integration" \
-    "python3 tests/test_plugin_integration.py"
-
-# Test Suite 4: Merge Service Unit Tests
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 5/7: Merge Service Unit Tests"
+echo "STEP 3/5: Unit and E2E Tests"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-run_test "Merge Service Unit Tests" \
-    "python3 -m pytest tests/unit/merge_service/ -v --import-mode=importlib"
+run_test "Unit and E2E Tests" \
+    "python3 -m pytest tests/unit/ tests/e2e/ -v --import-mode=importlib"
 
-# Test Suite 5: Merge Service Integration
+# Test Suite 3: Integration Tests (fast subset)
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 6/7: Merge Service Integration Tests"
+echo "STEP 4/5: Integration Tests"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-run_test "Merge Service Integration Tests" \
-    "python3 -m pytest tests/integration/test_merge_api.py -v --import-mode=importlib"
+run_test "Integration Tests" \
+    "python3 -m pytest tests/integration/ --ignore=tests/integration/test_ui_comprehensive.py --ignore=tests/integration/test_ui_quick.py -v --import-mode=importlib"
 
-# Test Suite 6: Live Container Tests
+# Test Suite 4: Live Container Tests
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "STEP 7/7: Live Container Tests"
+echo "STEP 5/5: Live Container Tests"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 

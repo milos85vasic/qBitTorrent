@@ -67,7 +67,7 @@ Created comprehensive automated tests to verify the fix:
    - Test stdout flushing
    - Test search result building
 
-2. **Integration Tests** (`tests/test_plugin_integration.py`)
+2. **Integration Tests** (`tests/integration/`)
    - Test real connection to RuTracker (requires credentials)
    - Test actual torrent downloads
    - Verify torrent file validity
@@ -91,13 +91,13 @@ python3 tests/verify_fix.py
 python3 tests/test_plugin_unit.py
 
 # Run integration tests (requires RuTracker credentials)
-python3 tests/test_plugin_integration.py
+python3 tests/integration/
 
 # Run E2E tests (requires running container and credentials)
 python3 tests/test_e2e_download.py --direct
 
 # Run all tests via test suite
-./tests/run_tests.sh --suite python
+./run-all-tests.sh --suite python
 ```
 
 ## Verification
@@ -142,8 +142,8 @@ This fix ensures that:
 
 - `plugins/rutracker.py` - Fixed download_torrent method
 - `tests/test_plugin_unit.py` - Unit tests
-- `tests/test_plugin_integration.py` - Integration tests  
+- `tests/integration/` - Integration tests  
 - `tests/test_e2e_download.py` - End-to-end tests
 - `tests/verify_fix.py` - Quick verification script
 - `tests/novaprinter.py` - Mock module for testing
-- `tests/run_tests.sh` - Updated to include Python tests
+- `./run-all-tests.sh` - Updated to include Python tests
