@@ -68,7 +68,7 @@
         .stat-item { background: var(--theme-bg-primary); padding: var(--theme-spacing-md) var(--theme-spacing-xl); border-radius: var(--theme-radius-lg); border: 1px solid var(--theme-border); }
         .stat-item .stat-value { font-size: var(--theme-font-size-3xl); font-weight: 700; color: var(--theme-accent); }
         .stat-item .stat-label { font-size: var(--theme-font-size-md); color: var(--theme-text-secondary); }
-        .tracker-tag { display: inline-block; padding: 2px var(--theme-spacing-sm); border-radius: var(--theme-radius-md); font-size: var(--theme-font-size-sm); background: var(--theme-bg-tertiary); color: var(--theme-text-primary); margin-right: var(--theme-spacing-xs); }
+        .tracker-tag { display: inline-block; padding: 2px var(--theme-spacing-sm); border-radius: var(--theme-radius-md); font-size: var(--theme-font-size-sm); background: var(--theme-bg-tertiary); color: var(--theme-text-primary); margin-right: var(--theme-spacing-xs); margin-bottom: 3px; }
         .tracker-tag.freeleech { background: var(--theme-freeleech); }
         .quality-badge { display: inline-block; padding: 2px 6px; border-radius: var(--theme-radius-sm); font-size: var(--theme-font-size-xs); font-weight: 700; margin-left: var(--theme-spacing-xs); }
         .quality-badge.uhd_4k { background: var(--theme-quality-uhd); color: #fff; }
@@ -86,7 +86,7 @@
         .type-badge.game { background: var(--theme-type-game); color: #fff; }
         .type-badgeebook { background: var(--theme-type-ebook); color: #fff; }
         .type-badge.unknown { background: var(--theme-text-muted); color: #ccc; }
-        .merged-indicator { display: inline-flex; align-items: center; gap: 3px; padding: 2px var(--theme-spacing-sm); border-radius: var(--theme-radius-md); font-size: var(--theme-font-size-sm); font-weight: 600; background: var(--theme-merged); color: #fff; margin-left: var(--theme-spacing-xs); }
+        .merged-indicator { display: inline-flex; align-items: center; gap: 3px; padding: 2px var(--theme-spacing-sm); border-radius: var(--theme-radius-md); font-size: var(--theme-font-size-sm); font-weight: 600; background: var(--theme-merged); color: #fff; margin-left: var(--theme-spacing-xs); margin-bottom: 3px; }
         .merged-indicator .merge-icon { font-size: var(--theme-font-size-md); }
         .merged-count { background: rgba(255,255,255,0.2); padding: 1px 5px; border-radius: var(--theme-radius-sm); margin-left: 2px; }
         @media (max-width: 768px) {
@@ -893,7 +893,7 @@
                 if (data.status === 'initiated') {
                     alert('Sent to qBittorrent at ' + qbitUrl);
                 } else if (data.status === 'auth_failed' || (data.results && data.results.some(function(x) { return x.status === 'auth_failed'; }))) {
-                    alert('qBittorrent login required. Click OK to login.');
+                    alert('qBittorrent rejected the connection. Check that qBittorrent is running and credentials are correct. Click OK to login.');
                     _pendingAction = { type: 'schedule', index: index };
                     openQbitLogin();
                 } else {
@@ -911,6 +911,12 @@
         }
 
         function doDownload(index) {
+            
+            if (!_qbitAuthenticated) {
+                _pendingAction = { type: 'download', index: index };
+                openQbitLogin();
+                return;
+            }
             
             var results = _lastResults;
             if (!results || !results[index]) {
@@ -941,7 +947,7 @@
                     btn.textContent = 'Login needed';
                     btn.classList.add('failed');
                     _pendingAction = { type: 'download', index: index };
-                    var login = confirm('qBittorrent login required. Open login form?');
+                    var login = confirm('qBittorrent rejected the connection. Check that qBittorrent is running and credentials are correct. Open login form?');
                     if (login) openQbitLogin();
                 } else {
                     btn.textContent = 'Failed';

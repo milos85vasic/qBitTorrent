@@ -350,6 +350,8 @@ def _load_qbit_credentials():
 
 @router.get("/status")
 async def all_trackers_auth_status():
+    import aiohttp
+
     orch = _get_orchestrator()
     trackers = {}
 
@@ -361,9 +363,23 @@ async def all_trackers_auth_status():
         }
 
     creds = _load_qbit_credentials()
+    qbit_has_session = False
+    qbit_username = creds.get("username", "") if creds else ""
+    if creds:
+        qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:7185")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{qbit_url}/api/v2/auth/login",
+                    data={"username": creds.get("username", "admin"), "password": creds.get("password", "admin")},
+                    timeout=aiohttp.ClientTimeout(total=5),
+                ) as resp:
+                    qbit_has_session = resp.status == 200
+        except Exception:
+            pass
     trackers["qbittorrent"] = {
-        "has_session": creds is not None,
-        "username": creds.get("username", "") if creds else "",
+        "has_session": qbit_has_session,
+        "username": qbit_username,
     }
 
     return {"trackers": trackers}
