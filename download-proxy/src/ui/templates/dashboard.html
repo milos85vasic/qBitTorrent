@@ -132,6 +132,10 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--theme-text-muted); border-top-color: var(--theme-accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: var(--theme-spacing-xs); }
         .auth-section { display: flex; align-items: center; gap: var(--theme-spacing-sm); flex-wrap: wrap; }
+        .service-links { display: flex; gap: var(--theme-spacing-sm); align-items: center; flex-wrap: wrap; margin-top: var(--theme-spacing-sm); }
+        .service-links a { padding: var(--theme-spacing-xs) var(--theme-spacing-md); background: var(--theme-bg-tertiary); color: var(--theme-text-primary); border-radius: var(--theme-radius-md); text-decoration: none; font-size: var(--theme-font-size-sm); border: 1px solid var(--theme-border); }
+        .service-links a:hover { background: var(--theme-accent); color: #fff; border-color: var(--theme-accent); }
+        .service-links a.current { background: var(--theme-accent); color: #fff; border-color: var(--theme-accent); cursor: default; }
         .auth-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 3px; }
         .auth-indicator.active { background: var(--theme-success); }
         .auth-indicator.inactive { background: var(--theme-danger); }
@@ -168,7 +172,10 @@
 <body>
     <div class="container">
         <header>
-            <h1>Merge Search Dashboard</h1>
+            <div>
+                <h1>Merge Search Dashboard</h1>
+                <div class="service-links" id="service-links"></div>
+            </div>
             <div class="auth-section" id="auth-section"></div>
         </header>
 
@@ -330,6 +337,24 @@
             } catch(e) { _config = { qbittorrent_url: 'http://localhost:7185' }; }
         }
         loadConfig();
+
+        function renderServiceLinks() {
+            var host = window.location.hostname || 'localhost';
+            var links = [
+                { name: 'qBittorrent WebUI', port: 7185, url: 'http://' + host + ':7185' },
+                { name: 'Download Proxy', port: 7186, url: 'http://' + host + ':7186' },
+                { name: 'Merge Search', port: 7187, url: 'http://' + host + ':7187', current: true },
+                { name: 'WebUI Bridge', port: 7188, url: 'http://' + host + ':7188' }
+            ];
+            var html = '';
+            for (var i = 0; i < links.length; i++) {
+                var cls = links[i].current ? 'current' : '';
+                html += '<a href="' + links[i].url + '" target="_blank" class="' + cls + '" title="Open ' + links[i].name + ' (port ' + links[i].port + ')">' + links[i].name + '</a>';
+            }
+            var el = document.getElementById('service-links');
+            if (el) el.innerHTML = html;
+        }
+        renderServiceLinks();
 
         function sortResults(col) {
             if (_sortColumn === col) {

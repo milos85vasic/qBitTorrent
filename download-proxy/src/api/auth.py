@@ -374,7 +374,8 @@ async def all_trackers_auth_status():
                     data={"username": creds.get("username", "admin"), "password": creds.get("password", "admin")},
                     timeout=aiohttp.ClientTimeout(total=5),
                 ) as resp:
-                    qbit_has_session = resp.status == 200
+                    login_text = await resp.text()
+                    qbit_has_session = resp.status == 200 and login_text.strip() == "Ok."
         except Exception:
             pass
     trackers["qbittorrent"] = {

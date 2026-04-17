@@ -301,7 +301,8 @@ async def get_active_downloads():
                 f"{qbit_url}/api/v2/auth/login",
                 data={"username": qbit_user, "password": qbit_pass},
             ) as resp:
-                if resp.status != 200:
+                login_text = await resp.text()
+                if resp.status != 200 or login_text.strip() != "Ok.":
                     return {"downloads": [], "count": 0, "error": "auth failed"}
                 cookies = resp.cookies
 
@@ -353,7 +354,8 @@ async def auth_qbittorrent(request: Request):
                 f"{qbit_url}/api/v2/auth/login",
                 data={"username": req.username, "password": req.password},
             ) as resp:
-                if resp.status == 200:
+                login_text = await resp.text()
+                if resp.status == 200 and login_text.strip() == "Ok.":
                     cookies = resp.cookies
                     async with session.get(f"{qbit_url}/api/v2/app/version", cookies=cookies) as vresp:
                         version = await vresp.text() if vresp.status == 200 else "unknown"
@@ -471,7 +473,8 @@ async def initiate_download(request: DownloadRequest, req: Request):
                 f"{qbit_url}/api/v2/auth/login",
                 data={"username": qbit_user, "password": qbit_pass},
             ) as resp:
-                if resp.status != 200:
+                login_text = await resp.text()
+                if resp.status != 200 or login_text.strip() != "Ok.":
                     return {
                         "download_id": download_id,
                         "status": "auth_failed",

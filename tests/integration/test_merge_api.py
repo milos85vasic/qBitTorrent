@@ -325,7 +325,7 @@ class TestMagnetEndpoint:
 class TestDownloadEndpoint:
     @patch("api.routes._get_orchestrator")
     @patch("api.routes.aiohttp.ClientSession")
-    def test_download_auth_failed(self, mock_session_cls, mock_get_orch, client):
+    def test_download_auth_failed_403(self, mock_session_cls, mock_get_orch, client):
         orch = MagicMock()
         mock_get_orch.return_value = orch
 
@@ -335,6 +335,7 @@ class TestDownloadEndpoint:
 
         mock_resp = MagicMock()
         mock_resp.status = 403
+        mock_resp.text = AsyncMock(return_value="Forbidden")
         mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_resp)
         mock_session.post.return_value.__aexit__ = AsyncMock(return_value=False)
 
@@ -345,6 +346,160 @@ class TestDownloadEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "auth_failed"
+
+    @patch("api.routes._get_orchestrator")
+    @patch("api.routes.aiohttp.ClientSession")
+    def test_download_auth_failed_200_body_fails(self, mock_session_cls, mock_get_orch, client):
+        """qBittorrent returns HTTP 200 with body 'Fails.' on bad credentials."""
+        orch = MagicMock()
+        mock_get_orch.return_value = orch
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.text = AsyncMock(return_value="Fails.")
+        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        resp = client.post(
+            "/api/v1/download",
+            json={"result_id": "test-1", "download_urls": ["https://example.com/file.torrent"]},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "auth_failed"
+
+    @patch("api.routes._get_orchestrator")
+    @patch("api.routes.aiohttp.ClientSession")
+    def test_download_empty_urls(self, mock_session_cls, mock_get_orch, client):
+        """Download with empty URLs should return failed status, not crash."""
+        orch = MagicMock()
+        mock_get_orch.return_value = orch
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        login_resp = MagicMock()
+        login_resp.status = 200
+        login_resp.text = AsyncMock(return_value="Ok.")
+        login_resp.cookies = {}
+
+        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=login_resp)
+        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        resp = client.post(
+            "/api/v1/download",
+            json={"result_id": "test-1", "download_urls": []},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "failed"
+        assert data["added_count"] == 0
+
+    @patch("api.routes._get_orchestrator")
+    @patch("api.routes.aiohttp.ClientSession")
+    def test_download_connection_error(self, mock_session_cls, mock_get_orch, client):
+        """Download when qBittorrent is unreachable should return connection_failed."""
+        orch = MagicMock()
+        mock_get_orch.return_value = orch
+
+        mock_session_cls.side_effect = Exception("Connection refused")
+
+        resp = client.post(
+            "/api/v1/download",
+            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "connection_failed"
+
+    @patch("api.routes._get_orchestrator")
+    @patch("api.routes.aiohttp.ClientSession")
+    def test_download_qbit_rejects_add(self, mock_session_cls, mock_get_orch, client):
+        """Download when qBittorrent auth succeeds but add-torrent fails."""
+        orch = MagicMock()
+        mock_get_orch.return_value = orch
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        login_resp = MagicMock()
+        login_resp.status = 200
+        login_resp.text = AsyncMock(return_value="Ok.")
+        login_resp.cookies = {}
+
+        add_resp = MagicMock()
+        add_resp.status = 400
+        add_resp.text = AsyncMock(return_value="Bad Request")
+
+        def post_side_effect(*args, **kwargs):
+            mock_r = MagicMock()
+            if "/auth/login" in args[0]:
+                mock_r.__aenter__ = AsyncMock(return_value=login_resp)
+            else:
+                mock_r.__aenter__ = AsyncMock(return_value=add_resp)
+            mock_r.__aexit__ = AsyncMock(return_value=False)
+            return mock_r
+
+        mock_session.post.side_effect = post_side_effect
+
+        resp = client.post(
+            "/api/v1/download",
+            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "failed"
+        assert data["added_count"] == 0
+        assert len(data["results"]) == 1
+        assert data["results"][0]["status"] == "failed"
+
+    @patch("api.routes._get_orchestrator")
+    @patch("api.routes.aiohttp.ClientSession")
+    def test_download_successful_add(self, mock_session_cls, mock_get_orch, client):
+        """Download when qBittorrent accepts the torrent."""
+        orch = MagicMock()
+        mock_get_orch.return_value = orch
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        login_resp = MagicMock()
+        login_resp.status = 200
+        login_resp.text = AsyncMock(return_value="Ok.")
+        login_resp.cookies = {}
+
+        add_resp = MagicMock()
+        add_resp.status = 200
+        add_resp.text = AsyncMock(return_value="Ok.")
+
+        def post_side_effect(*args, **kwargs):
+            mock_r = MagicMock()
+            if "/auth/login" in args[0]:
+                mock_r.__aenter__ = AsyncMock(return_value=login_resp)
+            else:
+                mock_r.__aenter__ = AsyncMock(return_value=add_resp)
+            mock_r.__aexit__ = AsyncMock(return_value=False)
+            return mock_r
+
+        mock_session.post.side_effect = post_side_effect
+
+        resp = client.post(
+            "/api/v1/download",
+            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "initiated"
+        assert data["added_count"] == 1
+        assert len(data["results"]) == 1
+        assert data["results"][0]["status"] == "added"
 
 
 class TestActiveDownloadsEndpoint:
