@@ -307,7 +307,7 @@
                 <button class="cancel-btn" onclick="closeMagnetDialog()">Close</button>
                 <button class="submit-btn" id="magnet-copy-btn" onclick="copyMagnetLink()">Copy</button>
                 <a id="magnet-open-btn" class="submit-btn" href="#" style="background:var(--theme-purple);text-decoration:none;display:inline-block;" onclick="openMagnetClient()">Open</a>
-                <button class="submit-btn" id="magnet-add-btn" onclick="addMagnetToQbit()" style="background:var(--theme-green);">Add</button>
+                <button class="submit-btn" id="magnet-add-btn" onclick="addMagnetToQbit()" style="background:var(--theme-success);color:#fff;">Add</button>
             </div>
         </div>
     </div>
@@ -321,6 +321,7 @@
         var _searchAbortController = null;
         var _searchId = null;
         var _isSearching = false;
+        var _pendingAction = null; // Stores pending action to continue after login
 
         async function loadConfig() {
             try {
@@ -697,6 +698,7 @@
                     closeMagnetDialog();
                 } else if (data.status === 'auth_failed') {
                     alert('Please login first');
+                    _pendingAction = { type: 'addMagnet' };
                     openQbitLogin();
                 } else {
                     alert('Failed: ' + (data.error || JSON.stringify(data).substring(0,100)));
@@ -718,6 +720,7 @@
             
             if (!_config || !_config.qbittorrent_url) {
                 console.log('[DEBUG] No qBittorrent URL configured, opening login');
+                _pendingAction = { type: 'schedule', index: index };
                 openQbitLogin();
                 return;
             }
@@ -751,6 +754,7 @@
                     alert('Sent to qBittorrent at ' + qbitUrl);
                 } else if (data.status === 'auth_failed' || (data.results && data.results.some(function(x) { return x.status === 'auth_failed'; }))) {
                     alert('qBittorrent login required. Click OK to login.');
+                    _pendingAction = { type: 'schedule', index: index };
                     openQbitLogin();
                 } else {
                     alert('Failed to send to qBittorrent: ' + JSON.stringify(data).substring(0, 200));
@@ -758,6 +762,7 @@
             })
             .catch(function(e) { 
                 if (e.message && e.message.indexOf('auth') !== -1) {
+                    _pendingAction = { type: 'schedule', index: index };
                     openQbitLogin();
                 } else {
                     alert('Error: ' + e.message); 
@@ -799,6 +804,7 @@
                 } else if (data.status === 'auth_failed') {
                     btn.textContent = 'Login needed';
                     btn.classList.add('failed');
+                    _pendingAction = { type: 'download', index: index };
                     var login = confirm('qBittorrent login required. Open login form?');
                     if (login) openQbitLogin();
                 } else {
@@ -1076,9 +1082,21 @@
                 if (data.status === 'authenticated') {
                     console.log('[DEBUG] Authenticated! Closing modal...');
                     document.getElementById('qbit-login-modal').classList.remove('show');
-                    console.log('[DEBUG] Modal should be closed now');
-                    // Don't auto-close - let user click X or wait
-                    alert('Successfully logged in to qBittorrent!' + (saveCredentials ? ' Credentials saved.' : ''));
+                    // Continue any pending action
+                    if (_pendingAction) {
+                        console.log('[DEBUG] Continuing pending action:', _pendingAction);
+                        var action = _pendingAction;
+                        _pendingAction = null;
+                        if (action.type === 'download') {
+                            doDownload(action.index);
+                        } else if (action.type === 'schedule') {
+                            doSchedule(action.index);
+                        } else if (action.type === 'addMagnet') {
+                            addMagnetToQbit();
+                        }
+                    } else {
+                        alert('Successfully logged in to qBittorrent!' + (saveCredentials ? ' Credentials saved.' : ''));
+                    }
                 } else {
                     console.log('[DEBUG] NOT authenticated, showing error');
                     document.getElementById('qbit-login-error').textContent = data.error || 'Login failed';
