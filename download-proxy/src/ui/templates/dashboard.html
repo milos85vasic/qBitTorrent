@@ -135,7 +135,7 @@
         .auth-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 3px; }
         .auth-indicator.active { background: var(--theme-success); }
         .auth-indicator.inactive { background: var(--theme-danger); }
-        .auth-chip { display: inline-flex; align-items: center; gap: 3px; padding: var(--theme-spacing-xs) var(--theme-spacing-sm); border-radius: var(--theme-radius-round); font-size: var(--theme-font-size-md); background: var(--theme-bg-primary); border: 1px solid var(--theme-border); cursor: pointer; }
+        .auth-chip { display: inline-flex; align-items: center; gap: 3px; padding: var(--theme-spacing-xs) var(--theme-spacing-sm); border-radius: var(--theme-radius-round); font-size: var(--theme-font-size-md); background: var(--theme-bg-primary); border: 1px solid var(--theme-border); cursor: pointer; margin-right: 8px; margin-bottom: 5px; }
         .auth-chip:hover { border-color: var(--theme-accent); }
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--theme-overlay); z-index: var(--theme-z-modal); justify-content: center; align-items: center; }
         .modal-overlay.show { display: flex; }
@@ -422,11 +422,62 @@
             
             _eventSource = new EventSource('/api/v1/search/stream/' + searchId);
             
+            _eventSource.onopen = function() {
+                console.log('SSE connected!');
+                status.innerHTML = '<span style="color:#0ff">SSE connected - waiting for results...</span>';
+            };
+            
+            _eventSource.onerror = function(e) {
+                console.log('SSE error:', e);
+            };
+            
+            // Fallback: poll if SSE not receiving results after 5 seconds
+            var fallbackSearchId = _searchId;
+            setTimeout(function() {
+                if (_liveResults.length === 0 && _isSearching && fallbackSearchId) {
+                    console.log('SSE fallback: fetching results...');
+                    status.innerHTML = '<span style="color:#fa0">Fetching results...</span>';
+                    fetch('/api/v1/search/' + fallbackSearchId)
+                    .then(function(r) { return r.json(); })
+                    .then(function(resp) {
+                        if (resp.results && resp.results.length > 0) {
+                            status.textContent = 'Found ' + resp.total_results + ' results (' + resp.merged_results + ' merged)';
+                            renderResults(resp.results);
+                        } else {
+                            status.textContent = 'No results found.';
+                        }
+                        resetSearchButton();
+                    })
+                    .catch(function() { status.textContent = 'Error loading results.'; });
+                }
+            }, 5000);
+            
             _eventSource.addEventListener('search_start', function(e) {
                 console.log('Search started:', JSON.parse(e.data));
+                status.innerHTML = '<span style="color:#0ff">Search started - getting results...</span>';
             });
             
+            // onmessage catches ALL events
+            _eventSource.onmessage = function(e) {
+                console.log('ON MESSAGE:', e.data);
+                try {
+                    var data = JSON.parse(e.data);
+                    if (data.name) {
+                        addLiveResult({
+                            name: data.name || 'Unknown',
+                            seeds: data.seeds || 0,
+                            leechers: data.leechers || 0,
+                            size: data.size || 0,
+                            link: data.link || '',
+                            tracker: data.tracker || '',
+                        });
+                        updateStatus('Found ' + _liveResults.length + ' results...');
+                    }
+                } catch(err) {}
+            };
+            
             _eventSource.addEventListener('result_found', function(e) {
+                console.log('result_found event received:', e.data);
                 var data = JSON.parse(e.data);
                 var result = {
                     name: data.name || 'Unknown',
@@ -474,13 +525,18 @@
         var _liveResults = [];
 
         function addLiveResult(result) {
+            console.log('addLiveResult called:', result.name);
             _liveResults.push(result);
             addResultToTable(result);
         }
 
         function addResultToTable(result) {
             var table = document.getElementById('results-body');
-            if (!table) return;
+            if (!table) {
+                console.log('ERROR: results-body table not found!');
+                document.getElementById('results-tab').innerHTML = '<div id="results-body"></div>';
+                table = document.getElementById('results-body');
+            }
             
             var row = document.createElement('tr');
             var size = result.size || 0;
@@ -494,6 +550,7 @@
                 '<button class="download-btn" onclick="openMagnetDialog(\'' + escapeHtml(result.name).replace(/'/g, "\\'") + '\', \'' + (result.link || '').replace(/'/g, "\\'") + '\')">Magnet</button>' +
                 '<button class="download-btn btn-schedule" onclick="doSchedule(' + (_lastResults ? _lastResults.length : 0) + ')">qBit</button>' +
                 '</div></td>';
+            console.log('Added result to table:', result.name);
             table.appendChild(row);
         }
 
@@ -574,7 +631,12 @@
             })
             .then(function(data) {
                 clearTimeout(searchTimeout);
-                if (!data) return;
+                if (!data) {
+                    status.innerHTML = '<span style="color:#f00">ERROR: no data returned</span>';
+                    return;
+                }
+                status.innerHTML = '<span style="color:#0f0">API SUCCESS: ' + data.status + ' id:' + data.search_id + '</span>';
+                console.log('API success, status:', data.status);
                 _searchId = data.search_id;
 
                 function pollResults() {
@@ -604,6 +666,8 @@
                 }
 
                 if (_isSearching) {
+                    status.innerHTML = '<span style="color:#ff0">About to call streamResults: ' + _searchId + '</span>';
+                    console.log('Calling streamResults with searchId:', _searchId);
                     streamResults(_searchId);
                 } else {
                     resetSearchButton();
@@ -809,10 +873,10 @@
         }
 
         function doSchedule(index) {
-            console.log('[DEBUG] doSchedule called with index:', index);
+            console.log('[DEBUG] doSchedule called, authenticated:', _qbitAuthenticated);
             
-            if (!_config || !_config.qbittorrent_url) {
-                console.log('[DEBUG] No qBittorrent URL configured, opening login');
+            if (!_qbitAuthenticated) {
+                console.log('[DEBUG] Not authenticated, opening login');
                 _pendingAction = { type: 'schedule', index: index };
                 openQbitLogin();
                 return;
