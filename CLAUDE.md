@@ -2,6 +2,13 @@
 
 ## Critical Constraints
 
+- **TDD is MANDATORY for all bug fixes and features**:
+  - Write failing test first (RED)
+  - Watch it fail
+  - Write minimal code to pass (GREEN)
+  - Verify tests pass
+  - Then commit
+
 - **WebUI credentials `admin`/`admin` are hardcoded** — do not change.
 - **Never commit `.env`** — it contains tracker credentials.
 - **Never commit `.ruff_cache/`** — add to `.gitignore`.

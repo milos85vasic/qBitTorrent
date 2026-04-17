@@ -159,6 +159,22 @@ If tests fail:
 - **Permission denied**: Check file permissions
 - **Syntax errors**: Review and fix the file
 
+## TDD Workflow (MANDATORY)
+
+**For every bug fix and feature, follow this process:**
+
+1. **RED** - Write failing test first
+   - Write test that reproduces the bug or tests the new feature
+   - Run test and verify it FAILS
+
+2. **GREEN** - Write minimal code to pass
+   - Implement the minimal code needed for test to pass
+   - Run test and verify it PASSES
+
+3. **REFACTOR** - Clean up if needed (after green)
+
+**Never write production code before a failing test.** If you write code first, delete it and start with tests.
+
 ## Best Practices
 
 1. Run tests before every commit
