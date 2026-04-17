@@ -1044,6 +1044,10 @@
 
         function openQbitLogin() {
             document.getElementById('qbit-login-modal').classList.add('show');
+            // Reset error styling
+            var errEl = document.getElementById('qbit-login-error');
+            errEl.textContent = '';
+            errEl.style.color = '#dc3545';
         }
 
         function closeQbitLogin() {
@@ -1081,25 +1085,41 @@
                 btn.textContent = 'Login';
                 if (data.status === 'authenticated') {
                     console.log('[DEBUG] Authenticated! Closing modal...');
-                    document.getElementById('qbit-login-modal').classList.remove('show');
-                    // Continue any pending action
-                    if (_pendingAction) {
-                        console.log('[DEBUG] Continuing pending action:', _pendingAction);
-                        var action = _pendingAction;
-                        _pendingAction = null;
-                        if (action.type === 'download') {
-                            doDownload(action.index);
-                        } else if (action.type === 'schedule') {
-                            doSchedule(action.index);
-                        } else if (action.type === 'addMagnet') {
-                            addMagnetToQbit();
+                    // Show success message inline first
+                    document.getElementById('qbit-login-error').style.color = '#28a745';
+                    document.getElementById('qbit-login-error').textContent = '✓ Logged in! ' + (saveCredentials ? 'Credentials saved.' : '');
+                    
+                    // Close modal after short delay to show success
+                    setTimeout(function() {
+                        document.getElementById('qbit-login-modal').classList.remove('show');
+                        // Continue any pending action
+                        if (_pendingAction) {
+                            console.log('[DEBUG] Continuing pending action:', _pendingAction);
+                            var action = _pendingAction;
+                            _pendingAction = null;
+                            if (action.type === 'download') {
+                                doDownload(action.index);
+                            } else if (action.type === 'schedule') {
+                                doSchedule(action.index);
+                            } else if (action.type === 'addMagnet') {
+                                addMagnetToQbit();
+                            }
                         }
-                    } else {
-                        alert('Successfully logged in to qBittorrent!' + (saveCredentials ? ' Credentials saved.' : ''));
-                    }
+                    }, 500);
                 } else {
                     console.log('[DEBUG] NOT authenticated, showing error');
-                    document.getElementById('qbit-login-error').textContent = data.error || 'Login failed';
+                    var errorMsg = data.error || 'Login failed';
+                    // Provide more helpful error messages
+                    if (errorMsg.toLowerCase().includes('invalid')) {
+                        errorMsg = 'Invalid username or password. Please check your credentials.';
+                    } else if (errorMsg.toLowerCase().includes('banned') || errorMsg.toLowerCase().includes('too many')) {
+                        errorMsg = 'Too many failed attempts. Please wait a moment and try again.';
+                    } else if (errorMsg.toLowerCase().includes('forbidden') || errorMsg.toLowerCase().includes('403')) {
+                        errorMsg = 'Access forbidden. IP may be banned. Try restarting qBittorrent.';
+                    } else if (errorMsg.toLowerCase().includes('connection') || errorMsg.toLowerCase().includes('network')) {
+                        errorMsg = 'Cannot connect to qBittorrent. Is it running?';
+                    }
+                    document.getElementById('qbit-login-error').textContent = errorMsg;
                 }
             })
             .catch(function(e) {
