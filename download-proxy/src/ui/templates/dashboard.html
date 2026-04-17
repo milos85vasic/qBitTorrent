@@ -24,6 +24,8 @@
         #search-status { color: var(--theme-text-secondary); font-size: var(--theme-font-size-lg); margin-top: var(--theme-spacing-xs); }
         .results-table { width: 100%; border-collapse: collapse; }
         .results-table th, .results-table td { padding: var(--theme-spacing-sm) var(--theme-spacing-md); text-align: left; border-bottom: 1px solid var(--theme-border); font-size: var(--theme-font-size-base); }
+        .results-table td:first-child { max-width: 450px; word-break: break-word; white-space: normal; }
+        .results-table td:last-child { white-space: nowrap; }
         .results-table th { color: var(--theme-accent); font-weight: 600; }
         .results-table tr:hover { background: var(--theme-bg-tertiary); }
         .download-btn { padding: 6px 14px; background: var(--theme-success); color: #fff; border: none; border-radius: var(--theme-radius-md); cursor: pointer; font-size: var(--theme-font-size-base); }
@@ -33,8 +35,8 @@
         .download-btn.failed:hover { background: var(--theme-danger-bg); }
         .btn-group { display: flex; gap: var(--theme-spacing-xs); }
         .btn-group .btn { padding: var(--theme-spacing-xs) var(--theme-spacing-sm); font-size: var(--theme-font-size-sm); }
-        .btn-magnet { background: var(--theme-purple); text-decoration: none; display: inline-block; }
-        .btn-magnet:hover { background: var(--theme-purple-hover); }
+        .btn-magnet { background: var(--theme-purple); color: #fff; text-decoration: none; display: inline-block; }
+        .btn-magnet:hover { background: var(--theme-purple-hover); color: #fff; }
         .btn-magnet:visited { color: #fff; }
         .btn-schedule { background: var(--theme-info); }
         .btn-schedule:hover { background: var(--theme-info-bg); }
@@ -103,9 +105,10 @@
             .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
             .tab { padding: 10px 14px; white-space: nowrap; font-size: 13px; }
             .results-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-            .results-table th, .results-table td { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
-            .results-table th:first-child, .results-table td:first-child { position: sticky; left: 0; background: #16213e; z-index: 1; }
-            .results-table td:first-child { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+            .results-table th, .results-table td { padding: 8px 10px; font-size: 12px; }
+            .results-table td { white-space: nowrap; }
+            .results-table td:first-child { position: sticky; left: 0; background: #16213e; z-index: 1; max-width: 200px; word-break: break-word; white-space: normal; }
+            .results-table td:last-child { white-space: nowrap; }
             .download-btn, .delete-btn { padding: 8px 12px; font-size: 12px; }
             .inline-form { flex-wrap: wrap; }
             .inline-form input, .inline-form select { flex: 1; min-width: 80px; }
@@ -413,10 +416,21 @@
             if (name === 'downloads') loadDownloads();
         }
 
-        function formatSize(bytes) {
+        function formatSize(value) {
+            if (!value && value !== 0) return '0 B';
+            if (typeof value === 'string') {
+                var trimmed = value.trim();
+                if (trimmed.match(/^[\d.]+\s*[KMGT]?B$/i)) return trimmed;
+                var num = parseFloat(trimmed);
+                if (!isNaN(num)) value = num;
+                else return trimmed || '0 B';
+            }
+            var bytes = parseFloat(value) || 0;
             if (bytes === 0) return '0 B';
             var units = ['B', 'KB', 'MB', 'GB', 'TB'];
             var i = Math.floor(Math.log(bytes) / Math.log(1024));
+            if (i < 0) i = 0;
+            if (i >= units.length) i = units.length - 1;
             return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
         }
 
@@ -542,31 +556,78 @@
         var _liveResults = [];
 
         function addLiveResult(result) {
-            _liveResults.push(result);
-            addResultToTable(result);
+            var normalized = {
+                name: result.name || 'Unknown',
+                size: result.size || '0 B',
+                seeds: result.seeds || 0,
+                leechers: result.leechers || 0,
+                tracker: result.tracker || 'unknown',
+                link: result.link || '',
+                sources: [{tracker: result.tracker || 'unknown', seeds: result.seeds || 0, leechers: result.leechers || 0}],
+                quality: 'unknown',
+                content_type: 'unknown',
+                download_urls: [result.link || ''],
+                metadata: null,
+                freeleech: false,
+            };
+            _liveResults.push(normalized);
+            if (!_lastResults) _lastResults = [];
+            _lastResults.push(normalized);
+            addResultToTable(normalized, _lastResults.length - 1);
         }
 
-        function addResultToTable(result) {
-            var table = document.getElementById('results-body');
+        function addResultToTable(result, index) {
+            var container = document.getElementById('results-tab');
+            var table = document.getElementById('results-table');
+            var tbody;
+
             if (!table) {
-                console.log('ERROR: results-body table not found!');
-                document.getElementById('results-tab').innerHTML = '<div id="results-body"></div>';
-                table = document.getElementById('results-body');
+                container.innerHTML = '<table class="results-table" id="results-table"><thead><tr>' +
+                    '<th data-sort="name">Name<span class="sort-icon"></span></th>' +
+                    '<th data-sort="type">Type<span class="sort-icon"></span></th>' +
+                    '<th data-sort="size">Size<span class="sort-icon"></span></th>' +
+                    '<th data-sort="seeds">Seeds<span class="sort-icon"></span></th>' +
+                    '<th data-sort="leechers">Leechers<span class="sort-icon"></span></th>' +
+                    '<th data-sort="quality">Quality<span class="sort-icon"></span></th>' +
+                    '<th data-sort="sources">Sources<span class="sort-icon"></span></th>' +
+                    '<th>Action</th>' +
+                    '</tr></thead><tbody></tbody></table>';
+                table = document.getElementById('results-table');
             }
-            
+
+            tbody = table.querySelector('tbody');
+            if (!tbody) {
+                tbody = document.createElement('tbody');
+                table.appendChild(tbody);
+            }
+
+            var sizeDisplay = (typeof result.size === 'string' && result.size.match(/^[\d.]+\s*[KMGT]?B$/i))
+                ? escapeHtml(result.size)
+                : formatSize(result.size);
+
+            var q = result.quality || 'unknown';
+            var qClass = q.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
+            var contentType = result.content_type || 'unknown';
+            var typeClass = contentType.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
+            var tracker = result.tracker || 'unknown';
+            var isFree = tracker.indexOf('[free]') !== -1;
+            var tagClass = isFree ? 'tracker-tag freeleech' : 'tracker-tag';
+
             var row = document.createElement('tr');
-            var size = result.size || 0;
             row.innerHTML =
-                '<td><a href="' + (result.link || '') + '" target="_blank">' + escapeHtml(result.name) + '</a></td>' +
-                '<td>' + formatSize(size) + '</td>' +
+                '<td>' + escapeHtml(result.name) + '</td>' +
+                '<td><span class="type-badge ' + typeClass + '">' + escapeHtml(contentType) + '</span></td>' +
+                '<td>' + sizeDisplay + '</td>' +
                 '<td>' + (result.seeds || 0) + '</td>' +
                 '<td>' + (result.leechers || 0) + '</td>' +
-                '<td>' + (result.tracker || '') + '</td>' +
+                '<td><span class="quality-badge ' + qClass + '">' + escapeHtml(q) + '</span></td>' +
+                '<td><span class="' + tagClass + '">' + escapeHtml(tracker) + '</span></td>' +
                 '<td><div class="btn-group">' +
-                '<button class="download-btn" onclick="openMagnetDialog(\'' + escapeHtml(result.name).replace(/'/g, "\\'") + '\', \'' + (result.link || '').replace(/'/g, "\\'") + '\')">Magnet</button>' +
-                '<button class="download-btn btn-schedule" onclick="doSchedule(' + (_lastResults ? _lastResults.length : 0) + ')">qBit</button>' +
+                '<a class="download-btn btn-magnet" onclick="doMagnet(' + index + '); return false;" title="Get Magnet Link">Magnet</a>' +
+                '<button class="download-btn btn-schedule" onclick="doSchedule(' + index + ')" title="Send to qBittorrent">qBit</button>' +
+                '<button class="download-btn" onclick="doDownload(' + index + ')" title="Download">+</button>' +
                 '</div></td>';
-            table.appendChild(row);
+            tbody.appendChild(row);
         }
 
         function updateStatus(msg) {
@@ -745,8 +806,11 @@
                 var qClass = q.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
                 var contentType = r.content_type || (r.metadata && r.metadata.content_type) || 'unknown';
                 var typeClass = contentType.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
+                var sizeDisplay = (typeof r.size === 'string' && r.size.match(/^[\d.]+\s*[KMGT]?B$/i))
+                    ? escapeHtml(r.size)
+                    : formatSize(r.size);
                 html += '<tr>' +
-                    '<td>' + escapeHtml(r.name);
+                    '<td>' + escapeHtml(r.name || 'Unknown');
                 if (r.metadata && r.metadata.poster_url) {
                     html += '<br><span class="meta-line"><img class="poster-thumb" src="' + escapeHtml(r.metadata.poster_url) + '" loading="lazy">';
                     if (r.metadata.title) html += ' ' + escapeHtml(r.metadata.title);
@@ -756,15 +820,15 @@
                 }
                 html += '</td>' +
                     '<td><span class="type-badge ' + typeClass + '">' + escapeHtml(contentType) + '</span></td>' +
-                    '<td>' + escapeHtml(r.size) + '</td>' +
-                    '<td>' + r.seeds + '</td>' +
-                    '<td>' + r.leechers + '</td>' +
+                    '<td>' + sizeDisplay + '</td>' +
+                    '<td>' + (r.seeds || 0) + '</td>' +
+                    '<td>' + (r.leechers || 0) + '</td>' +
                     '<td><span class="quality-badge ' + qClass + '">' + escapeHtml(q) + '</span></td>' +
                     '<td>' + trackerHtml + '</td>' +
                     '<td><div class="btn-group">' +
                     '<a class="download-btn btn-magnet" onclick="doMagnet(' + i + '); return false;" title="Get Magnet Link">Magnet</a>' +
                     '<button class="download-btn btn-schedule" onclick="doSchedule(' + i + ')" title="Send to qBittorrent">qBit</button>' +
-                    '<button class="download-btn" onclick="doDownload(' + i + ')">+</button>' +
+                    '<button class="download-btn" onclick="doDownload(' + i + ')" title="Download">+</button>' +
                     '</div></td>' +
                     '</tr>';
             });
