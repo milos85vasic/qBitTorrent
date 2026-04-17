@@ -602,10 +602,24 @@
         }
 
         function doMagnet(index) {
+            console.log('[DEBUG] doMagnet called with index:', index);
+            console.log('[DEBUG] _lastResults:', _lastResults);
+            console.log('[DEBUG] _lastResults[index]:', _lastResults ? _lastResults[index] : 'UNDEFINED');
+            
+            if (!_lastResults || !_lastResults[index]) {
+                alert('Error: No results available. Please search first.');
+                console.log('[DEBUG] ERROR: No results for index', index);
+                return;
+            }
+            
             var magnet = generateMagnet(_lastResults, index);
+            console.log('[DEBUG] Generated magnet:', magnet);
+            
             navigator.clipboard.writeText(magnet).then(function() {
+                console.log('[DEBUG] Magnet copied to clipboard successfully');
                 alert('Magnet link copied to clipboard!');
-            }).catch(function() {
+            }).catch(function(err) {
+                console.log('[DEBUG] Clipboard failed, using prompt:', err);
                 prompt('Copy this magnet link:', magnet);
             });
         }
@@ -615,10 +629,20 @@
         }
 
         function doSchedule(index) {
+            console.log('[DEBUG] doSchedule called with index:', index);
+            
             if (!_config || !_config.qbittorrent_url) {
+                console.log('[DEBUG] No qBittorrent URL configured, opening login');
                 openQbitLogin();
                 return;
             }
+            
+            if (!_lastResults || !_lastResults[index]) {
+                console.log('[DEBUG] ERROR: No results for index', index);
+                alert('Error: No results available. Search first.');
+                return;
+            }
+            
             var r = _lastResults[index];
             var sources = r.sources || [];
             if (!sources.length) {
@@ -657,13 +681,21 @@
         }
 
         function doDownload(index) {
+            console.log('[DEBUG] doDownload called with index:', index);
+            console.log('[DEBUG] _lastResults:', _lastResults);
+            
             var results = _lastResults;
-            if (!results || !results[index]) return;
+            if (!results || !results[index]) {
+                console.log('[DEBUG] ERROR: No results for index', index);
+                alert('Error: No results available. Search first.');
+                return;
+            }
             var r = results[index];
             var btn = event.target;
             var originalText = btn.textContent;
             btn.disabled = true;
             btn.textContent = 'Adding...';
+            console.log('[DEBUG] Sending download request for:', r.name);
 
             fetch('/api/v1/download', {
                 method: 'POST',
