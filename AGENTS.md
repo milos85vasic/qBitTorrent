@@ -29,10 +29,11 @@ The project is **not a Python package** — there is no `pyproject.toml`, `setup
 
 - **REBUILD AND REBOOT is MANDATORY after every successful round of changes**:
   1. After all tests pass and fixes are committed, STOP all containers and services
-  2. REBUILD containers (`./stop.sh -r && ./start.sh -p`) to pick up latest code
-  3. RESTART webui-bridge (`python3 webui-bridge.py` or via systemd)
-  4. VERIFY all services healthy before approving manual testing
-  5. This ensures the running environment matches committed code exactly
+  2. DELETE all `__pycache__` directories inside containers to prevent stale bytecode from shadowing source changes
+  3. REBUILD containers (`./stop.sh -r && ./start.sh -p`) to pick up latest code
+  4. RESTART webui-bridge (`python3 webui-bridge.py` or via systemd)
+  5. VERIFY all services healthy AND served content matches committed code (curl check)
+  6. This ensures the running environment matches committed code exactly
 
 - **WebUI credentials `admin`/`admin` are hardcoded** in `start.sh` config generation, `docker-compose.yml`, and multiple scripts. **Do not change them.**
 - **Never commit `.env`** — it contains tracker credentials. `.env.example` is the template.

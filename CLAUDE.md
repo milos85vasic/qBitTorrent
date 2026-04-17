@@ -11,8 +11,10 @@
 
 - **REBUILD AND REBOOT is MANDATORY after every successful round of changes**:
   - After all tests pass and fixes are committed, STOP all containers/services
+  - DELETE all `__pycache__` directories inside the container to prevent stale bytecode
   - REBUILD containers to pick up latest code
   - RESTART all services (containers + webui-bridge)
+  - VERIFY served content matches committed code (curl check for key changes)
   - ONLY THEN proceed to manual testing approval
   - This ensures the running environment matches the committed code exactly
 

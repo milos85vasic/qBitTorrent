@@ -652,7 +652,7 @@
                 '<td><div class="btn-group">' +
                 '<a class="download-btn btn-magnet" onclick="doMagnet(' + index + '); return false;" title="Get Magnet Link">Magnet</a>' +
                 '<button class="download-btn btn-schedule" onclick="doSchedule(' + index + ')" title="Send to qBittorrent">qBit</button>' +
-                '<button class="download-btn" onclick="doDownload(' + index + ')" title="Download">+</button>' +
+                '<button class="download-btn" onclick="doDownloadTorrent(' + index + ', this)" title="Download .torrent">+</button>' +
                 '</div></td>';
             tbody.appendChild(row);
         }
@@ -855,7 +855,7 @@
                     '<td><div class="btn-group">' +
                     '<a class="download-btn btn-magnet" onclick="doMagnet(' + i + '); return false;" title="Get Magnet Link">Magnet</a>' +
                     '<button class="download-btn btn-schedule" onclick="doSchedule(' + i + ')" title="Send to qBittorrent">qBit</button>' +
-                    '<button class="download-btn" onclick="doDownloadTorrent(' + i + ')" title="Download .torrent">+</button>' +
+                    '<button class="download-btn" onclick="doDownloadTorrent(' + i + ', this)" title="Download .torrent">+</button>' +
                     '</div></td>' +
                     '</tr>';
             });
@@ -1084,13 +1084,13 @@
             });
         }
 
-        function doDownloadTorrent(index) {
+        function doDownloadTorrent(index, btn) {
             if (!_lastResults || !_lastResults[index]) {
                 alert('Error: No results available. Search first.');
                 return;
             }
             var r = _lastResults[index];
-            var btn = event.target;
+            if (!btn) btn = event.target || event.srcElement;
             var originalText = btn.textContent;
             btn.disabled = true;
             btn.textContent = 'DL...';

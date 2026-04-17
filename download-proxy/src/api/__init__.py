@@ -95,7 +95,14 @@ async def dashboard():
     dashboard_path = os.path.join(os.path.dirname(__file__), "..", "ui", "templates", "dashboard.html")
     dashboard_path = os.path.normpath(dashboard_path)
     if os.path.isfile(dashboard_path):
-        return FileResponse(dashboard_path)
+        return FileResponse(
+            dashboard_path,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return {
         "message": "Merge Search API",
         "version": "1.0.0",
@@ -108,7 +115,15 @@ async def theme_css():
     theme_path = os.path.join(os.path.dirname(__file__), "..", "ui", "templates", "theme.css")
     theme_path = os.path.normpath(theme_path)
     if os.path.isfile(theme_path):
-        return FileResponse(theme_path, media_type="text/css")
+        return FileResponse(
+            theme_path,
+            media_type="text/css",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return {"error": "Theme not found"}
 
 

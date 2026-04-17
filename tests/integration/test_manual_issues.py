@@ -296,3 +296,115 @@ class TestFooter:
         import re
         link_pattern = r'<a[^>]*href=["\']https://www\.vasic\.digital["\'][^>]*>.*Vasic Digital.*</a>'
         assert re.search(link_pattern, dashboard, re.IGNORECASE), "Vasic Digital must be a clickable link"
+
+
+
+class TestSearchPerformance:
+    """Search endpoint must return quickly with search_id, not block for minutes."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        try:
+            r = requests.get(f"{BASE_URL}/health", timeout=5)
+            r.raise_for_status()
+        except (requests.ConnectionError, requests.Timeout):
+            pytest.skip("Merge service not available")
+
+    def test_search_returns_within_fifteen_seconds(self):
+        """POST /search must return within 15s with search_id, not block for minutes."""
+        start = time.time()
+        resp = requests.post(
+            f"{BASE_URL}/api/v1/search",
+            json={"query": "ubuntu", "limit": 5},
+            timeout=20,
+        )
+        elapsed = time.time() - start
+        assert resp.status_code == 200, f"Search returned {resp.status_code}: {resp.text[:200]}"
+        data = resp.json()
+        assert "search_id" in data, "Response must contain search_id"
+        assert elapsed < 15, f"Search took {elapsed:.1f}s, must return within 15s"
+
+    def test_search_returns_running_status_immediately(self):
+        """Initial search response must have status 'running' or 'in_progress'."""
+        resp = requests.post(
+            f"{BASE_URL}/api/v1/search",
+            json={"query": "ubuntu", "limit": 5},
+            timeout=30,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data.get("status") in ("running", "in_progress", "completed"), \
+            f"Unexpected status: {data.get('status')}"
+
+
+class TestDownloadButtonConsistency:
+    """Both renderResults and addResultToTable must use doDownloadTorrent for + button."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        try:
+            r = requests.get(f"{BASE_URL}/health", timeout=5)
+            r.raise_for_status()
+        except (requests.ConnectionError, requests.Timeout):
+            pytest.skip("Merge service not available")
+
+    def test_addResultToTable_uses_doDownloadTorrent(self):
+        """Live results (SSE) + button must call doDownloadTorrent, not doDownload."""
+        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        import re
+        # Extract addResultToTable function body (from { to next top-level function)
+        match = re.search(
+            r'function addResultToTable\(result, index\)\s*\{(.*?)function \w+\(',
+            dashboard, re.DOTALL
+        )
+        assert match, "addResultToTable function not found"
+        func_body = match.group(1)
+        # The + button in addResultToTable must call doDownloadTorrent
+        assert "doDownloadTorrent(" in func_body, \
+            "addResultToTable + button must call doDownloadTorrent, not doDownload"
+        assert "doDownload(" not in func_body, \
+            "addResultToTable must NOT call old doDownload function"
+
+    def test_doDownloadTorrent_does_not_use_event_target(self):
+        """doDownloadTorrent must not rely on global event variable."""
+        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        import re
+        match = re.search(r'function doDownloadTorrent\([^)]*\)\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}', dashboard, re.DOTALL)
+        assert match, "doDownloadTorrent function not found"
+        func_body = match.group(1)
+        # Should not use event.target
+        assert "event.target" not in func_body, \
+            "doDownloadTorrent must not use event.target - pass button reference instead"
+        # Should accept a button parameter
+        match_sig = re.search(r'function doDownloadTorrent\(([^)]*)\)', dashboard)
+        assert match_sig, "doDownloadTorrent signature not found"
+        params = match_sig.group(1)
+        assert "," in params or "btn" in params, \
+            "doDownloadTorrent must accept button element as parameter"
+
+
+class TestDashboardCacheControl:
+    """Dashboard must have cache-busting headers to prevent stale content."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        try:
+            r = requests.get(f"{BASE_URL}/health", timeout=5)
+            r.raise_for_status()
+        except (requests.ConnectionError, requests.Timeout):
+            pytest.skip("Merge service not available")
+
+    def test_dashboard_has_cache_control_header(self):
+        """Dashboard response must include Cache-Control: no-cache or similar."""
+        resp = requests.get(f"{BASE_URL}/", timeout=5)
+        cc = resp.headers.get("Cache-Control", "").lower()
+        assert "no-cache" in cc or "no-store" in cc or "must-revalidate" in cc, \
+            f"Missing cache-control header, got: {cc!r}"
+
+    def test_dashboard_has_no_etag_or_weak_etag(self):
+        """Dashboard should not use strong etag caching."""
+        resp = requests.get(f"{BASE_URL}/", timeout=5)
+        # ETag is OK if Cache-Control is set to no-cache
+        cc = resp.headers.get("Cache-Control", "").lower()
+        assert "no-cache" in cc or "no-store" in cc, \
+            "Dashboard must have cache-busting headers"

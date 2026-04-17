@@ -224,6 +224,7 @@ PRIVATE_TRACKERS = {
 
 class SearchOrchestrator:
     def __init__(self):
+        import asyncio
         from .deduplicator import Deduplicator
         from .validator import TrackerValidator
 
@@ -233,6 +234,8 @@ class SearchOrchestrator:
         self._tracker_sessions: Dict[str, Any] = {}
         self._last_merged_results: Dict[str, tuple] = {}
         self._tracker_results: Dict[str, Dict[str, List[Any]]] = {}
+        # No semaphore by default — all trackers run concurrently
+        # Subprocess timeouts limit how long any single tracker can run
 
     def _load_env(self):
         import logging
@@ -291,13 +294,9 @@ class SearchOrchestrator:
                     # Store results incrementally for streaming
                     self._tracker_results[search_id][tracker.name] = results
 
-                    # CRITICAL FIX: Also populate _last_merged_results incrementally
-                    # This makes results available to SSE streaming IMMEDIATELY
-                    all_current = []
-                    for tr_results in self._tracker_results[search_id].values():
-                        all_current.extend(tr_results)
-                    merged = self.deduplicator.merge_results(all_current)
-                    self._last_merged_results[search_id] = (merged, all_current)
+                    # Store raw results for final deduplication
+                    # Incremental deduplication removed for performance —
+                    # O(n²) cost per tracker is too slow for queries with many results
 
                     return tracker.name, results, None
                 except Exception as e:
@@ -396,6 +395,7 @@ class SearchOrchestrator:
             "print(_json.dumps(_results))\n"
         )
 
+        proc = None
         try:
             proc = await asyncio.create_subprocess_exec(
                 "python3",
@@ -404,7 +404,7 @@ class SearchOrchestrator:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
 
             if proc.returncode != 0:
                 err = stderr.decode(errors="replace").strip()
@@ -441,8 +441,20 @@ class SearchOrchestrator:
 
         except asyncio.TimeoutError:
             logger.debug(f"Plugin {tracker_name} timed out")
+            if proc and proc.returncode is None:
+                try:
+                    proc.kill()
+                    await proc.wait()
+                except Exception:
+                    pass
         except Exception as e:
             logger.debug(f"Plugin {tracker_name} execution error: {e}")
+            if proc and proc.returncode is None:
+                try:
+                    proc.kill()
+                    await proc.wait()
+                except Exception:
+                    pass
 
         return results
 
@@ -464,7 +476,7 @@ class SearchOrchestrator:
             base_url = os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org").split(",")[0].strip()
             search_url = f"{base_url}/forum/tracker.php?{urlencode({'nm': query, 'fo': 1})}"
 
-            timeout = aiohttp.ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=15)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     f"{base_url}/forum/login.php",
@@ -580,7 +592,7 @@ class SearchOrchestrator:
 
         try:
             base_url = os.getenv("KINOZAL_MIRRORS", "https://kinozal.tv").split(",")[0].strip()
-            timeout = aiohttp.ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=15)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 login_data = urlencode({"username": username, "password": password}, encoding="cp1251")
                 async with session.post(
@@ -676,7 +688,7 @@ class SearchOrchestrator:
 
         try:
             base_url = os.getenv("NNMCLUB_MIRRORS", "https://nnm-club.me").split(",")[0].strip()
-            timeout = aiohttp.ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=15)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     f"{base_url}/forum/tracker.php?{urlencode({'nm': query, 'f': '-1'})}",
@@ -752,7 +764,7 @@ class SearchOrchestrator:
             "books": "35",
         }
         try:
-            timeout = aiohttp.ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=15)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     f"{base_url}/do-login.php",

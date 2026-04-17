@@ -134,6 +134,7 @@ def _to_response(r, content_type: Optional[str] = None) -> SearchResultResponse:
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest, req: Request):
     from .hooks import dispatch_event
+    import asyncio
 
     orch = _get_orchestrator(req)
 
@@ -142,7 +143,7 @@ async def search(request: SearchRequest, req: Request):
     metadata = await orch.search(
         query=request.query,
         category=request.category,
-        enable_metadata=request.enable_metadata,
+        enable_metadata=False,
         validate_trackers=request.validate_trackers,
     )
 
