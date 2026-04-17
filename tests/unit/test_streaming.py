@@ -216,3 +216,28 @@ class TestRealTimeStreaming:
         assert len(update_events) > 0, "Should have results_update events"
         has_trackers = any("rutracker" in e or "kinozal" in e for e in update_events)
         assert has_trackers, "Should show which trackers have been searched"
+
+
+class TestSSEFormatCompliance:
+    """Test that SSE events conform to the Server-Sent Events specification."""
+
+    def test_event_ends_with_double_newline(self):
+        """SSE events must end with two newline characters per spec."""
+        from api.streaming import SSEHandler
+
+        event = SSEHandler.format_event("result_found", {"name": "test"})
+        assert event.endswith("\n\n"), f"Event should end with \\n\\n, got: {repr(event)}"
+
+    def test_empty_event_ends_with_double_newline(self):
+        """Even empty events must end with two newlines."""
+        from api.streaming import SSEHandler
+
+        event = SSEHandler.format_event("", {"data": "value"})
+        assert event.endswith("\n\n"), f"Empty event should end with \\n\\n, got: {repr(event)}"
+
+    def test_multiline_data_ends_with_double_newline(self):
+        """Multiline data events must end with two newlines."""
+        from api.streaming import SSEHandler
+
+        event = SSEHandler.format_event("update", {"key": "line1\nline2"})
+        assert event.endswith("\n\n"), f"Multiline event should end with \\n\\n, got: {repr(event)}"

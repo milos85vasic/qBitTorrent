@@ -45,6 +45,7 @@ class SSEHandler:
             lines.append(f"{SSEHandler.ID_FIELD}: {event_id}")
 
         lines.append("")  # Empty line terminates event
+        lines.append("")  # Second newline required by SSE spec
         return "\n".join(lines)
 
     @staticmethod

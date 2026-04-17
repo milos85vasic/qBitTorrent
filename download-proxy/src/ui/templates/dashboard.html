@@ -423,9 +423,7 @@
             _eventSource = new EventSource('/api/v1/search/stream/' + searchId);
             
             _eventSource.onopen = function() {
-                console.log('SSE connected!');
-                status.innerHTML = '<span style="color:#0ff">SSE connected - waiting for results...</span>';
-            };
+                            };
             
             _eventSource.onerror = function(e) {
                 console.log('SSE error:', e);
@@ -435,9 +433,7 @@
             var fallbackSearchId = _searchId;
             setTimeout(function() {
                 if (_liveResults.length === 0 && _isSearching && fallbackSearchId) {
-                    console.log('SSE fallback: fetching results...');
-                    status.innerHTML = '<span style="color:#fa0">Fetching results...</span>';
-                    fetch('/api/v1/search/' + fallbackSearchId)
+                                        fetch('/api/v1/search/' + fallbackSearchId)
                     .then(function(r) { return r.json(); })
                     .then(function(resp) {
                         if (resp.results && resp.results.length > 0) {
@@ -453,13 +449,10 @@
             }, 5000);
             
             _eventSource.addEventListener('search_start', function(e) {
-                console.log('Search started:', JSON.parse(e.data));
-                status.innerHTML = '<span style="color:#0ff">Search started - getting results...</span>';
-            });
+                            });
             
             // onmessage catches ALL events
             _eventSource.onmessage = function(e) {
-                console.log('ON MESSAGE:', e.data);
                 try {
                     var data = JSON.parse(e.data);
                     if (data.name) {
@@ -477,7 +470,6 @@
             };
             
             _eventSource.addEventListener('result_found', function(e) {
-                console.log('result_found event received:', e.data);
                 var data = JSON.parse(e.data);
                 var result = {
                     name: data.name || 'Unknown',
@@ -525,7 +517,6 @@
         var _liveResults = [];
 
         function addLiveResult(result) {
-            console.log('addLiveResult called:', result.name);
             _liveResults.push(result);
             addResultToTable(result);
         }
@@ -550,7 +541,6 @@
                 '<button class="download-btn" onclick="openMagnetDialog(\'' + escapeHtml(result.name).replace(/'/g, "\\'") + '\', \'' + (result.link || '').replace(/'/g, "\\'") + '\')">Magnet</button>' +
                 '<button class="download-btn btn-schedule" onclick="doSchedule(' + (_lastResults ? _lastResults.length : 0) + ')">qBit</button>' +
                 '</div></td>';
-            console.log('Added result to table:', result.name);
             table.appendChild(row);
         }
 
@@ -636,7 +626,6 @@
                     return;
                 }
                 status.innerHTML = '<span style="color:#0f0">API SUCCESS: ' + data.status + ' id:' + data.search_id + '</span>';
-                console.log('API success, status:', data.status);
                 _searchId = data.search_id;
 
                 function pollResults() {
@@ -666,9 +655,7 @@
                 }
 
                 if (_isSearching) {
-                    status.innerHTML = '<span style="color:#ff0">About to call streamResults: ' + _searchId + '</span>';
-                    console.log('Calling streamResults with searchId:', _searchId);
-                    streamResults(_searchId);
+                                        streamResults(_searchId);
                 } else {
                     resetSearchButton();
                 }
@@ -809,7 +796,6 @@
             try {
                 success = document.execCommand('copy');
             } catch (err) {
-                console.log('[DEBUG] execCommand copy failed:', err);
             }
             document.body.removeChild(textArea);
             
@@ -873,17 +859,14 @@
         }
 
         function doSchedule(index) {
-            console.log('[DEBUG] doSchedule called, authenticated:', _qbitAuthenticated);
             
             if (!_qbitAuthenticated) {
-                console.log('[DEBUG] Not authenticated, opening login');
                 _pendingAction = { type: 'schedule', index: index };
                 openQbitLogin();
                 return;
             }
             
             if (!_lastResults || !_lastResults[index]) {
-                console.log('[DEBUG] ERROR: No results for index', index);
                 alert('Error: No results available. Search first.');
                 return;
             }
@@ -928,12 +911,9 @@
         }
 
         function doDownload(index) {
-            console.log('[DEBUG] doDownload called with index:', index);
-            console.log('[DEBUG] _lastResults:', _lastResults);
             
             var results = _lastResults;
             if (!results || !results[index]) {
-                console.log('[DEBUG] ERROR: No results for index', index);
                 alert('Error: No results available. Search first.');
                 return;
             }
@@ -942,7 +922,6 @@
             var originalText = btn.textContent;
             btn.disabled = true;
             btn.textContent = 'Adding...';
-            console.log('[DEBUG] Sending download request for:', r.name);
 
             fetch('/api/v1/download', {
                 method: 'POST',
@@ -1268,12 +1247,9 @@
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                console.log('[DEBUG] Login Response JSON:', JSON.stringify(data));
-                console.log('[DEBUG] data.status:', data.status);
                 btn.disabled = false;
                 btn.textContent = 'Login';
                 if (data.status === 'authenticated') {
-                    console.log('[DEBUG] Authenticated! Closing modal...');
                     // Show success message inline first
                     document.getElementById('qbit-login-error').style.color = '#28a745';
                     document.getElementById('qbit-login-error').textContent = '✓ Logged in! ' + (saveCredentials ? 'Credentials saved.' : '');
@@ -1283,7 +1259,6 @@
                         document.getElementById('qbit-login-modal').classList.remove('show');
                         // Continue any pending action
                         if (_pendingAction) {
-                            console.log('[DEBUG] Continuing pending action:', _pendingAction);
                             var action = _pendingAction;
                             _pendingAction = null;
                             if (action.type === 'download') {
@@ -1296,7 +1271,6 @@
                         }
                     }, 500);
                 } else {
-                    console.log('[DEBUG] NOT authenticated, showing error');
                     var errorMsg = data.error || 'Login failed';
                     // Provide more helpful error messages
                     if (errorMsg.toLowerCase().includes('invalid')) {
