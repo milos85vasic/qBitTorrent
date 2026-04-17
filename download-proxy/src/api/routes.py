@@ -10,7 +10,8 @@ import os
 import json
 import urllib.parse
 import aiohttp
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional
 

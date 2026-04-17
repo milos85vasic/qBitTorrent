@@ -180,7 +180,7 @@ class TrackerValidator:
                     error="Invalid tracker URL",
                 )
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             class UDPProtocol(asyncio.DatagramProtocol):
                 def __init__(self):
