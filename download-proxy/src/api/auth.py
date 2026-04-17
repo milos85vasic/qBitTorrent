@@ -111,9 +111,7 @@ async def rutracker_fetch_captcha():
             detail="RUTRACKER_USERNAME and RUTRACKER_PASSWORD not configured",
         )
 
-    base_url = (
-        os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org").split(",")[0].strip()
-    )
+    base_url = os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org").split(",")[0].strip()
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -141,10 +139,7 @@ async def rutracker_fetch_captcha():
                         login_text = await login_resp.text()
                         cookies = {c.key: c.value for c in login_resp.cookies.values()}
 
-                    if (
-                        'id="logged-in-username"' in login_text
-                        or "bb_session" in cookies
-                    ):
+                    if 'id="logged-in-username"' in login_text or "bb_session" in cookies:
                         orch._tracker_sessions["rutracker"] = {
                             "cookies": cookies,
                             "base_url": base_url,
@@ -256,9 +251,7 @@ async def rutracker_login_with_captcha(request: CaptchaLoginRequest):
                     "message": "Successfully authenticated with RuTracker.",
                 }
 
-            captcha_img = re.search(
-                r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"', text
-            )
+            captcha_img = re.search(r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"', text)
             if captcha_img:
                 cap_sid_match = re.search(r'name="cap_sid"\s+value="([^"]+)"', text)
                 cap_code_match = re.search(r'name="(cap_code_[^"]+)"', text)
@@ -309,9 +302,7 @@ async def rutracker_cookie_login(request: CookieLoginRequest):
             detail="Cookie string must contain bb_session cookie.",
         )
 
-    base_url = (
-        os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org").split(",")[0].strip()
-    )
+    base_url = os.getenv("RUTRACKER_MIRRORS", "https://rutracker.org").split(",")[0].strip()
 
     import aiohttp
 
@@ -344,6 +335,19 @@ async def rutracker_cookie_login(request: CookieLoginRequest):
     }
 
 
+def _load_qbit_credentials():
+    import json
+
+    creds_path = "/config/download-proxy/qbittorrent_creds.json"
+    if os.path.exists(creds_path):
+        try:
+            with open(creds_path) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+
 @router.get("/status")
 async def all_trackers_auth_status():
     orch = _get_orchestrator()
@@ -356,7 +360,25 @@ async def all_trackers_auth_status():
             "base_url": session.get("base_url", "") if session else "",
         }
 
+    creds = _load_qbit_credentials()
+    trackers["qbittorrent"] = {
+        "has_session": creds is not None,
+        "username": creds.get("username", "") if creds else "",
+    }
+
     return {"trackers": trackers}
+
+
+@router.post("/qbittorrent/logout")
+async def qbittorrent_logout():
+    creds_path = "/config/download-proxy/qbittorrent_creds.json"
+    try:
+        if os.path.exists(creds_path):
+            os.remove(creds_path)
+        return {"status": "logged_out", "message": "Credentials cleared"}
+    except Exception as e:
+        logger.error(f"qBittorrent logout error: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 __all__ = ["router"]

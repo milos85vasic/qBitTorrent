@@ -893,6 +893,8 @@
             .catch(function(err) { console.error('Failed to load downloads:', err); });
         }
 
+        var _qbitAuthenticated = false;
+
         function loadAllAuthStatus() {
             fetch('/api/v1/auth/status')
             .then(function(r) { return r.json(); })
@@ -902,17 +904,47 @@
                 var names = Object.keys(trackers);
                 names.forEach(function(name) {
                     var t = trackers[name];
-                    var cls = t.authenticated ? 'active' : 'inactive';
+                    var hasSession = t.has_session || t.authenticated;
+                    var cls = hasSession ? 'active' : 'inactive';
                     var label = name.charAt(0).toUpperCase() + name.slice(1);
                     if (name === 'rutracker') {
                         html += '<span class="auth-chip" onclick="openCaptchaModal()"><span class="auth-indicator ' + cls + '"></span>' + label + '</span>';
+                    } else if (name === 'qbittorrent') {
+                        _qbitAuthenticated = hasSession;
+                        if (hasSession && t.username) {
+                            html += '<span class="auth-chip" onclick="logoutQbit()"><span class="auth-indicator ' + cls + '"></span>' + t.username + ' (logout)</span>';
+                        } else {
+                            html += '<span class="auth-chip" onclick="openQbitLogin()"><span class="auth-indicator ' + cls + '"></span>Login</span>';
+                        }
                     } else {
                         html += '<span class="auth-chip"><span class="auth-indicator ' + cls + '"></span>' + label + '</span>';
                     }
                 });
                 document.getElementById('auth-section').innerHTML = html;
+                updateButtonStates();
             })
             .catch(function() {});
+        }
+
+        function logoutQbit() {
+            if (!confirm('Logout from qBittorrent?')) return;
+            fetch('/api/v1/auth/qbittorrent/logout', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                loadAllAuthStatus();
+            })
+            .catch(function(err) { console.error('Logout failed:', err); });
+        }
+
+        function updateButtonStates() {
+            var buttons = document.querySelectorAll('.download-btn.btn-schedule, .download-btn.btn-add');
+            buttons.forEach(function(btn) {
+                var onclick = btn.getAttribute ? btn.getAttribute('onclick') : '';
+                if (onclick && (onclick.indexOf('doSchedule') !== -1 || onclick.indexOf('doAdd') !== -1)) {
+                    btn.disabled = !_qbitAuthenticated;
+                    btn.title = _qbitAuthenticated ? 'Send to qBittorrent' : 'Login required';
+                }
+            });
         }
 
         function loadSchedules() {
