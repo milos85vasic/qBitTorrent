@@ -144,8 +144,8 @@
         .modal img { max-width: 100%; border-radius: var(--theme-radius-lg); margin-bottom: var(--theme-spacing-lg); background: #fff; }
         .modal input[type="text"], .modal input[type="number"], .modal input[type="password"] { width: 100%; padding: var(--theme-spacing-md); border: 1px solid var(--theme-border); border-radius: var(--theme-radius-lg); font-size: var(--theme-font-size-xl); background: var(--theme-bg-primary); color: var(--theme-text-primary); margin-bottom: var(--theme-spacing-lg); }
         .modal input:focus { outline: none; border-color: var(--theme-accent); }
-        .modal-actions { display: flex; gap: var(--theme-spacing-sm); }
-        .modal-actions button { flex: 1; padding: var(--theme-spacing-sm); border-radius: var(--theme-radius-lg); border: none; cursor: pointer; font-size: var(--theme-font-size-lg); }
+        .modal-actions { display: flex; gap: var(--theme-spacing-sm); flex-wrap: wrap; }
+        .modal-actions button, .modal-actions a { flex: 1; min-width: 80px; padding: var(--theme-spacing-sm); border-radius: var(--theme-radius-lg); border: none; cursor: pointer; font-size: var(--theme-font-size-lg); text-align: center; }
         .modal-actions .submit-btn { background: var(--theme-accent); color: #fff; }
         .modal-actions .submit-btn:hover { background: var(--theme-accent-hover); }
         .modal-actions .cancel-btn { background: #333; color: #ccc; }
