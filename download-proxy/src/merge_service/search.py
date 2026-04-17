@@ -290,6 +290,15 @@ class SearchOrchestrator:
                     logger.info(f"Tracker {tracker.name}: {len(results)} results for '{query}'")
                     # Store results incrementally for streaming
                     self._tracker_results[search_id][tracker.name] = results
+
+                    # CRITICAL FIX: Also populate _last_merged_results incrementally
+                    # This makes results available to SSE streaming IMMEDIATELY
+                    all_current = []
+                    for tr_results in self._tracker_results[search_id].values():
+                        all_current.extend(tr_results)
+                    merged = self.deduplicator.merge_results(all_current)
+                    self._last_merged_results[search_id] = (merged, all_current)
+
                     return tracker.name, results, None
                 except Exception as e:
                     logger.error(f"Tracker {tracker.name} error: {e}")
@@ -931,12 +940,36 @@ class SearchOrchestrator:
         return self._active_searches.get(search_id)
 
     def get_live_results(self, search_id: str) -> List[Any]:
-        """Get all results found so far for a search, not yet merged."""
+        """Get all results found so far for a search, not yet merged.
+
+        FIX: Also check _last_merged_results which IS populated incrementally
+        as each tracker completes (inside asyncio.gather callback).
+        """
+        # First try _tracker_results
+        if search_id in self._tracker_results:
+            results = []
+            for tracker_results in self._tracker_results[search_id].values():
+                if tracker_results:
+                    results.extend(tracker_results)
+            if results:
+                return results
+
+        # Fallback: check _last_merged_results (populated INCREMENTALLY)
+        if search_id in self._last_merged_results:
+            merged, all_results = self._last_merged_results[search_id]
+            if all_results:
+                return all_results
+
+        return []
+
+    def get_all_tracker_results(self, search_id: str) -> List[Any]:
+        """Get all results from _tracker_results."""
         if search_id not in self._tracker_results:
             return []
         results = []
         for tracker_results in self._tracker_results[search_id].values():
-            results.extend(tracker_results)
+            if tracker_results:
+                results.extend(tracker_results)
         return results
 
     def get_active_searches(self) -> List[SearchMetadata]:
