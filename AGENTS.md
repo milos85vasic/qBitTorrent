@@ -27,6 +27,13 @@ The project is **not a Python package** — there is no `pyproject.toml`, `setup
   5. Then commit
   6. See `tests/README.md` for detailed TDD workflow
 
+- **REBUILD AND REBOOT is MANDATORY after every successful round of changes**:
+  1. After all tests pass and fixes are committed, STOP all containers and services
+  2. REBUILD containers (`./stop.sh -r && ./start.sh -p`) to pick up latest code
+  3. RESTART webui-bridge (`python3 webui-bridge.py` or via systemd)
+  4. VERIFY all services healthy before approving manual testing
+  5. This ensures the running environment matches committed code exactly
+
 - **WebUI credentials `admin`/`admin` are hardcoded** in `start.sh` config generation, `docker-compose.yml`, and multiple scripts. **Do not change them.**
 - **Never commit `.env`** — it contains tracker credentials. `.env.example` is the template.
 - **Freeleech-only downloads from IPTorrents** — all automated testing must ONLY download freeleech torrents. Freeleech results are tagged `IPTorrents [free]` in tracker display name. Non-freeleech IPTorrents downloads cost ratio and must NEVER be triggered by automation or tests.

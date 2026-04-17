@@ -9,6 +9,13 @@
   - Verify tests pass
   - Then commit
 
+- **REBUILD AND REBOOT is MANDATORY after every successful round of changes**:
+  - After all tests pass and fixes are committed, STOP all containers/services
+  - REBUILD containers to pick up latest code
+  - RESTART all services (containers + webui-bridge)
+  - ONLY THEN proceed to manual testing approval
+  - This ensures the running environment matches the committed code exactly
+
 - **WebUI credentials `admin`/`admin` are hardcoded** — do not change.
 - **Never commit `.env`** — it contains tracker credentials.
 - **Never commit `.ruff_cache/`** — add to `.gitignore`.
