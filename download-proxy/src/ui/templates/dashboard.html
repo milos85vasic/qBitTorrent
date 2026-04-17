@@ -437,7 +437,7 @@
                     tracker: data.tracker || '',
                 };
                 addLiveResult(result);
-                updateStatus('Found ' + (_lastResults ? _lastResults.length : 0) + ' results...');
+                updateStatus('Found ' + _liveResults.length + ' results...');
             });
             
             _eventSource.addEventListener('results_update', function(e) {
