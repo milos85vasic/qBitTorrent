@@ -267,3 +267,51 @@ Results should appear after fallback - need to verify if they do.
 - Added debug status messages
 - Fixed doSchedule() to check _qbitAuthenticated not _config
 - Added margin-right and margin-bottom to .auth-chip for spacing
+
+---
+
+## Known Issues (2026-04-17)
+
+### Issue 1: SSE result_found Events Not Received (HIGH)
+
+**Status**: Working fallback exists - results show after 5s
+
+**Root Cause**: Unknown - Yandex Browser may not process named SSE events
+
+**Workaround**: 5-second polling fallback fetches results
+
+### Issue 2: Debug Code Needs Cleanup
+
+**Status**: Not critical - works but messy
+
+**Items**:
+- Remove console.log debug statements
+- Remove colored status messages
+- Clean up code comments
+
+### Issue 3: Plus Button (Magnet) also needs auth check
+
+**Status**: May have same issue as qBit button
+
+**Need to verify**: Does + button check `_qbitAuthenticated`?
+
+### Issue 4: Auth Chip Spacing Was Fixed
+
+**Status**: ✅ FIXED - Added margin to .auth-chip
+
+### Issue 5: qBit Button Auth Check Fixed
+
+**Status**: ✅ FIXED - doSchedule() now checks _qbitAuthenticated
+
+---
+
+## Commit Summary (2026-04-17)
+
+All commits this session:
+1. Add browser tests for real-time streaming
+2. Fix real-time streaming: results-body ID
+3. Fix real-time streaming: use _liveResults.length
+4. Fix real-time streaming: add debug logs
+5. Fix: Auth state check for buttons, add auth chip spacing
+
+Total: 5 commits today
