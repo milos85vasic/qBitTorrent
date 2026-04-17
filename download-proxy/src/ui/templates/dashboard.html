@@ -602,26 +602,36 @@
         }
 
         function doMagnet(index) {
-            console.log('[DEBUG] doMagnet called with index:', index);
-            console.log('[DEBUG] _lastResults:', _lastResults);
-            console.log('[DEBUG] _lastResults[index]:', _lastResults ? _lastResults[index] : 'UNDEFINED');
-            
             if (!_lastResults || !_lastResults[index]) {
                 alert('Error: No results available. Please search first.');
-                console.log('[DEBUG] ERROR: No results for index', index);
                 return;
             }
             
             var magnet = generateMagnet(_lastResults, index);
-            console.log('[DEBUG] Generated magnet:', magnet);
             
-            navigator.clipboard.writeText(magnet).then(function() {
-                console.log('[DEBUG] Magnet copied to clipboard successfully');
+            // Use fallback for clipboard - works in all browsers including Yandex
+            var textArea = document.createElement('textarea');
+            textArea.value = magnet;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            var success = false;
+            try {
+                success = document.execCommand('copy');
+            } catch (err) {
+                console.log('[DEBUG] execCommand copy failed:', err);
+            }
+            document.body.removeChild(textArea);
+            
+            if (success) {
                 alert('Magnet link copied to clipboard!');
-            }).catch(function(err) {
-                console.log('[DEBUG] Clipboard failed, using prompt:', err);
+            } else {
                 prompt('Copy this magnet link:', magnet);
-            });
+            }
         }
 
         function getMagnetUrl(index) {
@@ -984,12 +994,18 @@
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
+                console.log('[DEBUG] Login Response JSON:', JSON.stringify(data));
+                console.log('[DEBUG] data.status:', data.status);
                 btn.disabled = false;
                 btn.textContent = 'Login';
                 if (data.status === 'authenticated') {
-                    closeQbitLogin();
+                    console.log('[DEBUG] Authenticated! Closing modal...');
+                    document.getElementById('qbit-login-modal').classList.remove('show');
+                    console.log('[DEBUG] Modal should be closed now');
+                    // Don't auto-close - let user click X or wait
                     alert('Successfully logged in to qBittorrent!' + (saveCredentials ? ' Credentials saved.' : ''));
                 } else {
+                    console.log('[DEBUG] NOT authenticated, showing error');
                     document.getElementById('qbit-login-error').textContent = data.error || 'Login failed';
                 }
             })
