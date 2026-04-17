@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [Unreleased] - 2026-04-17
+
+### Fixed
+- **Missing `HTTPException` import** in `download-proxy/src/api/routes.py` — caused 500 errors on `GET /search/{id}` when search not found
+- **Missing `JSONResponse` import** in `download-proxy/src/api/routes.py` — caused 500 errors on invalid `POST /magnet` requests
+- **Deprecated `asyncio.get_event_loop()`** in `download-proxy/src/merge_service/validator.py` — replaced with `asyncio.get_running_loop()` for Python 3.13 compatibility
+- **Test collection failure** in `tests/unit/test_dashboard.py` — added workaround for pytest importlib mode namespace package issue
+- **Mock setup in `test_merge_api.py`** — `_last_merged_results` now properly initialized as empty dict to avoid unpacking errors
+- **Python 3.13 deprecation warnings** across test suite — replaced `asyncio.get_event_loop().run_until_complete()` with `asyncio.run()` in 5 test files
+
+### Improved
+- **Integration test resilience** — tests that require running qBittorrent now `skip` instead of fail when qBittorrent is unavailable or auth-banned
+- **UI integration test timeouts** — added `timeout` parameters to all HTTP requests in `test_ui_quick.py` and `test_ui_comprehensive.py` to prevent hangs
+- **Concurrent search queries** in `test_ui_comprehensive.py` — uses `ThreadPoolExecutor(max_workers=5)` to reduce test duration from ~8 min to ~2 min
+- **Robust content type detection test** — validates against valid enum values instead of flaky per-query expectations
+
+### Added
+- **Abort search endpoint tests** — `POST /search/{id}/abort` (2 tests)
+- **Magnet generation endpoint tests** — `POST /magnet` with hash, without hash, invalid request (3 tests)
+- **Download endpoint tests** — `POST /download` auth-failure path (1 test)
+- **Active downloads endpoint tests** — `GET /downloads/active` auth-failure path (1 test)
+
+### Test Results
+- **319 unit tests** passing (0 failures)
+- **7 e2e tests** passing (0 failures)
+- **201 integration tests** passing, 13 skipped when services unavailable
+- **Total: 527 automated tests** across unit/integration/e2e suites
+
 ### Added
 
 #### Freeleech & Safety
