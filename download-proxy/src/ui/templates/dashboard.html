@@ -411,6 +411,99 @@
             return div.innerHTML;
         }
 
+        var _eventSource = null;
+
+        function streamResults(searchId) {
+            if (!searchId) return;
+            
+            if (_eventSource) {
+                _eventSource.close();
+            }
+            
+            _eventSource = new EventSource('/api/v1/search/stream/' + searchId);
+            
+            _eventSource.addEventListener('search_start', function(e) {
+                console.log('Search started:', JSON.parse(e.data));
+            });
+            
+            _eventSource.addEventListener('result_found', function(e) {
+                var data = JSON.parse(e.data);
+                var result = {
+                    name: data.name || 'Unknown',
+                    seeds: data.seeds || 0,
+                    leechers: data.leechers || 0,
+                    size: data.size || 0,
+                    link: data.link || '',
+                    tracker: data.tracker || '',
+                };
+                addLiveResult(result);
+                updateStatus('Found ' + (_lastResults ? _lastResults.length : 0) + ' results...');
+            });
+            
+            _eventSource.addEventListener('results_update', function(e) {
+                var data = JSON.parse(e.data);
+                updateStatus('Found ' + data.total_results + ' results from ' + data.trackers_searched.join(', '));
+            });
+            
+            _eventSource.addEventListener('search_complete', function(e) {
+                var data = JSON.parse(e.data);
+                _eventSource.close();
+                _eventSource = null;
+                resetSearchButton();
+                if (data.status === 'completed') {
+                    if (data.total_results > 0) {
+                        status.textContent = 'Found ' + data.total_results + ' results (' + data.merged_results + ' merged)';
+                    } else {
+                        status.textContent = 'No results found.';
+                        document.getElementById('results-tab').innerHTML = '<p class="empty-state">No results found for "' + escapeHtml(query) + '"</p>';
+                    }
+                } else if (data.status === 'failed') {
+                    status.textContent = 'Search failed: ' + (data.errors ? data.errors.join(', ') : 'Unknown error');
+                }
+                loadStats();
+            });
+            
+            _eventSource.onerror = function() {
+                if (_eventSource) {
+                    _eventSource.close();
+                    _eventSource = null;
+                }
+            };
+        }
+
+        var _liveResults = [];
+
+        function addLiveResult(result) {
+            _liveResults.push(result);
+            addResultToTable(result);
+        }
+
+        function addResultToTable(result) {
+            var table = document.getElementById('results-body');
+            if (!table) return;
+            
+            var row = document.createElement('tr');
+            var size = result.size || 0;
+            row.innerHTML =
+                '<td><a href="' + (result.link || '') + '" target="_blank">' + escapeHtml(result.name) + '</a></td>' +
+                '<td>' + formatSize(size) + '</td>' +
+                '<td>' + (result.seeds || 0) + '</td>' +
+                '<td>' + (result.leechers || 0) + '</td>' +
+                '<td>' + (result.tracker || '') + '</td>' +
+                '<td><div class="btn-group">' +
+                '<button class="download-btn" onclick="openMagnetDialog(\'' + escapeHtml(result.name).replace(/'/g, "\\'") + '\', \'' + (result.link || '').replace(/'/g, "\\'") + '\')">Magnet</button>' +
+                '<button class="download-btn btn-schedule" onclick="doSchedule(' + (_lastResults ? _lastResults.length : 0) + ')">qBit</button>' +
+                '</div></td>';
+            table.appendChild(row);
+        }
+
+        function updateStatus(msg) {
+            var status = document.getElementById('search-status');
+            if (status) {
+                status.innerHTML = '<span class="spinner"></span>' + msg;
+            }
+        }
+
         function resetSearchButton() {
             var btn = document.getElementById('search-btn');
             btn.disabled = false;
@@ -511,7 +604,7 @@
                 }
 
                 if (_isSearching) {
-                    pollResults();
+                    streamResults(_searchId);
                 } else {
                     resetSearchButton();
                 }

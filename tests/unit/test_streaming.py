@@ -4,9 +4,7 @@ import json
 import asyncio
 import pytest
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src")
-)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 
 from api.streaming import SSEHandler
 
@@ -21,9 +19,7 @@ class TestSSEHandler:
         assert result.endswith("\n")
 
     def test_format_event_with_id(self):
-        result = SSEHandler.format_event(
-            event="test_event", data={"x": 1}, event_id="abc-123"
-        )
+        result = SSEHandler.format_event(event="test_event", data={"x": 1}, event_id="abc-123")
         assert "id: abc-123" in result
         assert "event: test_event" in result
 
@@ -61,17 +57,13 @@ class TestSSEHandler:
             def get_search_status(self, sid):
                 return FakeMeta()
 
-        gen = SSEHandler.search_results_stream(
-            "sid", FakeOrchestrator(), poll_interval=0
-        )
+        gen = SSEHandler.search_results_stream("sid", FakeOrchestrator(), poll_interval=0)
         events = asyncio.get_event_loop().run_until_complete(self._collect(gen))
         assert any("search_start" in e for e in events)
         assert any("search_complete" in e for e in events)
 
     def test_download_progress_stream_not_found(self):
-        gen = SSEHandler.download_progress_stream(
-            "dl-id", lambda x: None, poll_interval=0
-        )
+        gen = SSEHandler.download_progress_stream("dl-id", lambda x: None, poll_interval=0)
         events = asyncio.get_event_loop().run_until_complete(self._collect(gen))
         assert len(events) == 2
         assert any("download_start" in e for e in events)
@@ -87,9 +79,7 @@ class TestSSEHandler:
                 return None
             return {"progress": 50, "complete": False}
 
-        gen = SSEHandler.download_progress_stream(
-            "dl-id", get_progress, poll_interval=0
-        )
+        gen = SSEHandler.download_progress_stream("dl-id", get_progress, poll_interval=0)
         events = asyncio.get_event_loop().run_until_complete(self._collect(gen))
         assert len(events) >= 2
 
@@ -107,3 +97,122 @@ class TestSSEHandler:
         async for item in gen:
             results.append(item)
         return results
+
+
+class TestRealTimeStreaming:
+    """Tests for real-time streaming of individual search results."""
+
+    async def _collect_limit(self, gen, max_iterations=20):
+        results = []
+        async for item in gen:
+            results.append(item)
+            if len(results) >= max_iterations:
+                break
+        return results
+
+    def test_streaming_yields_individual_results(self):
+        """Test that search_results_stream yields individual results as they arrive, not just counts."""
+
+        class FakeResult:
+            hash = "abc123"
+            name = "Test Movie 2023 1080p"
+            seeds = 100
+            tracker = "rutracker"
+
+        call_count = [0]
+
+        class FakeMeta:
+            status = "running"
+            total_results = 1
+            merged_results = 0
+            trackers_searched = ["rutracker"]
+
+            def to_dict(self):
+                return {"status": "running", "total_results": 1}
+
+        class FakeOrchestrator:
+            def get_search_status(self, sid):
+                call_count[0] += 1
+                if call_count[0] > 3:
+                    m = FakeMeta()
+                    m.status = "completed"
+                    return m
+                return FakeMeta()
+
+            def get_live_results(self, sid):
+                return [FakeResult()]
+
+        gen = SSEHandler.search_results_stream("sid", FakeOrchestrator(), poll_interval=0)
+        events = asyncio.get_event_loop().run_until_complete(self._collect_limit(gen))
+        has_result_found = any("result_found" in e for e in events)
+        assert has_result_found, "Should emit result_found event with individual result data"
+
+    def test_streaming_result_contains_result_details(self):
+        """Test that result_found event contains actual result details (name, seeds, tracker)."""
+        call_count = [0]
+
+        class FakeResult:
+            hash = "def456"
+            name = "Awesome Film 2024 4K"
+            seeds = 250
+            leechers = 50
+            tracker = "kinozal"
+
+        class FakeMeta:
+            status = "running"
+            total_results = 1
+            merged_results = 0
+            trackers_searched = ["kinozal"]
+
+            def to_dict(self):
+                return {"status": "running", "total_results": 1}
+
+        class FakeOrchestrator:
+            def get_search_status(self, sid):
+                call_count[0] += 1
+                if call_count[0] > 3:
+                    m = FakeMeta()
+                    m.status = "completed"
+                    return m
+                return FakeMeta()
+
+            def get_live_results(self, sid):
+                return [FakeResult()]
+
+        gen = SSEHandler.search_results_stream("sid", FakeOrchestrator(), poll_interval=0)
+        events = asyncio.get_event_loop().run_until_complete(self._collect_limit(gen))
+        result_events = [e for e in events if "result_found" in e]
+        assert len(result_events) > 0, "Should have result_found event"
+        assert "Awesome Film" in result_events[0], "Result should contain name"
+
+    def test_streaming_shows_trackers_as_they_complete(self):
+        """Test that results_update events show which trackers have completed."""
+        call_count = [0]
+
+        class FakeMeta:
+            status = "running"
+            total_results = 10
+            merged_results = 5
+            trackers_searched = ["rutracker", "kinozal"]
+
+            def to_dict(self):
+                return {"status": "running", "total_results": 10, "trackers_searched": ["rutracker", "kinozal"]}
+
+        class FakeOrchestrator:
+            def get_search_status(self, sid):
+                call_count[0] += 1
+                if call_count[0] > 3:
+                    m = FakeMeta()
+                    m.status = "completed"
+                    return m
+                return FakeMeta()
+
+            def get_live_results(self, sid):
+                return []
+
+        gen = SSEHandler.search_results_stream("sid", FakeOrchestrator(), poll_interval=0)
+        events = asyncio.get_event_loop().run_until_complete(self._collect_limit(gen))
+        update_events = [e for e in events if "results_update" in e]
+        assert len(update_events) > 0, "Should have results_update events"
+        has_trackers = any("rutracker" in e or "kinozal" in e for e in update_events)
+        assert has_trackers, "Should show which trackers have been searched"

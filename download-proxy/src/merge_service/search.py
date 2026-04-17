@@ -232,6 +232,7 @@ class SearchOrchestrator:
         self._active_searches: Dict[str, SearchMetadata] = {}
         self._tracker_sessions: Dict[str, Any] = {}
         self._last_merged_results: Dict[str, tuple] = {}
+        self._tracker_results: Dict[str, Dict[str, List[Any]]] = {}
 
     def _load_env(self):
         import logging
@@ -277,6 +278,7 @@ class SearchOrchestrator:
         search_id = str(uuid.uuid4())
         metadata = SearchMetadata(search_id=search_id, query=query, category=category)
         self._active_searches[search_id] = metadata
+        self._tracker_results[search_id] = {}
 
         try:
             trackers = self._get_enabled_trackers()
@@ -286,6 +288,8 @@ class SearchOrchestrator:
                 try:
                     results = await self._search_tracker(tracker, query, category)
                     logger.info(f"Tracker {tracker.name}: {len(results)} results for '{query}'")
+                    # Store results incrementally for streaming
+                    self._tracker_results[search_id][tracker.name] = results
                     return tracker.name, results, None
                 except Exception as e:
                     logger.error(f"Tracker {tracker.name} error: {e}")
@@ -925,6 +929,15 @@ class SearchOrchestrator:
 
     def get_search_status(self, search_id: str) -> Optional[SearchMetadata]:
         return self._active_searches.get(search_id)
+
+    def get_live_results(self, search_id: str) -> List[Any]:
+        """Get all results found so far for a search, not yet merged."""
+        if search_id not in self._tracker_results:
+            return []
+        results = []
+        for tracker_results in self._tracker_results[search_id].values():
+            results.extend(tracker_results)
+        return results
 
     def get_active_searches(self) -> List[SearchMetadata]:
         return list(self._active_searches.values())

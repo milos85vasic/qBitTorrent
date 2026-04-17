@@ -29,9 +29,7 @@ class SSEHandler:
     RETRY_FIELD = "retry"
 
     @staticmethod
-    def format_event(
-        event: str, data: Dict[str, Any], event_id: Optional[str] = None
-    ) -> str:
+    def format_event(event: str, data: Dict[str, Any], event_id: Optional[str] = None) -> str:
         """Format a single SSE event."""
         lines = []
 
@@ -73,6 +71,7 @@ class SSEHandler:
         )
 
         last_count = 0
+        seen_hashes = set()
 
         while True:
             # Get current search status
@@ -88,10 +87,31 @@ class SSEHandler:
 
             # Check if search completed
             if metadata.status in ("completed", "failed"):
-                yield SSEHandler.format_event(
-                    event="search_complete", data=metadata.to_dict(), event_id=search_id
-                )
+                yield SSEHandler.format_event(event="search_complete", data=metadata.to_dict(), event_id=search_id)
                 break
+
+            # Stream individual results as they arrive
+            try:
+                live_results = orchestrator.get_live_results(search_id)
+                for result in live_results:
+                    result_hash = getattr(result, "hash", None) or str(id(result))
+                    if result_hash not in seen_hashes:
+                        seen_hashes.add(result_hash)
+                        yield SSEHandler.format_event(
+                            event="result_found",
+                            data={
+                                "search_id": search_id,
+                                "name": getattr(result, "name", ""),
+                                "seeds": getattr(result, "seeds", 0),
+                                "leechers": getattr(result, "leechers", 0),
+                                "tracker": getattr(result, "tracker", ""),
+                                "size": getattr(result, "size", 0),
+                                "link": getattr(result, "link", ""),
+                            },
+                            event_id=search_id,
+                        )
+            except Exception as e:
+                pass  # Ignore errors getting live results
 
             # Stream intermediate results if count changed
             if metadata.total_results != last_count:
@@ -144,9 +164,7 @@ class SSEHandler:
                 )
                 break
 
-            yield SSEHandler.format_event(
-                event="download_progress", data=progress, event_id=download_id
-            )
+            yield SSEHandler.format_event(event="download_progress", data=progress, event_id=download_id)
 
             if progress.get("complete", False):
                 break
