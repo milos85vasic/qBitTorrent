@@ -148,6 +148,7 @@
         .modal-actions button, .modal-actions a { flex: 1; min-width: 80px; padding: var(--theme-spacing-sm); border-radius: var(--theme-radius-lg); border: none; cursor: pointer; font-size: var(--theme-font-size-lg); text-align: center; }
         .modal-actions .submit-btn { background: var(--theme-accent); color: #fff; }
         .modal-actions .submit-btn:hover { background: var(--theme-accent-hover); }
+        .modal-actions .submit-btn[style*="theme-green"]:hover { background: var(--theme-success-hover); }
         .modal-actions .cancel-btn { background: #333; color: #ccc; }
         .modal-actions .cancel-btn:hover { background: #444; }
         .modal-actions .submit-btn:disabled { background: #555; cursor: not-allowed; }
@@ -300,12 +301,13 @@
     <div id="magnet-dialog" class="modal-overlay">
         <div class="modal">
             <h3>Magnet Link</h3>
-            <p style="color:#888;font-size:13px;margin-bottom:15px;">Share or open this magnet link in your torrent client.</p>
+            <p style="color:#888;font-size:13px;margin-bottom:15px;">Share or open this magnet link in your torrent client, or add directly to qBittorrent.</p>
             <textarea id="magnet-link-text" readonly style="width:100%;height:80px;padding:10px;background:#222;border:1px solid #444;color:#fff;font-family:monospace;font-size:12px;border-radius:4px;resize:none;margin-bottom:15px;" onclick="this.select()"></textarea>
             <div class="modal-actions">
                 <button class="cancel-btn" onclick="closeMagnetDialog()">Close</button>
                 <button class="submit-btn" id="magnet-copy-btn" onclick="copyMagnetLink()">Copy</button>
                 <a id="magnet-open-btn" class="submit-btn" href="#" style="background:var(--theme-purple);text-decoration:none;display:inline-block;" onclick="openMagnetClient()">Open</a>
+                <button class="submit-btn" id="magnet-add-btn" onclick="addMagnetToQbit()" style="background:var(--theme-green);">Add</button>
             </div>
         </div>
     </div>
@@ -666,6 +668,45 @@
             // The href is already set to the magnet URI
             // Just close dialog after a moment
             setTimeout(closeMagnetDialog, 500);
+        }
+        
+        function addMagnetToQbit() {
+            var magnet = document.getElementById('magnet-link-text').value;
+            if (!magnet) {
+                alert('No magnet link available');
+                return;
+            }
+            
+            var btn = document.getElementById('magnet-add-btn');
+            var originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+            
+            // Send to qBittorrent via API
+            fetch('/api/v1/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ result_id: '0', download_urls: [magnet] })
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                btn.disabled = false;
+                btn.textContent = originalText;
+                if (data.status === 'initiated' || data.status === 'added') {
+                    alert('Added to qBittorrent!');
+                    closeMagnetDialog();
+                } else if (data.status === 'auth_failed') {
+                    alert('Please login first');
+                    openQbitLogin();
+                } else {
+                    alert('Failed: ' + (data.error || JSON.stringify(data).substring(0,100)));
+                }
+            })
+            .catch(function(e) {
+                btn.disabled = false;
+                btn.textContent = originalText;
+                alert('Error: ' + e.message);
+            });
         }
 
         function getMagnetUrl(index) {
