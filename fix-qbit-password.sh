@@ -40,8 +40,7 @@ set_password() {
 
     echo "[INFO] Setting permanent password 'admin'..."
     curl -s -b "$session_cookies" -X POST "$QBIT_URL/api/v2/app/setPreferences" \
-        -H "Content-Type: application/json" \
-        -d "{\"json\": \"{\\\"WebUI\\\\\\\\Username\\\":\\\"admin\\\",\\\"WebUI\\\\\\\\Password\\\":\\\"admin\\\"}\"}" || {
+        -d 'json={"web_ui_password":"admin"}' || {
         echo "[WARN] Setting password may have failed"; }
 
     rm -f "$session_cookies"

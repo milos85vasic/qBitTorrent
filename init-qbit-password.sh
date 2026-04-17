@@ -18,8 +18,8 @@ echo "[init] Checking for existing password or setting up..."
 # Get current temp password from logs (if any)
 temp_pass=$(podman logs qbittorrent 2>&1 | grep -oP 'temporary password is provided for this session: \K\w+' | tail -1 || true)
 
-local cookie_jar="/tmp/qbit_init_cookies.txt"
-    local target_pass="admin"
+cookie_jar="/tmp/qbit_init_cookies.txt"
+    target_pass="admin"
 
     if [[ -z "$temp_pass" ]]; then
         echo "[init] No temp password found - trying empty password..."

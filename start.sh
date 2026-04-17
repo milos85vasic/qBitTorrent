@@ -383,8 +383,8 @@ ensure_webui_password() {
         return 0
     fi
 
-    curl -s -b /tmp/qbit_setup "http://localhost:${webui_port}/api/v2/app/setPreferences" \
-        -d 'json={"WebUI":{"Password":"admin"}}' 2>/dev/null || true
+    curl -s -b /tmp/qbit_setup -X POST "http://localhost:${webui_port}/api/v2/app/setPreferences" \
+        -d 'json={"web_ui_password":"admin"}' 2>/dev/null || true
 
     rm -f /tmp/qbit_setup 2>/dev/null
     print_success "WebUI password set to admin"
