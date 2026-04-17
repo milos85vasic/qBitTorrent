@@ -261,3 +261,38 @@ class TestIssue5Sorting:
         dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
         # The sort function should handle 'unknown' specially
         assert "unknown" in dashboard
+
+
+
+class TestFooter:
+    """Footer must show 'Made with <3 by Vasic Digital' on every screen."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        try:
+            r = requests.get(f"{BASE_URL}/health", timeout=5)
+            r.raise_for_status()
+        except (requests.ConnectionError, requests.Timeout):
+            pytest.skip("Merge service not available")
+
+    def test_footer_contains_made_with_love_text(self):
+        """Footer must contain 'Made with' text."""
+        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        assert "Made with" in dashboard
+
+    def test_footer_contains_heart_symbol(self):
+        """Footer must contain a heart symbol (emoji or HTML entity)."""
+        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        # Check for heart emoji or HTML entity
+        heart_indicators = ["❤", "&#10084;", "&hearts;", "♥", "💖", "💙", "💚"]
+        assert any(h in dashboard for h in heart_indicators), "No heart symbol found in footer"
+
+    def test_footer_contains_vasic_digital_link(self):
+        """Footer must contain clickable 'Vasic Digital' link to vasic.digital."""
+        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        assert "Vasic Digital" in dashboard
+        assert "https://www.vasic.digital" in dashboard
+        # Should be inside an <a> tag
+        import re
+        link_pattern = r'<a[^>]*href=["\']https://www\.vasic\.digital["\'][^>]*>.*Vasic Digital.*</a>'
+        assert re.search(link_pattern, dashboard, re.IGNORECASE), "Vasic Digital must be a clickable link"

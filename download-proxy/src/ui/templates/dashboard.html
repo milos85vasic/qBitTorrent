@@ -170,6 +170,10 @@
         .inline-form input:focus { outline: none; border-color: #e94560; }
         .inline-form button { padding: 6px 14px; background: #e94560; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
         .inline-form button:hover { background: #c73652; }
+        .site-footer { text-align: center; padding: var(--theme-spacing-xl); margin-top: var(--theme-spacing-xl); border-top: 1px solid var(--theme-border); color: var(--theme-text-secondary); font-size: var(--theme-font-size-md); }
+        .site-footer a { color: var(--theme-accent); text-decoration: none; }
+        .site-footer a:hover { text-decoration: underline; }
+        .site-footer .heart { color: #e94560; }
     </style>
 </head>
 <body>
@@ -1539,5 +1543,8 @@
         loadDownloads();
         setInterval(function() { loadStats(); loadDownloads(); loadAllAuthStatus(); }, 30000);
     </script>
+    <footer class="site-footer">
+        Made with <span class="heart">&#10084;</span> by <a href="https://www.vasic.digital" target="_blank" rel="noopener noreferrer">Vasic Digital</a>
+    </footer>
 </body>
 </html>
