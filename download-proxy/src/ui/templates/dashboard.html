@@ -387,9 +387,10 @@
                     case 'type':
                         av = a.content_type || 'unknown';
                         bv = b.content_type || 'unknown';
-                        // Unknown always goes to the end
-                        if (av === 'unknown' && bv !== 'unknown') return 1;
-                        if (bv === 'unknown' && av !== 'unknown') return -1;
+                        // Unknown goes to the end in asc, beginning in desc
+                        var unknownFirst = _sortDirection === 'desc';
+                        if (av === 'unknown' && bv !== 'unknown') return unknownFirst ? -1 : 1;
+                        if (bv === 'unknown' && av !== 'unknown') return unknownFirst ? 1 : -1;
                         cmp = av < bv ? -1 : (av > bv ? 1 : 0);
                         return _sortDirection === 'asc' ? cmp : -cmp;
                     case 'size':
@@ -402,8 +403,8 @@
                         av = a.leechers || 0; bv = b.leechers || 0;
                         return _sortDirection === 'asc' ? av - bv : bv - av;
                     case 'quality':
-                        // Quality weight: uhd_4k=5, full_hd=4, hd=3, sd=2, unknown=1
-                        var qw = {uhd_4k: 5, full_hd: 4, hd: 3, sd: 2, unknown: 1};
+                        // Quality weight: uhd_8k=6, uhd_4k=5, full_hd=4, hd=3, sd=2, unknown=1
+                        var qw = {uhd_8k: 6, uhd_4k: 5, full_hd: 4, hd: 3, sd: 2, unknown: 1};
                         av = qw[a.quality] || 1; bv = qw[b.quality] || 1;
                         return _sortDirection === 'asc' ? av - bv : bv - av;
                     case 'sources':
@@ -652,7 +653,7 @@
                 '<td><div class="btn-group">' +
                 '<a class="download-btn btn-magnet" onclick="doMagnet(' + index + '); return false;" title="Get Magnet Link">Magnet</a>' +
                 '<button class="download-btn btn-schedule" onclick="doSchedule(' + index + ')" title="Send to qBittorrent">qBit</button>' +
-                '<button class="download-btn" onclick="doDownloadTorrent(' + index + ', this)" title="Download .torrent">+</button>' +
+                '<button class="download-btn" onclick="doDownloadTorrent(' + index + ', this)" title="Download">Download</button>' +
                 '</div></td>';
             tbody.appendChild(row);
         }
@@ -855,7 +856,7 @@
                     '<td><div class="btn-group">' +
                     '<a class="download-btn btn-magnet" onclick="doMagnet(' + i + '); return false;" title="Get Magnet Link">Magnet</a>' +
                     '<button class="download-btn btn-schedule" onclick="doSchedule(' + i + ')" title="Send to qBittorrent">qBit</button>' +
-                    '<button class="download-btn" onclick="doDownloadTorrent(' + i + ', this)" title="Download .torrent">+</button>' +
+                    '<button class="download-btn" onclick="doDownloadTorrent(' + i + ', this)" title="Download">Download</button>' +
                     '</div></td>' +
                     '</tr>';
             });
@@ -870,20 +871,33 @@
             });
         }
 
-        function generateMagnet(results, index) {
+        async function generateMagnet(results, index) {
             var r = results[index];
             var name = r.name || 'download';
+            var urls = r.download_urls || [];
+            try {
+                var resp = await fetch('/api/v1/magnet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ result_id: name, download_urls: urls })
+                });
+                var data = await resp.json();
+                if (data.magnet) {
+                    return data.magnet;
+                }
+            } catch(e) {}
+            // Fallback
             var dn = encodeURIComponent(name);
             return 'magnet:?dn=' + dn + '&tr=udp://tracker.opentrackr.org:1337&tr=udp://tracker.leechers.org:6969';
         }
 
-        function doMagnet(index) {
+        async function doMagnet(index) {
             if (!_lastResults || !_lastResults[index]) {
                 alert('Error: No results available. Please search first.');
                 return;
             }
             
-            var magnet = generateMagnet(_lastResults, index);
+            var magnet = await generateMagnet(_lastResults, index);
             
             // Show dialog with magnet link
             document.getElementById('magnet-link-text').value = magnet;
@@ -1056,7 +1070,7 @@
                     btn.textContent = 'Added';
                     btn.classList.remove('failed');
                     setTimeout(function() {
-                        btn.textContent = '+';
+                        btn.textContent = 'Download';
                         btn.classList.remove('failed');
                     }, 2000);
                 } else if (data.status === 'auth_failed') {
@@ -1069,7 +1083,7 @@
                     btn.textContent = 'Failed';
                     btn.classList.add('failed');
                     setTimeout(function() {
-                        btn.textContent = '+';
+                        btn.textContent = 'Download';
                         btn.classList.remove('failed');
                     }, 2000);
                 }
@@ -1078,7 +1092,7 @@
                 btn.textContent = 'Error';
                 btn.classList.add('failed');
                 setTimeout(function() {
-                    btn.textContent = '+';
+                    btn.textContent = 'Download';
                     btn.classList.remove('failed');
                 }, 2000);
             });
@@ -1124,7 +1138,7 @@
             .then(function() {
                 btn.textContent = 'Done';
                 setTimeout(function() {
-                    btn.textContent = '+';
+                    btn.textContent = 'Download';
                     btn.disabled = false;
                 }, 2000);
             })
@@ -1132,7 +1146,7 @@
                 btn.textContent = 'Err';
                 btn.classList.add('failed');
                 setTimeout(function() {
-                    btn.textContent = '+';
+                    btn.textContent = 'Download';
                     btn.classList.remove('failed');
                     btn.disabled = false;
                 }, 2000);
@@ -1141,7 +1155,7 @@
 
         function resetDownloadButton(btn) {
             if (btn) {
-                btn.textContent = '+';
+                btn.textContent = 'Download';
                 btn.classList.remove('failed');
                 btn.disabled = false;
             }
@@ -1400,7 +1414,7 @@
             document.getElementById('qbit-login-error').textContent = '';
             var btns = document.querySelectorAll('.download-btn.failed');
             btns.forEach(function(b) {
-                b.textContent = '+';
+                b.textContent = 'Download';
                 b.classList.remove('failed');
                 b.disabled = false;
             });

@@ -78,9 +78,10 @@ class Deduplicator:
                 else:
                     remaining.append(result)
 
-            # After collecting all sources, update to best name
+            # After collecting all sources, update to best name and quality
             if len(merged.original_results) > 1:
                 self._update_to_best_name(merged)
+            self._update_best_quality(merged)
 
             unmatched = remaining
             self._merged_groups.append(merged)
@@ -144,6 +145,29 @@ class Deduplicator:
         if best_result.name != merged.original_results[0].name:
             new_identity = self._extract_identity_from_result(best_result)
             merged.canonical_identity = new_identity
+
+    def _update_best_quality(self, merged: "MergedResult") -> None:
+        """Set best_quality based on the highest quality among sources."""
+        from api.routes import _detect_quality
+
+        best = None
+        best_weight = -1
+        weight_map = {
+            "unknown": 1,
+            "sd": 2,
+            "hd": 3,
+            "full_hd": 4,
+            "uhd_4k": 5,
+            "uhd_8k": 6,
+        }
+        for r in merged.original_results:
+            q = _detect_quality(r.name, r.size)
+            w = weight_map.get(q, 1)
+            if w > best_weight:
+                best_weight = w
+                best = q
+        if best:
+            merged.best_quality = QualityTier(best)
 
     def _extract_identity_from_result(self, result: SearchResult) -> CanonicalIdentity:
         """Extract canonical identity from a search result."""
@@ -255,7 +279,7 @@ class Deduplicator:
     def _normalize_name(self, name: str) -> str:
         """Normalize a torrent name for comparison."""
         # Remove year, resolution, codec, group info for cleaner comparison
-        normalized = re.sub(r"\s*\d{4}\s*", " ", name)  # Remove year
+        normalized = re.sub(r"\s*\b(19|20)\d{2}\b\s*", " ", name)  # Remove year
         normalized = re.sub(r"\s*(720p|1080p|2160p|4k|8k)\s*", " ", normalized, flags=re.I)  # Remove resolution
         normalized = re.sub(r"\s*(x264|x265|hevc|h264|h265|xvid|divx)\s*", " ", normalized, flags=re.I)  # Remove codec
         normalized = re.sub(r"\s*\[.*?\]\s*", " ", normalized)  # Remove group brackets
@@ -411,14 +435,27 @@ class Deduplicator:
             identity.content_type = ContentType.MOVIE
             return
 
+        # Priority 7b: EBOOK formats
+        if re.search(r"\b(epub|pdf|mobi|azw3|cbz|cbr|djvu)\b", n):
+            identity.content_type = ContentType.EBOOK
+            return
+
         # Priority 8: AUDIO FORMAT - music
-        if re.search(r"\b(mp3|flac|ogg|opus|aac|wav|aiff)\b", n) or re.search(
-            r"\b(lossless|320kbps|256kbps|128kbps|v0|vbr|cbr)\b", n
+        if re.search(r"\b(mp3|flac|ogg|opus|aac|wav|aiff|alac|m4a|wma)\b", n) or re.search(
+            r"\b(lossless|320kbps|256kbps|128kbps|v0|vbr|cbr|v2)\b", n
         ):
             identity.content_type = ContentType.MUSIC
             return
 
-        # Priority 9: OST/Soundtrack (music)
+        # Priority 9: GENRE keywords without parentheses (music)
+        if re.search(
+            r"\b(rock|pop|metal|jazz|blues|folk|hip hop|electronic|dance|classical|hard rock|indie|rap|soul|r&b|country|techno|trance|house|dubstep|ambient|reggae|punk|funk|disco|metalcore|progressive)\b",
+            n,
+        ):
+            identity.content_type = ContentType.MUSIC
+            return
+
+        # Priority 10: OST/Soundtrack (music)
         if re.search(r"\b(ost|soundtrack|score)\b", n):
             identity.content_type = ContentType.MUSIC
             return

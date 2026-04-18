@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [Unreleased] - 2026-04-17
+## [Unreleased] - 2026-04-18
 
 ### Fixed
+- **CRITICAL: Public tracker subprocess NameError** in `download-proxy/src/merge_service/search.py` — `{{tracker_name}}` in f-string produced undefined variable `{tracker_name}` in subprocess, causing ALL 33+ public trackers to silently return 0 results. Fixed by hardcoding tracker name in script template.
+- **Year regex stripping resolutions** in `download-proxy/src/merge_service/deduplicator.py` — `\d{4}` matched `1080` in `1080p`, breaking name normalization and deduplication. Fixed to `\b(19|20)\d{2}\b`.
+- **Magnet hash extraction truncated 40-char hashes** in `download-proxy/src/api/routes.py` — regex `[a-f0-9]{32}|[a-f0-9]{40}` matched 32 chars first. Fixed order to `{40}|[a-f0-9]{32}`.
 - **Missing `HTTPException` import** in `download-proxy/src/api/routes.py` — caused 500 errors on `GET /search/{id}` when search not found
 - **Missing `JSONResponse` import** in `download-proxy/src/api/routes.py` — caused 500 errors on invalid `POST /magnet` requests
 - **Deprecated `asyncio.get_event_loop()`** in `download-proxy/src/merge_service/validator.py` — replaced with `asyncio.get_running_loop()` for Python 3.13 compatibility
@@ -18,22 +21,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Python 3.13 deprecation warnings** across test suite — replaced `asyncio.get_event_loop().run_until_complete()` with `asyncio.run()` in 5 test files
 
 ### Improved
+- **Content type detection** — added ebook formats (`epub`, `pdf`, `mobi`, `azw3`, `cbz`, `cbr`, `djvu`), expanded music genres and formats, ebook detection runs before music to prevent `cbr` misclassification
+- **Quality detection** — added `BDRip` → `full_hd`, `BDRemux` → `uhd_4k`, `WEBRip`/`HDRip` → `hd`, `DVDRip` → `sd`; `bdrip`/`bd-remux` detected in enricher
+- **Magnet generation** — `/api/v1/magnet` now extracts ALL source trackers from magnet URLs and merges them into generated magnet
+- **Merged result quality** — `MergedResult.best_quality` is now automatically populated after deduplication using weighted quality tiers
+- **Backend sorting** — `POST /search` supports `sort_by` and `sort_order` parameters; default is `seeds` descending
+- **Frontend sorting** — unknown type respects sort direction (last in asc, first in desc); quality weights include `uhd_8k: 6`
+- **Dashboard button** — `+` renamed to `Download`; magnet dialog uses backend endpoint; all reset handlers updated
 - **Integration test resilience** — tests that require running qBittorrent now `skip` instead of fail when qBittorrent is unavailable or auth-banned
 - **UI integration test timeouts** — added `timeout` parameters to all HTTP requests in `test_ui_quick.py` and `test_ui_comprehensive.py` to prevent hangs
 - **Concurrent search queries** in `test_ui_comprehensive.py` — uses `ThreadPoolExecutor(max_workers=5)` to reduce test duration from ~8 min to ~2 min
 - **Robust content type detection test** — validates against valid enum values instead of flaky per-query expectations
 
 ### Added
+- **Unit tests** — `test_public_tracker_subprocess.py` (6), `test_content_type_refinement.py` (12), `test_quality_detection.py` (9), `test_download_merged.py` (6), `test_sorting_weights.py` (7)
+- **Integration tests** — `test_dashboard_automation.py` (15)
+- **E2E tests** — `test_dashboard_issues.py` (9)
 - **Abort search endpoint tests** — `POST /search/{id}/abort` (2 tests)
 - **Magnet generation endpoint tests** — `POST /magnet` with hash, without hash, invalid request (3 tests)
 - **Download endpoint tests** — `POST /download` auth-failure path (1 test)
 - **Active downloads endpoint tests** — `GET /downloads/active` auth-failure path (1 test)
 
 ### Test Results
-- **319 unit tests** passing (0 failures)
-- **7 e2e tests** passing (0 failures)
-- **201 integration tests** passing, 13 skipped when services unavailable
-- **Total: 527 automated tests** across unit/integration/e2e suites
+- **410 unit tests** passing (0 failures)
+- **16 e2e tests** passing (0 failures)
+- **34 integration tests** passing, skipped when services unavailable
+- **Total: 460 automated tests** across unit/integration/e2e suites (verified 2026-04-18)
 
 ### Added
 

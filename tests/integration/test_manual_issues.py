@@ -18,8 +18,8 @@ BASE_URL = "http://localhost:7187"
 QBIT_URL = "http://localhost:7185"
 
 
-class TestIssue1PlusButtonDownload:
-    """Issue 1: Plus button MUST download a .torrent file."""
+class TestIssue1DownloadButton:
+    """Issue 1: Download button MUST download a file with merged sources."""
 
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -40,14 +40,35 @@ class TestIssue1PlusButtonDownload:
         # Should not be 404 - endpoint must exist
         assert resp.status_code != 404, "Download file endpoint does not exist"
 
-    def test_plus_button_triggers_file_download(self):
-        """Dashboard + button must call download/file endpoint, not /download."""
+    def test_download_button_replaces_plus_button(self):
+        """Dashboard must show 'Download' button instead of '+'."""
         dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
-        # The + button onclick should reference a download function, not doDownload
-        # which sends to qBittorrent
-        assert "doDownload" in dashboard or "downloadTorrent" in dashboard
-        # The doDownload function should trigger a file download
-        assert "download/file" in dashboard or "download.php" in dashboard or "magnet:" in dashboard
+        assert ">Download</button>" in dashboard, "Dashboard must have 'Download' button"
+        assert ">+</button>" not in dashboard, "Dashboard must not have '+' button"
+
+    def test_download_button_calls_file_endpoint(self):
+        """Download button must call download/file endpoint."""
+        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        assert "download/file" in dashboard, "Dashboard must reference download/file endpoint"
+
+    def test_magnet_endpoint_returns_merged_sources(self):
+        """/magnet endpoint must return a magnet with all source trackers."""
+        resp = requests.post(
+            f"{BASE_URL}/api/v1/magnet",
+            json={
+                "result_id": "Test",
+                "download_urls": [
+                    "magnet:?xt=urn:btih:abc123def4567890abc123def4567890abc12345&tr=udp://t1:1337",
+                    "magnet:?xt=urn:btih:def4567890abc123def4567890abc123def45678&tr=udp://t2:6969",
+                ]
+            },
+            timeout=10,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["hashes"]) == 2
+        magnet = data["magnet"]
+        assert "t1" in magnet or "t2" in magnet or "opentrackr" in magnet
 
 
 class TestIssue2TypeColumn:
@@ -338,7 +359,7 @@ class TestSearchPerformance:
 
 
 class TestDownloadButtonConsistency:
-    """Both renderResults and addResultToTable must use doDownloadTorrent for + button."""
+    """Both renderResults and addResultToTable must use doDownloadTorrent for Download button."""
 
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -349,7 +370,7 @@ class TestDownloadButtonConsistency:
             pytest.skip("Merge service not available")
 
     def test_addResultToTable_uses_doDownloadTorrent(self):
-        """Live results (SSE) + button must call doDownloadTorrent, not doDownload."""
+        """Live results (SSE) Download button must call doDownloadTorrent, not doDownload."""
         dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
         import re
         # Extract addResultToTable function body (from { to next top-level function)
@@ -359,9 +380,9 @@ class TestDownloadButtonConsistency:
         )
         assert match, "addResultToTable function not found"
         func_body = match.group(1)
-        # The + button in addResultToTable must call doDownloadTorrent
+        # The Download button in addResultToTable must call doDownloadTorrent
         assert "doDownloadTorrent(" in func_body, \
-            "addResultToTable + button must call doDownloadTorrent, not doDownload"
+            "addResultToTable Download button must call doDownloadTorrent, not doDownload"
         assert "doDownload(" not in func_body, \
             "addResultToTable must NOT call old doDownload function"
 

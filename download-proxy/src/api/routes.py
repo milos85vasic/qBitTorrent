@@ -36,6 +36,8 @@ class SearchRequest(BaseModel):
     limit: int = Field(default=50, description="Maximum results", ge=1, le=100)
     enable_metadata: bool = Field(default=True, description="Enable metadata enrichment")
     validate_trackers: bool = Field(default=True, description="Validate tracker health")
+    sort_by: str = Field(default="seeds", description="Sort column")
+    sort_order: str = Field(default="desc", description="Sort direction: asc or desc")
 
 
 class SearchResultResponse(BaseModel):
@@ -98,9 +100,14 @@ def _detect_quality(name: str, size: str) -> str:
             "720p": "hd",
             "SD": "sd",
             "BluRay": "full_hd",
+            "BDRip": "full_hd",
+            "BDRemux": "uhd_4k",
             "WEB-DL": "hd",
+            "WEBRip": "hd",
+            "HDRip": "hd",
             "HDTV": "hd",
             "DVD": "sd",
+            "DVDRip": "sd",
         }
         return mapping.get(quality, "unknown")
     sb = _parse_size_to_bytes(size)
@@ -166,7 +173,30 @@ async def search(request: SearchRequest, req: Request):
         resp.leechers = m.total_leechers
         results.append(resp)
 
-    results.sort(key=lambda x: x.seeds, reverse=True)
+    # Apply sorting
+    sort_by = request.sort_by
+    sort_order = request.sort_order
+    reverse = sort_order == "desc"
+    sort_weights = {"unknown": 0, "sd": 1, "hd": 2, "full_hd": 3, "uhd_4k": 4, "uhd_8k": 5}
+
+    def _sort_key(x):
+        if sort_by == "name":
+            return (x.name or "").lower()
+        if sort_by == "type":
+            return x.content_type or "unknown"
+        if sort_by == "size":
+            return _parse_size_to_bytes(x.size)
+        if sort_by == "seeds":
+            return x.seeds
+        if sort_by == "leechers":
+            return x.leechers
+        if sort_by == "quality":
+            return sort_weights.get(x.quality or "unknown", 0)
+        if sort_by == "sources":
+            return len(x.sources)
+        return x.seeds
+
+    results.sort(key=_sort_key, reverse=reverse)
     results = results[: request.limit]
 
     if request.enable_metadata and hasattr(req.app.state, "enricher"):
@@ -654,19 +684,30 @@ async def generate_magnet(request: Request):
 
     urls = req.download_urls
     hashes = []
+    trackers = set()
     for url in urls:
-        m = re.search(r"btih:([a-f0-9]{32}|[a-f0-9]{40})", url, re.I)
+        m = re.search(r"btih:([a-f0-9]{40}|[a-f0-9]{32})", url, re.I)
         if m:
             hashes.append(m.group(1))
+        # Extract trackers from magnet links
+        if url.startswith("magnet:"):
+            for tr in re.findall(r"tr=([^&]+)", url):
+                trackers.add(urllib.parse.unquote(tr))
 
     name = req.result_id or "download"
     dn = urllib.parse.quote(name)
     xt = "&".join(f"xt=urn:btih:{h}" for h in hashes) if hashes else ""
-    magnet = (
-        f"magnet:?dn={dn}"
-        + (f"&{xt}" if xt else "")
-        + "&tr=udp://tracker.opentrackr.org:1337&tr=udp://tracker.leechers.org:6969"
-    )
+    # Include source trackers + fallback public trackers
+    default_trackers = [
+        "udp://tracker.opentrackr.org:1337",
+        "udp://tracker.leechers.org:6969",
+    ]
+    for dt in default_trackers:
+        trackers.add(dt)
+    tr_params = "&".join(f"tr={urllib.parse.quote(t)}" for t in sorted(trackers))
+    magnet = f"magnet:?dn={dn}" + (f"&{xt}" if xt else "")
+    if tr_params:
+        magnet += "&" + tr_params
 
     return {"magnet": magnet, "hashes": hashes}
 

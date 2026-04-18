@@ -325,7 +325,7 @@ class MetadataEnricher:
         if re.search(r"480p|sd|camrip", name_lower):
             return "SD"
 
-        if "bluray" in name_lower or "blu-ray" in name_lower:
+        if "bluray" in name_lower or "blu-ray" in name_lower or "bdrip" in name_lower or "bd-remux" in name_lower:
             return "BluRay"
         if "web-dl" in name_lower or "webrip" in name_lower or "web.dl" in name_lower or "webdl" in name_lower:
             return "WEB-DL"
