@@ -1,0 +1,49 @@
+{
+  "title": "Merge Search Service",
+  "uid": "qbit-merge-search",
+  "schemaVersion": 38,
+  "version": 1,
+  "tags": ["qbittorrent", "merge-search"],
+  "timezone": "",
+  "time": {"from": "now-6h", "to": "now"},
+  "refresh": "15s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Active searches",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {"expr": "qbit_merge_active_searches", "refId": "A"}
+      ],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}}}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Tracker requests per second",
+      "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0},
+      "targets": [
+        {"expr": "rate(qbit_merge_tracker_requests_total[1m])", "refId": "A", "legendFormat": "{{tracker}}"}
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Search latency (p95)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum(rate(qbit_merge_search_duration_seconds_bucket[5m])) by (le))", "refId": "A"}
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Circuit breaker state per tracker",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {"expr": "qbit_merge_circuit_breaker_state", "refId": "A", "legendFormat": "{{tracker}}"}
+      ]
+    }
+  ]
+}

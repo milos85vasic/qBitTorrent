@@ -1,0 +1,21 @@
+# Snyk policy for qBittorrent-Fixed.
+# https://support.snyk.io/hc/en-us/articles/360018618237-.snyk-file
+# Each ignore must have a documented expiry and rationale.
+
+version: v1.25.0
+
+# No ignores at initial configuration.
+# Phase 2 resolves findings; exceptions documented here with expiry.
+ignore: {}
+
+# Don't scan generated output or third-party bundles.
+exclude:
+  global:
+    - download-proxy/src/ui/dist/**
+    - frontend/node_modules/**
+    - frontend/.angular/**
+    - "**/__pycache__/**"
+    - htmlcov/**
+    - coverage.xml
+    - "**/*.min.js"
+    - "**/*.map"

@@ -1,0 +1,178 @@
+# Opt-in quality stack for qBittorrent-Fixed.
+#
+# This file is intentionally separate from docker-compose.yml so that
+# the runtime Container-First principle (.specify/memory/constitution.md
+# Principle I) is preserved: the two-container product topology does
+# not mandate this stack, and no product service depends on it. Quality
+# tooling is additive and only started on demand.
+#
+#   Usage (rootless Podman or Docker):
+#     $COMPOSE_CMD -f docker-compose.yml \
+#                  -f docker-compose.quality.yml up -d sonarqube
+#
+#     # Or run scanners one-shot (no long-lived containers):
+#     ./scripts/scan.sh --all
+#
+# See docs/QUALITY_STACK.md and docs/SCANNING.md for justification,
+# environment variables, and how this stack interacts with CI.
+
+version: "3.8"
+
+services:
+  sonarqube:
+    image: sonarqube:10-community
+    container_name: qbit-sonarqube
+    profiles: [quality, sonarqube]
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonar
+      SONAR_JDBC_USERNAME: ${SONAR_DB_USER:-sonar}
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:-sonar}
+      # Disable the built-in H2 (not for production) — we use postgres.
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+    restart: unless-stopped
+
+  sonar-db:
+    image: postgres:16-alpine
+    container_name: qbit-sonar-db
+    profiles: [quality, sonarqube]
+    environment:
+      POSTGRES_USER: ${SONAR_DB_USER:-sonar}
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:-sonar}
+      POSTGRES_DB: sonar
+    volumes:
+      - sonar_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SONAR_DB_USER:-sonar}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # One-shot scanners. Run via `./scripts/scan.sh <name>`.
+  # The `run-once` profile keeps them out of `up -d` by default.
+  snyk:
+    image: snyk/snyk:python
+    container_name: qbit-snyk
+    profiles: [run-once, snyk]
+    environment:
+      SNYK_TOKEN: ${SNYK_TOKEN:-}
+    working_dir: /project
+    volumes:
+      - ./:/project:ro
+      - ./artifacts/scans:/artifacts
+    command: >-
+      sh -c "
+      if [ -z \"$$SNYK_TOKEN\" ]; then
+        echo 'SNYK_TOKEN unset; skipping snyk scan';
+        exit 0;
+      fi;
+      snyk auth --auth-token=$$SNYK_TOKEN >/dev/null &&
+      snyk test --file=download-proxy/requirements.txt --sarif-file-output=/artifacts/snyk.sarif || true;
+      snyk code test --sarif-file-output=/artifacts/snyk-code.sarif || true
+      "
+
+  semgrep:
+    image: returntocorp/semgrep:latest
+    container_name: qbit-semgrep
+    profiles: [run-once, semgrep]
+    working_dir: /src
+    volumes:
+      - ./:/src:ro
+      - ./artifacts/scans:/artifacts
+    command: >-
+      semgrep scan --config=auto --config=.semgrep.yml
+        --sarif -o /artifacts/semgrep.sarif
+
+  trivy:
+    image: aquasec/trivy:latest
+    container_name: qbit-trivy
+    profiles: [run-once, trivy]
+    working_dir: /src
+    volumes:
+      - ./:/src:ro
+      - ./artifacts/scans:/artifacts
+      - trivy_cache:/root/.cache/trivy
+    command: >-
+      fs --scanners vuln,secret,misconfig
+         --severity HIGH,CRITICAL
+         --format sarif
+         --output /artifacts/trivy-fs.sarif
+         --exit-code 0
+         /src
+
+  gitleaks:
+    image: zricethezav/gitleaks:latest
+    container_name: qbit-gitleaks
+    profiles: [run-once, gitleaks]
+    working_dir: /src
+    volumes:
+      - ./:/src:ro
+      - ./artifacts/scans:/artifacts
+    command: >-
+      detect --source /src
+             --config /src/.gitleaks.toml
+             --report-format sarif
+             --report-path /artifacts/gitleaks.sarif
+             --exit-code 0
+
+  # Observability stack (Phase 6). Profile = observability so it stays
+  # off by default. Grafana dashboards live under observability/dashboards/.
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: qbit-prometheus
+    profiles: [observability]
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --web.listen-address=:9090
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: qbit-grafana
+    profiles: [observability]
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./observability/datasources:/etc/grafana/provisioning/datasources:ro
+    restart: unless-stopped
+
+volumes:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
+  sonar_db_data:
+  trivy_cache:
+  prometheus_data:
+  grafana_data:

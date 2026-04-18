@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    project: qbittorrent-fixed
+
+scrape_configs:
+  - job_name: merge-search
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.containers.internal:7187", "host.docker.internal:7187", "localhost:7187"]
+        labels: {service: merge-search}
+
+  - job_name: webui-bridge
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.containers.internal:7188", "host.docker.internal:7188", "localhost:7188"]
+        labels: {service: webui-bridge}
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

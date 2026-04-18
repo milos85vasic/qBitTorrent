@@ -1,0 +1,24 @@
+# Gitleaks config for qBittorrent-Fixed.
+# Extends the default ruleset with project-specific allowlists.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "hardcoded admin/admin WebUI default is intentional per constitution III"
+paths = [
+  '''docs/superpowers/plans/.*\.md''',   # plan documents mention tokens by name
+]
+regexes = [
+  '''admin:admin''',           # constitution-mandated default, not a secret
+  '''WEBUI_PASSWORD=admin''',  # same
+  '''password=admin''',        # same
+  '''ExamplePassword123''',    # test-only dummy
+]
+commits = []
+
+[[rules]]
+id = "qbit-tracker-cookie"
+description = "Private tracker cookies"
+regex = '''(bb_data|uid|pass)=[A-Za-z0-9]{20,}'''
+tags = ["cookie", "tracker"]

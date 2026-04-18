@@ -1,0 +1,4 @@
+# Trivy ignore list for qBittorrent-Fixed.
+# Format: one CVE/ID per line, optional `# reason` comment, optional
+# expiry `# expires: YYYY-MM-DD` (enforced by tests/unit/test_scan_config.py
+# once Phase 2 lands — do not forget to renew).

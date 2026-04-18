@@ -1,0 +1,51 @@
+# Project-local semgrep rules complementing the default registry.
+# Run with: semgrep scan --config=auto --config=.semgrep.yml
+rules:
+  - id: qbit-no-shell-true
+    message: "subprocess call with shell=True is a command-injection surface; pass a list argv instead"
+    severity: ERROR
+    languages: [python]
+    pattern: subprocess.$FN(..., shell=True, ...)
+
+  - id: qbit-no-blocking-sleep-in-async
+    message: "time.sleep blocks the event loop inside an async function; use asyncio.sleep"
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern-inside: |
+          async def $F(...):
+            ...
+      - pattern: time.sleep(...)
+
+  - id: qbit-no-unbounded-gather
+    message: "asyncio.gather over a dynamic iterable without a semaphore is unbounded concurrency"
+    severity: WARNING
+    languages: [python]
+    pattern-either:
+      - pattern: asyncio.gather(*[$F($X) for $X in $ITER])
+      - pattern: asyncio.gather(*($F($X) for $X in $ITER))
+
+  - id: qbit-no-cors-wildcard
+    message: "CORSMiddleware allow_origins=['*'] is overly permissive"
+    severity: ERROR
+    languages: [python]
+    pattern: |
+      CORSMiddleware(..., allow_origins=["*"], ...)
+
+  - id: qbit-no-plaintext-creds-log
+    message: "avoid logging credential variables"
+    severity: ERROR
+    languages: [python]
+    pattern-regex: (logger|logging|print)\.(debug|info|warn|warning|error)\(.*\b(PASSWORD|COOKIE|TOKEN|SECRET)\b
+
+  - id: qbit-filelock-required-on-cred-writes
+    message: "credential file writes must be guarded by filelock.FileLock"
+    severity: WARNING
+    languages: [python]
+    patterns:
+      - pattern: |
+          with open($PATH, ...) as $F:
+            ...
+      - metavariable-regex:
+          metavariable: $PATH
+          regex: .*creds.*\.json
