@@ -130,3 +130,7 @@ download-proxy/qbittorrent_creds.json
 
 # MkDocs build output
 website/site/
+
+# Asciinema recordings — keep placeholder .cast files tracked; future
+# re-recordings that are large/binary can go in courses/.gitignore.
+

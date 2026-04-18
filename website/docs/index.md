@@ -59,5 +59,6 @@ _Screenshots will land here once Phase 10 Playwright captures are committed._
 ## Learn more
 
 - [Architecture](architecture/container-topology.md)
+- [Courses](courses/index.md) — narrated Asciinema tracks for operators, plugin authors, contributors, and security/ops.
 - [Constitution](constitution.md)
 - [Contributing](developer-guide/contributing.md)

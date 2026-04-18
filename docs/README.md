@@ -45,6 +45,7 @@ contributor-facing. When a topic appears both here and in the top-level
 | `architecture/*.mmd` | Contributors | Mermaid diagrams for container, search, shutdown, plugin, bridge |
 | `issues/*.md` | Contributors | Frozen post-mortems for specific incidents |
 | `superpowers/plans/*.md` | Contributors | Long-horizon implementation plans |
+| `../courses/README.md` | All audiences | Asciinema video-course tracks (operator, plugin author, contributor, security/ops) |
 
 ## Conventions
 

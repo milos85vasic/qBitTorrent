@@ -101,5 +101,11 @@ nav:
   - Developer Guide:
       - AGENTS: developer-guide/agents.md
       - Contributing: developer-guide/contributing.md
+  - Courses:
+      - Overview: courses/index.md
+      - Operator 101: courses/operator.md
+      - Plugin Author: courses/plugin-author.md
+      - Contributor Deep-Dive: courses/contributor.md
+      - Security and Operations: courses/security-ops.md
   - Constitution: constitution.md
   - Changelog: changelog.md
