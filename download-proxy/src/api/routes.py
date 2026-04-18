@@ -270,7 +270,9 @@ async def search_stream(search_id: str, req: Request):
     from .streaming import SSEHandler
 
     orch = _get_orchestrator(req)
-    return SSEHandler.create_streaming_response(SSEHandler.search_results_stream(search_id, orch))
+    return SSEHandler.create_streaming_response(
+        SSEHandler.search_results_stream(search_id, orch, request=req)
+    )
 
 
 @router.get("/search/{search_id}", response_model=SearchResponse)

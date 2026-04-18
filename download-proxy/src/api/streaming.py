@@ -53,6 +53,7 @@ class SSEHandler:
         search_id: str,
         orchestrator: Any,
         poll_interval: float = 0.5,
+        request: Optional[Request] = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream search results as they come in.
@@ -61,6 +62,10 @@ class SSEHandler:
             search_id: The search ID to stream
             orchestrator: SearchOrchestrator instance
             poll_interval: How often to check for updates (seconds)
+            request: Optional FastAPI Request.  When provided, the loop
+                polls ``request.is_disconnected()`` every iteration and
+                exits cleanly (emitting an ``event: close`` sentinel) if
+                the client has gone away.
 
         Yields:
             SSE-formatted event strings
@@ -74,7 +79,23 @@ class SSEHandler:
         last_count = 0
         seen_hashes = set()
 
+        async def _client_gone() -> bool:
+            if request is None:
+                return False
+            try:
+                return await request.is_disconnected()
+            except Exception:
+                return False
+
         while True:
+            if await _client_gone():
+                yield SSEHandler.format_event(
+                    event="close",
+                    data={"search_id": search_id, "reason": "client_disconnected"},
+                    event_id=search_id,
+                )
+                return
+
             # Get current search status
             metadata = orchestrator.get_search_status(search_id)
 
@@ -160,6 +181,7 @@ class SSEHandler:
         download_id: str,
         get_progress: callable,
         poll_interval: float = 0.5,
+        request: Optional[Request] = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream download progress updates.
@@ -168,6 +190,10 @@ class SSEHandler:
             download_id: The download ID to track
             get_progress: Function to get current progress
             poll_interval: How often to check for updates
+            request: Optional FastAPI Request.  When provided, the loop
+                polls ``request.is_disconnected()`` every iteration and
+                exits cleanly (emitting an ``event: close`` sentinel) if
+                the client has gone away.
 
         Yields:
             SSE-formatted event strings
@@ -178,7 +204,23 @@ class SSEHandler:
             event_id=download_id,
         )
 
+        async def _client_gone() -> bool:
+            if request is None:
+                return False
+            try:
+                return await request.is_disconnected()
+            except Exception:
+                return False
+
         while True:
+            if await _client_gone():
+                yield SSEHandler.format_event(
+                    event="close",
+                    data={"download_id": download_id, "reason": "client_disconnected"},
+                    event_id=download_id,
+                )
+                return
+
             progress = get_progress(download_id)
 
             if progress is None:
