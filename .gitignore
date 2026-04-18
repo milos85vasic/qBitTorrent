@@ -127,3 +127,6 @@ FORK_SUMMARY.md
 ISSUES_AND_TODOS.md
 PLUGIN_STATUS.md
 download-proxy/qbittorrent_creds.json
+
+# MkDocs build output
+website/site/

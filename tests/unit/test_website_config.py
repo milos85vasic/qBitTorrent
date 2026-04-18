@@ -1,0 +1,135 @@
+"""Guards for the MkDocs website scaffold (`mkdocs.yml`).
+
+These tests deliberately parse YAML locally — they NEVER invoke `mkdocs`,
+so the suite runs without network access and without the mkdocs package
+installed.
+
+They enforce the invariants documented in Phase 8 of the completion
+initiative: strict mode is on, the docs dir points at `website/docs`,
+`mermaid2` and `include-markdown` plugins are registered, and every
+`.md` referenced in the `nav` actually exists under `website/docs/`.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+MKDOCS_YML = REPO_ROOT / "mkdocs.yml"
+DOCS_DIR = REPO_ROOT / "website" / "docs"
+
+
+class _MkDocsSafeLoader(yaml.SafeLoader):
+    """SafeLoader that tolerates MkDocs' `!!python/name:` custom tags.
+
+    MkDocs uses tags like `!!python/name:pymdownx.superfences.fence_code_format`
+    in `markdown_extensions`. PyYAML's SafeLoader rejects those. We register
+    a no-op constructor so parsing succeeds without executing anything.
+    """
+
+
+def _ignore_unknown(loader: yaml.Loader, tag_suffix: str, node: yaml.Node):  # noqa: ARG001
+    if isinstance(node, yaml.ScalarNode):
+        return loader.construct_scalar(node)
+    if isinstance(node, yaml.SequenceNode):
+        return loader.construct_sequence(node)
+    if isinstance(node, yaml.MappingNode):
+        return loader.construct_mapping(node)
+    return None
+
+
+_MkDocsSafeLoader.add_multi_constructor("tag:yaml.org,2002:python/name:", _ignore_unknown)
+_MkDocsSafeLoader.add_multi_constructor("!", _ignore_unknown)
+
+
+def _load_config() -> dict:
+    with MKDOCS_YML.open("r", encoding="utf-8") as fh:
+        return yaml.load(fh, Loader=_MkDocsSafeLoader)
+
+
+# --------------------------------------------------------------------------- #
+# existence + parsing
+# --------------------------------------------------------------------------- #
+
+
+def test_mkdocs_yml_exists() -> None:
+    assert MKDOCS_YML.is_file(), f"mkdocs.yml missing at {MKDOCS_YML}"
+
+
+def test_mkdocs_yml_parses_as_yaml() -> None:
+    config = _load_config()
+    assert isinstance(config, dict), "mkdocs.yml did not parse into a mapping"
+
+
+# --------------------------------------------------------------------------- #
+# required top-level settings
+# --------------------------------------------------------------------------- #
+
+
+def test_strict_mode_enabled() -> None:
+    assert _load_config().get("strict") is True, "strict: true must be set"
+
+
+def test_docs_dir_points_at_website_docs() -> None:
+    assert _load_config().get("docs_dir") == "website/docs"
+
+
+def test_site_name_is_set() -> None:
+    assert _load_config().get("site_name") == "qBittorrent-Fixed"
+
+
+# --------------------------------------------------------------------------- #
+# required plugins
+# --------------------------------------------------------------------------- #
+
+
+def _plugin_names(config: dict) -> list[str]:
+    plugins = config.get("plugins", []) or []
+    names: list[str] = []
+    for entry in plugins:
+        if isinstance(entry, str):
+            names.append(entry)
+        elif isinstance(entry, dict):
+            names.extend(entry.keys())
+    return names
+
+
+@pytest.mark.parametrize("plugin", ["search", "include-markdown", "mermaid2"])
+def test_required_plugin_present(plugin: str) -> None:
+    assert plugin in _plugin_names(_load_config()), f"plugin '{plugin}' missing from mkdocs.yml"
+
+
+# --------------------------------------------------------------------------- #
+# nav references resolve
+# --------------------------------------------------------------------------- #
+
+
+def _collect_nav_targets(nav) -> list[str]:
+    """Walk the nav tree and collect every string value (relative md path)."""
+    out: list[str] = []
+    if isinstance(nav, list):
+        for item in nav:
+            out.extend(_collect_nav_targets(item))
+    elif isinstance(nav, dict):
+        for value in nav.values():
+            out.extend(_collect_nav_targets(value))
+    elif isinstance(nav, str):
+        out.append(nav)
+    return out
+
+
+def test_every_nav_md_file_exists() -> None:
+    config = _load_config()
+    targets = _collect_nav_targets(config.get("nav", []))
+    assert targets, "nav must not be empty"
+    missing: list[str] = []
+    for rel in targets:
+        if not rel.endswith(".md"):
+            continue
+        path = DOCS_DIR / rel
+        if not path.is_file():
+            missing.append(rel)
+    assert not missing, f"nav references missing files under website/docs/: {missing}"

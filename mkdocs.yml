@@ -1,0 +1,105 @@
+# MkDocs configuration for qBittorrent-Fixed
+# Source of truth for the documentation website.
+# Content is NOT duplicated — include-markdown pulls from docs/ and top-level markdowns.
+
+site_name: qBittorrent-Fixed
+site_description: >-
+  qBittorrent with unified multi-tracker search, 42 plugins, and a download
+  proxy with authenticated tracker support.
+site_url: https://milos85vasic.github.io/qBitTorrent/
+site_author: Milos Vasic
+
+repo_url: https://github.com/milos85vasic/qBitTorrent
+repo_name: milos85vasic/qBitTorrent
+edit_uri: edit/main/website/docs/
+
+docs_dir: website/docs
+site_dir: website/site
+
+# Strict mode: any broken link or missing reference fails the build.
+strict: true
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+    - toc.follow
+    - content.code.copy
+    - content.tabs.link
+    - search.suggest
+    - search.highlight
+  icon:
+    logo: material/download-network
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - tables
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - include-markdown:
+      encoding: utf-8
+      preserve_includer_indent: true
+  - mermaid2
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - User Manual: user-manual.md
+  - Plugins:
+      - Overview: plugins/index.md
+      - Troubleshooting: plugins/troubleshooting.md
+  - Architecture:
+      - Container Topology: architecture/container-topology.md
+      - Search Lifecycle: architecture/search-lifecycle.md
+      - Plugin Execution: architecture/plugin-execution.md
+      - Private Tracker Bridge: architecture/private-tracker-bridge.md
+      - Shutdown Sequence: architecture/shutdown-sequence.md
+  - Subsystems:
+      - Testing: subsystems/testing.md
+      - Security: subsystems/security.md
+      - Scanning: subsystems/scanning.md
+      - Quality Stack: subsystems/quality-stack.md
+      - Observability: subsystems/observability.md
+      - Performance: subsystems/performance.md
+      - Concurrency: subsystems/concurrency.md
+      - Data Model: subsystems/data-model.md
+  - Developer Guide:
+      - AGENTS: developer-guide/agents.md
+      - Contributing: developer-guide/contributing.md
+  - Constitution: constitution.md
+  - Changelog: changelog.md
