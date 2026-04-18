@@ -1,0 +1,43 @@
+%% Search lifecycle for the merge service.
+%% Reference: download-proxy/src/merge_service/search.py:270 SearchOrchestrator.search().
+sequenceDiagram
+    autonumber
+    actor User
+    participant FE as Frontend (Angular :4200 / :7187)
+    participant API as FastAPI /api/v1/search (:7187)
+    participant ORCH as SearchOrchestrator
+    participant T1 as Tracker 1..N (subprocess nova3)
+    participant T2 as Private Tracker (aiohttp)
+    participant DEDUP as Deduplicator
+    participant ENRICH as MetadataEnricher
+    participant SSE as /api/v1/search/stream
+
+    User->>FE: enters query
+    FE->>API: POST /api/v1/search { query, category, sort_by, ... }
+    API->>ORCH: search(query, category)
+    ORCH->>ORCH: create SearchMetadata(search_id=uuid)
+
+    par fan-out (asyncio.gather, no semaphore today)
+        ORCH->>T1: subprocess python3 -c <engine>.search()
+        T1-->>ORCH: stdout JSON list of SearchResult dicts
+    and
+        ORCH->>T2: aiohttp POST login + GET search (rutracker/kinozal/nnmclub/iptorrents)
+        T2-->>ORCH: HTML → parsed SearchResult list
+    end
+
+    ORCH->>ORCH: store _tracker_results[search_id][name]
+    User->>FE: opens SSE stream
+    FE->>SSE: GET /api/v1/search/stream/{search_id}
+    SSE->>ORCH: get_live_results(search_id)
+    ORCH-->>SSE: incremental SearchResult list
+    SSE-->>FE: data: {...} (per result, deduped by seen_hashes)
+
+    ORCH->>DEDUP: merge_results(all_results)
+    DEDUP-->>ORCH: List[MergedResult]
+    opt enable_metadata
+        ORCH->>ENRICH: fill best_quality + CanonicalIdentity fields
+        ENRICH-->>ORCH: enriched MergedResult list
+    end
+    ORCH-->>API: SearchMetadata(status="completed", merged_results=N)
+    API-->>FE: SearchResponse JSON
+    FE-->>User: renders sorted, deduped, freeleech-aware results

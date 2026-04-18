@@ -5,7 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] — Phase 0 + Phase 1 (completion-initiative)
+
+### Added
+
+#### Phase 0 — Safety net & baseline
+- **`pyproject.toml`** consolidates all Python tool config (pytest,
+  coverage, ruff, mypy, bandit). Migrates ruff settings out of
+  `ruff.toml` (removed) into `[tool.ruff]`. Declares the marker
+  taxonomy used by later phases, 30 s `pytest-timeout`, asyncio auto
+  mode, and branch-coverage reports (HTML + XML + term-missing).
+  Coverage `fail_under` starts low and will be raised module-by-module
+  by Phase 5. Commit `106bf8a`.
+- **Service-availability fixtures** (`merge_service_live`,
+  `qbittorrent_live`, `webui_bridge_live`, `all_services_live`) in
+  `tests/fixtures/services.py`, wired via `tests/conftest.py`. These
+  fixtures **error** when the stack is unreachable instead of silently
+  skipping — integration tests now fail loud on a broken stack.
+  Commit `726bf8e`.
+- **71 runtime service-availability skips** converted into fixture
+  dependencies across 17 integration/security/performance/stress test
+  files. `tests/unit/test_no_runtime_service_skips.py` guards the
+  invariant so the pattern cannot come back. Removed
+  `--ignore=tests/integration/test_ui_{comprehensive,quick}.py` lines
+  from `run-all-tests.sh`. Commit `55d29ce`.
+- **Split CI workflow** — single manual-only `test.yml` replaced with
+  five auto-triggered workflows under `.github/workflows/`:
+  `syntax.yml` (push + PR — bash, py_compile, ruff, yamllint,
+  hadolint, shellcheck), `unit.yml` (push + PR), `integration.yml`
+  (push + PR, with compose bring-up), `nightly.yml` (full suite, cron),
+  `security.yml` (weekly scan + push on dep changes). Commit `c3878ba`.
+
+#### Phase 1 — Scanning & observability infrastructure
+- **`docker-compose.quality.yml`** — opt-in compose file adding
+  SonarQube + sonar-db (profile `quality`), four one-shot scanners
+  (`snyk`, `semgrep`, `trivy`, `gitleaks` — profile `run-once`), and
+  Prometheus + Grafana (profile `observability`). All quality ports
+  bind to `127.0.0.1` only. The product remains a two-container deploy
+  so constitution Principle I is preserved. Commit `00164db`.
+- **Scanner tooling config** — `.semgrep.yml`, `.gitleaks.toml`,
+  `.trivyignore`, `.snyk`, `sonar-project.properties`. Mandatory
+  waiver format (Finding ID / reason / expiry). Non-interactive
+  invariant guarded by `tests/unit/test_scan_script_non_interactive.py`.
+- **`scripts/scan.sh`** — single entry point that runs every scanner
+  locally (`--all`) or a subset (`pip-audit bandit ruff ...`). Reports
+  land in `artifacts/scans/<UTC timestamp>/` as SARIF.
+- **Observability assets** — `observability/prometheus.yml`,
+  `observability/dashboards/merge-search.json` (UID
+  `qbit-merge-search`), `observability/datasources/prometheus.yml`.
+  Dashboard panels chart `qbit_merge_active_searches`,
+  `qbit_merge_tracker_requests_total`, p95 search duration, and
+  per-tracker circuit-breaker state (metrics are surfaced by the
+  merge service in Phase 6).
+- **Supporting docs** — `docs/SCANNING.md`, `docs/QUALITY_STACK.md`
+  pinning the rationale and usage of the opt-in stack.
+
+### Notes
+- No product code path changed in either phase. The quality compose
+  stack is additive and never started by `./start.sh`.
+- Existing manual CI (`./ci.sh`) still works unchanged; the new
+  GitHub Actions workflows run in addition to it.
 
 ## [Unreleased] - 2026-04-18
 

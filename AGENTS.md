@@ -508,3 +508,36 @@ Click "Magnet" button to open a dialog with:
 - Always run tests before committing: `./test.sh --full` or `./ci.sh`
 - Update `README.md`, `USER_MANUAL.md`, and `AGENTS.md` for user/dev-facing changes
 - See `CONTRIBUTING.md` for full guidelines
+
+## Scanners & Quality Stack
+
+The project runs a seven-scanner security stack plus SonarQube and the
+Prometheus/Grafana observability stack. All of it is opt-in via the
+separate `docker-compose.quality.yml` (constitution Principle I is
+preserved — the product remains a two-container deploy).
+
+- `docs/SCANNING.md` — authoritative reference for the seven scanners
+  (`pip-audit`, `bandit`, `ruff`, `semgrep`, `trivy`, `gitleaks`,
+  `snyk`, plus SonarQube), local invocation via `scripts/scan.sh`, CI
+  wiring, waiver policy with mandatory expiry dates, and triage SLOs.
+- `docs/QUALITY_STACK.md` — why the quality compose file is separate,
+  profile table, environment variables, ports (`9000` SonarQube,
+  `9090` Prometheus, `3000` Grafana), lifecycle commands.
+- `docs/OBSERVABILITY.md` — metric names (`qbit_merge_active_searches`,
+  `qbit_merge_tracker_requests_total`,
+  `qbit_merge_search_duration_seconds_bucket`,
+  `qbit_merge_circuit_breaker_state`), pre-provisioned Grafana
+  dashboard at UID `qbit-merge-search`, and how
+  `tests/observability/` asserts metric existence.
+
+### Test Types
+
+`docs/TESTING.md` is the authoritative catalogue of the 30 test types
+used in this project (Unit, Integration, E2E, Contract, Property,
+Fuzz, Mutation, Security, Performance, Load, Stress, Chaos,
+Concurrency, Memory-leak, Smoke, Monitoring, Infra, A11y, Visual,
+Docs-link, Type-check, Lint, Dep-audit, SAST, Secret-scan, License,
+…). Each row lists framework, directory, how-to-run, and where
+coverage / reports land. The same document defines the TDD cadence
+(RED → watch fail → GREEN → rebuild-reboot → commit) required by
+`CLAUDE.md`.

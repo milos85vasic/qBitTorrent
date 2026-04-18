@@ -1,0 +1,36 @@
+%% Private-tracker authenticated-download path.
+%% Constitution V — Private Tracker Bridge Pattern.
+%% webui-bridge.py is a host process on :7188, nova2dl.py is a nova3 runtime shim.
+sequenceDiagram
+    autonumber
+    actor User
+    participant WebUI as qBittorrent WebUI (:7185)
+    participant QB as qBittorrent core
+    participant Bridge as webui-bridge.py (:7188 on host)
+    participant Nova as nova2dl.py (engines/)
+    participant Plugin as private plugin (rutracker/kinozal/nnmclub/iptorrents)
+    participant Tracker as Private tracker (HTTPS)
+    participant Tmp as ./tmp (shared-tmp bind)
+
+    User->>WebUI: clicks Download on a private-tracker result
+    WebUI->>QB: submit URL (qbt://.. or tracker URL)
+    QB->>Nova: python3 nova2dl.py <engine> <url>
+    Nova->>Plugin: import engines.<name>; <name>().download_torrent(url)
+    Plugin->>Bridge: HTTP GET :7188/download?url=...&tracker=<name>
+    note over Bridge: reads creds from env / .env / ~/.qbit.env
+    Bridge->>Tracker: POST /login (if session absent)
+    Tracker-->>Bridge: Set-Cookie: session=<uid>
+    Bridge->>Tracker: GET <url> with cookie + Referer
+    alt redirect / HTML wrapper
+        Tracker-->>Bridge: 302 → /download.php?id=N
+        Bridge->>Tracker: GET /download.php?id=N
+        Tracker-->>Bridge: application/x-bittorrent
+    else direct torrent
+        Tracker-->>Bridge: application/x-bittorrent
+    end
+    Bridge->>Tmp: write /shared-tmp/<uuid>.torrent
+    Bridge-->>Plugin: 200 OK, body = torrent bytes
+    Plugin-->>Nova: writes magnet or path to stdout
+    Nova-->>QB: returns magnet or file path
+    QB->>Tmp: reads /shared-tmp/<uuid>.torrent (shared volume)
+    QB->>User: torrent queued in qBittorrent

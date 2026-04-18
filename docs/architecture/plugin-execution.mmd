@@ -1,0 +1,31 @@
+%% nova3 plugin execution paths: current (subprocess) and post-Phase-2 (ProcessPoolExecutor).
+flowchart TB
+    start(["SearchOrchestrator._search_tracker(name)"])
+    start --> choose{"tracker.name"}
+
+    choose -->|"rutracker / kinozal /\nnnmclub / iptorrents"| private["aiohttp path:\n  POST /login\n  GET /search\n  parse HTML\n  store cookies in _tracker_sessions"]
+    choose -->|"public tracker\n(36 engines)"| public_current
+
+    subgraph current["Current — subprocess per search"]
+        public_current["_search_public_tracker(name)"]
+        public_current --> script["build one-liner:\nsys.path += /config/.../nova3\nprettyPrinter = capture\nengines.<name>.<name>().search(q,c)"]
+        script --> exec["asyncio.create_subprocess_exec(\n  python3, -c, script,\n  stdout=PIPE, stderr=PIPE)"]
+        exec --> wait["asyncio.wait_for(\n  communicate(), timeout=10s)"]
+        wait --> parse_json["json.loads(stdout)\n→ SearchResult dicts"]
+        wait -.timeout.-> kill["proc.kill()\n→ []"]
+    end
+
+    subgraph target["Post-Phase-2 — ProcessPoolExecutor"]
+        public_next["_search_public_tracker_v2(name)"]
+        public_next --> pool_submit["loop.run_in_executor(\n  shared ProcessPoolExecutor,\n  run_engine, name, q, c)"]
+        pool_submit --> worker["warm worker\n(preimported engines)\nresource-limited (rlimit)\ntimeout via future.result()"]
+        worker --> worker_result["SearchResult list"]
+    end
+
+    parse_json --> emit(["return List[SearchResult]"])
+    worker_result --> emit
+    private --> emit
+    kill --> emit
+
+    classDef pending fill:#fff7e6,stroke:#c68b17,color:#333;
+    class target,public_next,pool_submit,worker,worker_result pending;

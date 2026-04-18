@@ -112,11 +112,13 @@ config/download-proxy/src/
 # Generated reports
 plugin_update_report.json
 test_report.json
-tmp/
+tmp/*
+!tmp/README.md
 
 # IDE directories
 .opencode/
-.specify/
+.specify/*
+!.specify/README.md
 
 # Status/summary markdown (orphaned)
 FINAL_STATUS.md

@@ -1,0 +1,36 @@
+%% Container topology for qBittorrent-Fixed
+%% Product = two containers + one host process (constitution I).
+%% The "Quality Stack" box is opt-in via docker-compose.quality.yml
+%% and is not part of the product topology.
+graph TB
+    subgraph Host["Host machine"]
+        Bridge["webui-bridge.py\nhost process\nport 7188"]
+        BrowserUI[(Browser / Angular app)]
+    end
+
+    subgraph Product["docker-compose.yml — product"]
+        QB["qbittorrent\nlscr.io/linuxserver/qbittorrent\nWebUI :7185"]
+        Proxy["qbittorrent-proxy\npython:3.12-alpine\ndownload-proxy :7186\nmerge-service :7187"]
+    end
+
+    subgraph Quality["docker-compose.quality.yml — opt-in"]
+        Sonar["sonarqube :9000"]
+        SonarDB[("sonar-db\npostgres:16")]
+        Prom["prometheus :9090"]
+        Graf["grafana :3000"]
+        Scanners["semgrep / trivy / gitleaks / snyk\n(run-once)"]
+    end
+
+    BrowserUI -->|HTTP :7187| Proxy
+    BrowserUI -->|HTTP :7185| QB
+    Bridge -->|auth'd tracker download| Proxy
+    Proxy -->|subprocess nova3| QB
+    Proxy -->|shared ./tmp volume| QB
+
+    Proxy -. /metrics .-> Prom
+    Prom --> Graf
+    Sonar --> SonarDB
+    Scanners -. artifacts/scans/*.sarif .-> Host
+
+    classDef opt fill:#fff7e6,stroke:#c68b17,color:#333;
+    class Quality,Sonar,SonarDB,Prom,Graf,Scanners opt;
