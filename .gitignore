@@ -84,6 +84,17 @@ config/download-proxy/src/hooks.json
 # Ruff cache
 .ruff_cache/
 
+# Coverage / mutation / pytest artifacts
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mutmut-cache
+prof/
+.mypy_cache/
+.hypothesis/
+
 # Download-proxy runtime files
 config/download-proxy/hooks.json
 

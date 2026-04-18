@@ -1,0 +1,123 @@
+# Unified tool config for qBitTorrent-Fixed.
+# See docs/superpowers/plans/2026-04-19-completion-initiative.md Phase 0.1.
+
+[project]
+name = "qbittorrent-fixed"
+version = "0.1.0"
+description = "Containerized qBittorrent + multi-tracker merge search with private-tracker authenticated downloads."
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+minversion = "7.4"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=download-proxy/src",
+    "--cov=plugins",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-report=html",
+    "--timeout=30",
+    "--import-mode=importlib",
+]
+filterwarnings = [
+    "error::DeprecationWarning",
+    "ignore::DeprecationWarning:pytest_asyncio.*",
+    "ignore::DeprecationWarning:pkg_resources.*",
+]
+markers = [
+    "requires_credentials: test needs real tracker credentials (.env)",
+    "requires_compose: test needs the full docker-compose stack up",
+    "slow: test takes longer than 1s (opt-in)",
+    "stress: high-load stress test (opt-in)",
+    "security: security-focused test",
+    "contract: API contract test (schemathesis / openapi)",
+    "property: property-based (hypothesis) test",
+    "memory: memory-leak / tracemalloc test",
+    "chaos: chaos/fault-injection test",
+    "observability: scrapes prometheus / metrics",
+]
+
+[tool.coverage.run]
+source = ["download-proxy/src", "plugins"]
+branch = true
+omit = [
+    "*/__pycache__/*",
+    "*/tests/*",
+    "download-proxy/src/ui/*",
+    "plugins/webui_compatible/*",
+]
+parallel = true
+
+[tool.coverage.report]
+# `fail_under` is the COVERAGE GATE. It starts at 1 (baseline) and is
+# raised per phase as modules reach 100%. See docs/COVERAGE_BASELINE.md.
+fail_under = 1
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@overload",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+# ASYNC (flake8-async) rules catch blocking I/O inside async funcs — key
+# for Phase 3 concurrency hardening.
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC", "S", "PT", "C4", "TID"]
+ignore = [
+    "E501",      # handled by line-length
+    "S101",      # allow assert in tests
+    "S603",      # subprocess calls audited in Phase 2 separately
+    "S607",      # partial-path exec audited in Phase 2
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S106", "PT011"]
+"plugins/**/*.py" = ["S"]  # plugin contract pre-exists audit
+
+[tool.ruff.lint.isort]
+known-first-party = ["api", "merge_service", "config", "plugins"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+pretty = true
+show_error_codes = true
+# Per-module overrides: plugins/ is legacy, merge_service/ gets strict later
+exclude = [
+    "^plugins/(?!__init__).*$",
+    "^tests/.*$",
+    "^download-proxy/src/ui/.*$",
+]
+
+[[tool.mypy.overrides]]
+module = ["novaprinter", "helpers", "requests.*"]
+ignore_missing_imports = true
+
+[tool.mutmut]
+paths_to_mutate = "download-proxy/src/"
+runner = "pytest -x -q"
+tests_dir = "tests/unit"

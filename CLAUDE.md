@@ -79,7 +79,7 @@ python3 -m pytest tests/unit/ -k "search" -v --import-mode=importlib   # Filter 
 
 ### Linting
 ```bash
-ruff check .                                       # Lint (config in ruff.toml: py312, line 120, E/F/W/I/UP/B/SIM/RUF)
+ruff check .                                       # Lint (config in pyproject.toml: py312, line 120, E/F/W/I/UP/B/SIM/RUF/ASYNC/S/PT/C4/TID)
 ruff check --fix .                                 # Auto-fix
 ruff format .                                      # Format
 ```
