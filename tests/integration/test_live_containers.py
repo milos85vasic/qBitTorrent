@@ -132,6 +132,10 @@ class TestQbittorrentWebUI:
 
 
 class TestDownloadProxy:
+    @pytest.fixture(autouse=True)
+    def _service_up(self, qbittorrent_live):
+        self.proxy_url = qbittorrent_live
+
     def test_proxy_container_has_proxy_module(self):
         r = _exec(
             "qbittorrent-proxy",
@@ -140,15 +144,11 @@ class TestDownloadProxy:
         assert r.returncode == 0, f"download_proxy module not importable: {r.stderr}"
 
     def test_proxy_reachable(self):
-        status, body, _ = _fetch(f"{PROXY_URL}/")
-        if status is None:
-            pytest.skip("Download proxy on port 7186 not started (original proxy thread may have failed)")
-        assert status is not None, f"Proxy not reachable at {PROXY_URL}"
+        status, body, _ = _fetch(f"{self.proxy_url}/")
+        assert status is not None, f"Proxy not reachable at {self.proxy_url}"
 
     def test_proxy_forwards_to_qbittorrent(self):
-        status, body, _ = _fetch(f"{PROXY_URL}/")
-        if status is None:
-            pytest.skip("Download proxy on port 7186 not started")
+        status, body, _ = _fetch(f"{self.proxy_url}/")
         assert status == 200, f"Proxy forward failed: status={status}"
         assert "qBittorrent" in body or "html" in body.lower(), "Proxy not forwarding to qBittorrent WebUI"
 
@@ -234,11 +234,12 @@ class TestMergeService:
 
 
 class TestContainerEnvironment:
+    @pytest.mark.requires_credentials
     def test_rutracker_creds_configured(self):
         r = _exec("qbittorrent-proxy", "env | grep RUTRACKER_USERNAME || true")
         has_creds = r.stdout.strip() != ""
         if not has_creds:
-            pytest.skip("RUTRACKER_USERNAME not configured in .env — optional for testing")
+            pytest.skip("RUTRACKER_USERNAME not configured in .env — optional for testing")  # allow-skip: credential-gated
 
     def test_proxy_port_env(self):
         r = _exec("qbittorrent-proxy", "echo $PROXY_PORT")
@@ -248,13 +249,13 @@ class TestContainerEnvironment:
         r = _exec("qbittorrent-proxy", "echo $MERGE_SERVICE_PORT")
         port = r.stdout.strip()
         if not port:
-            pytest.skip("MERGE_SERVICE_PORT not explicitly set (uses default 7187)")
+            pytest.skip("MERGE_SERVICE_PORT not explicitly set (uses default 7187)")  # allow-skip: optional config var
         assert port == "7187", f"MERGE_SERVICE_PORT is: {port}"
 
     def test_shared_tmp_mount(self):
         r = _exec("qbittorrent-proxy", "ls -la /shared-tmp/ 2>/dev/null || true")
         if r.returncode != 0:
-            pytest.skip("/shared-tmp not mounted — requires container restart with updated docker-compose")
+            pytest.skip("/shared-tmp not mounted — requires container restart with updated docker-compose")  # allow-skip: optional compose feature
 
     def test_shared_tmp_in_qbittorrent(self):
         r = _exec("qbittorrent", "ls -la /shared-tmp/")

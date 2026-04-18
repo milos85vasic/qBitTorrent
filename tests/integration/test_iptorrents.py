@@ -101,15 +101,17 @@ class TestIPTorrentsPluginUnit:
 
 
 class TestIPTorrentsMergeService:
+    @pytest.mark.requires_credentials
     def test_iptorrents_in_stats(self):
         status, body, _ = _fetch(f"{MERGE_URL}/api/v1/stats")
         assert status == 200
         data = json.loads(body)
         tracker_names = [t["name"] for t in data.get("trackers", [])]
         if not _has_iptorrents_creds():
-            pytest.skip("IPTorrents creds not set")
+            pytest.skip("IPTorrents creds not set")  # allow-skip: credential-gated
         assert "iptorrents" in tracker_names, f"iptorrents not in enabled trackers: {tracker_names}"
 
+    @pytest.mark.requires_credentials
     @no_creds
     def test_search_returns_results(self):
         data = json.dumps({"query": "ubuntu", "limit": 10}).encode()
@@ -123,6 +125,7 @@ class TestIPTorrentsMergeService:
         result = json.loads(body)
         assert result.get("total_results", 0) >= 0
 
+    @pytest.mark.requires_credentials
     @no_creds
     def test_search_results_have_freeleech_field(self):
         data = json.dumps({"query": "1080p", "limit": 20}).encode()
@@ -133,13 +136,13 @@ class TestIPTorrentsMergeService:
             headers={"Content-Type": "application/json"},
         )
         if status not in (200, 201, 202):
-            pytest.skip(f"Search returned {status}")
+            pytest.skip(f"Search returned {status}")  # allow-skip: upstream tracker response, not merge-service availability
         result = json.loads(body)
         for r in result.get("results", []):
             if r.get("tracker") == "iptorrents":
-                assert "freeleech" in r, f"Missing freeleech field in iptorrents result"
+                assert "freeleech" in r, "Missing freeleech field in iptorrents result"
                 return
-        pytest.skip("No iptorrents results in this search")
+        pytest.skip("No iptorrents results in this search")  # allow-skip: data-dependent outcome
 
 
 class TestIPTorrentsFreeleechDetection:
@@ -210,6 +213,7 @@ class TestIPTorrentsFreeleechDetection:
 
 
 class TestIPTorrentsDownloadFreeleechOnly:
+    @pytest.mark.requires_credentials
     @no_creds
     def test_search_freeleech_via_merge_service(self):
         data = json.dumps({"query": "1080p", "limit": 20}).encode()
@@ -220,7 +224,7 @@ class TestIPTorrentsDownloadFreeleechOnly:
             headers={"Content-Type": "application/json"},
         )
         if status not in (200, 201, 202):
-            pytest.skip(f"Search returned {status}")
+            pytest.skip(f"Search returned {status}")  # allow-skip: upstream tracker response, not merge-service availability
 
         result = json.loads(body)
         ip_results = [
@@ -230,6 +234,7 @@ class TestIPTorrentsDownloadFreeleechOnly:
             assert r.get("freeleech") is True, f"Non-freeleech in results: {r}"
             assert "[free]" in r.get("tracker_display", ""), f"Missing [free] tag: {r}"
 
+    @pytest.mark.requires_credentials
     @no_creds
     def test_plugin_search_freeleech_method(self):
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins"))
@@ -237,7 +242,7 @@ class TestIPTorrentsDownloadFreeleechOnly:
 
         engine = iptorrents()
         if not engine.session:
-            pytest.skip("Could not login to IPTorrents")
+            pytest.skip("Could not login to IPTorrents")  # allow-skip: credential-gated login failure
         import io
         from contextlib import redirect_stdout
 

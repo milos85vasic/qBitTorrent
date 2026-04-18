@@ -15,25 +15,18 @@ import time
 import statistics
 
 
-BASE_URL = "http://localhost:7187"
-
-
 class TestConcurrentSearch:
     """Search endpoint must handle concurrent load gracefully."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_single_search_response_time(self):
         """Single search should complete within 15 seconds."""
         start = time.time()
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "ubuntu", "limit": 10},
             timeout=30,
         )
@@ -49,7 +42,7 @@ class TestConcurrentSearch:
         def search(query):
             start = time.time()
             resp = requests.post(
-                f"{BASE_URL}/api/v1/search",
+                f"{self.base_url}/api/v1/search",
                 json={"query": query, "limit": 10},
                 timeout=30,
             )
@@ -73,7 +66,7 @@ class TestConcurrentSearch:
         def search(query):
             start = time.time()
             resp = requests.post(
-                f"{BASE_URL}/api/v1/search",
+                f"{self.base_url}/api/v1/search",
                 json={"query": query, "limit": 5},
                 timeout=60,
             )
@@ -93,7 +86,7 @@ class TestConcurrentSearch:
         for i in range(5):
             start = time.time()
             resp = requests.post(
-                f"{BASE_URL}/api/v1/search",
+                f"{self.base_url}/api/v1/search",
                 json={"query": "ubuntu", "limit": 10},
                 timeout=30,
             )
@@ -115,7 +108,7 @@ class TestConcurrentSearch:
         # Start a slow search in background
         def slow_search():
             requests.post(
-                f"{BASE_URL}/api/v1/search",
+                f"{self.base_url}/api/v1/search",
                 json={"query": "ubuntu", "limit": 50},
                 timeout=60,
             )
@@ -124,7 +117,7 @@ class TestConcurrentSearch:
             futures = [executor.submit(slow_search) for _ in range(3)]
             # Dashboard should still respond
             for _ in range(5):
-                resp = requests.get(f"{BASE_URL}/dashboard", timeout=5)
+                resp = requests.get(f"{self.base_url}/dashboard", timeout=5)
                 assert resp.status_code == 200
                 time.sleep(0.5)
             # Wait for searches to complete
@@ -136,7 +129,7 @@ class TestConcurrentSearch:
         # Start multiple searches
         def search():
             requests.post(
-                f"{BASE_URL}/api/v1/search",
+                f"{self.base_url}/api/v1/search",
                 json={"query": "test", "limit": 10},
                 timeout=30,
             )
@@ -145,7 +138,7 @@ class TestConcurrentSearch:
             futures = [executor.submit(search) for _ in range(5)]
             for _ in range(10):
                 start = time.time()
-                resp = requests.get(f"{BASE_URL}/health", timeout=5)
+                resp = requests.get(f"{self.base_url}/health", timeout=5)
                 elapsed = time.time() - start
                 assert resp.status_code == 200
                 assert elapsed < 5, f"Health check took {elapsed:.1f}s"
@@ -158,7 +151,7 @@ class TestConcurrentSearch:
         # Run 10 searches sequentially
         for i in range(10):
             resp = requests.post(
-                f"{BASE_URL}/api/v1/search",
+                f"{self.base_url}/api/v1/search",
                 json={"query": f"test{i}", "limit": 5},
                 timeout=30,
             )
@@ -166,5 +159,5 @@ class TestConcurrentSearch:
             time.sleep(0.5)
 
         # Service should still be healthy
-        health = requests.get(f"{BASE_URL}/health", timeout=5)
+        health = requests.get(f"{self.base_url}/health", timeout=5)
         assert health.status_code == 200

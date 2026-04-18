@@ -14,25 +14,17 @@ import requests
 import time
 
 
-BASE_URL = "http://localhost:7187"
-QBIT_URL = "http://localhost:7185"
-
-
 class TestIssue1DownloadButton:
     """Issue 1: Download button MUST download a file with merged sources."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_download_file_endpoint_exists(self):
         """There must be an endpoint to download .torrent files."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/download/file",
+            f"{self.base_url}/api/v1/download/file",
             json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
             timeout=10,
             allow_redirects=False,
@@ -42,20 +34,20 @@ class TestIssue1DownloadButton:
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
-        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
         assert "<base href=\"/\">" in dashboard
         assert "<script src=\"main-" in dashboard
 
     def test_download_button_is_angular_component(self):
         """Download button must be Angular component."""
-        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
 
     def test_magnet_endpoint_returns_merged_sources(self):
         """/magnet endpoint must return a magnet with all source trackers."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/magnet",
+            f"{self.base_url}/api/v1/magnet",
             json={
                 "result_id": "Test",
                 "download_urls": [
@@ -76,16 +68,12 @@ class TestIssue2TypeColumn:
     """Issue 2: Type column shows Unknown for too many results."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def search_and_get_results(self, query, limit=20):
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": query, "limit": limit},
             timeout=60,
         )
@@ -96,7 +84,7 @@ class TestIssue2TypeColumn:
         # Poll until complete
         for _ in range(20):
             time.sleep(2)
-            poll = requests.get(f"{BASE_URL}/api/v1/search/{search_id}", timeout=10)
+            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=10)
             pdata = poll.json()
             if pdata.get("status") in ("completed", "failed"):
                 return pdata.get("results", [])
@@ -131,16 +119,12 @@ class TestIssue3SeedsLeechers:
     """Issue 3: Seeds/Leechers showing 0 for most results."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def search_and_get_results(self, query, limit=20):
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": query, "limit": limit},
             timeout=60,
         )
@@ -148,7 +132,7 @@ class TestIssue3SeedsLeechers:
         search_id = data["search_id"]
         for _ in range(20):
             time.sleep(2)
-            poll = requests.get(f"{BASE_URL}/api/v1/search/{search_id}", timeout=10)
+            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=10)
             pdata = poll.json()
             if pdata.get("status") in ("completed", "failed"):
                 return pdata.get("results", [])
@@ -182,18 +166,14 @@ class TestIssue4SearchPerformance:
     """Issue 4: Search hangs / takes too long."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_search_completes_within_reasonable_time(self):
         """Search must complete within 60 seconds."""
         start = time.time()
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "linux", "limit": 10},
             timeout=60,
         )
@@ -205,7 +185,7 @@ class TestIssue4SearchPerformance:
         completed = False
         for _ in range(30):
             time.sleep(2)
-            poll = requests.get(f"{BASE_URL}/api/v1/search/{search_id}", timeout=10)
+            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=10)
             pdata = poll.json()
             if pdata.get("status") in ("completed", "failed"):
                 completed = True
@@ -218,7 +198,7 @@ class TestIssue4SearchPerformance:
     def test_search_returns_results_from_multiple_trackers(self):
         """Search should return results from multiple trackers."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "matrix", "limit": 20},
             timeout=60,
         )
@@ -227,7 +207,7 @@ class TestIssue4SearchPerformance:
 
         for _ in range(30):
             time.sleep(2)
-            poll = requests.get(f"{BASE_URL}/api/v1/search/{search_id}", timeout=10)
+            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=10)
             pdata = poll.json()
             if pdata.get("status") == "completed":
                 trackers = set()
@@ -244,23 +224,19 @@ class TestIssue5Sorting:
     """Issue 5: Sorting is broken."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
-        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
         assert "<script src=\"main-" in dashboard
 
     def test_backend_supports_sort_params(self):
         """Backend should support sort parameters."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "test", "sort_by": "name", "sort_order": "asc"},
             timeout=30,
         )
@@ -271,16 +247,12 @@ class TestFooter:
     """Footer must show 'Made with <3 by Vasic Digital' on every screen."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
-        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
         assert "<script src=\"main-" in dashboard
 
@@ -289,18 +261,14 @@ class TestSearchPerformance:
     """Search endpoint must return quickly with search_id, not block for minutes."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_search_returns_within_thirty_seconds(self):
         """POST /search must return within 30s with search_id, not block for minutes."""
         start = time.time()
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "ubuntu", "limit": 5},
             timeout=45,
         )
@@ -313,7 +281,7 @@ class TestSearchPerformance:
     def test_search_returns_running_status_immediately(self):
         """Initial search response must have status 'running' or 'in_progress'."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "ubuntu", "limit": 5},
             timeout=30,
         )
@@ -327,21 +295,17 @@ class TestDownloadButtonConsistency:
     """Both renderResults and addResultToTable must use doDownloadTorrent for Download button."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
-        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
 
     def test_download_button_is_angular_component(self):
         """Download button must be Angular component."""
-        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
 
 
@@ -349,23 +313,19 @@ class TestDashboardCacheControl:
     """Dashboard must have cache-busting headers to prevent stale content."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_dashboard_has_cache_control_header(self):
         """Dashboard response must include Cache-Control: no-cache or similar."""
-        resp = requests.get(f"{BASE_URL}/", timeout=5)
+        resp = requests.get(f"{self.base_url}/", timeout=5)
         cc = resp.headers.get("Cache-Control", "").lower()
         assert "no-cache" in cc or "no-store" in cc or "must-revalidate" in cc, \
             f"Missing cache-control header, got: {cc!r}"
 
     def test_dashboard_has_no_etag_or_weak_etag(self):
         """Dashboard should not use strong etag caching."""
-        resp = requests.get(f"{BASE_URL}/", timeout=5)
+        resp = requests.get(f"{self.base_url}/", timeout=5)
         # ETag is OK if Cache-Control is set to no-cache
         cc = resp.headers.get("Cache-Control", "").lower()
         assert "no-cache" in cc or "no-store" in cc, \

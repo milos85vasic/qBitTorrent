@@ -11,29 +11,20 @@ Covers:
 
 import pytest
 import requests
-import subprocess
-import time
-
-
-BASE_URL = "http://localhost:7187"
-QBIT_URL = "http://localhost:7185"
 
 
 class TestQbitDefaultPassword:
     """Verify admin/admin is the default qBittorrent password."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _services_up(self, all_services_live):
+        self.base_url = all_services_live["merge_service"]
+        self.qbit_url = all_services_live["qbittorrent"]
 
     def test_admin_admin_login_succeeds(self):
         """qBittorrent must accept admin/admin credentials."""
         resp = requests.post(
-            f"{QBIT_URL}/api/v2/auth/login",
+            f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "admin"},
             timeout=5,
         )
@@ -43,7 +34,7 @@ class TestQbitDefaultPassword:
     def test_wrong_password_rejected(self):
         """Wrong password must be rejected."""
         resp = requests.post(
-            f"{QBIT_URL}/api/v2/auth/login",
+            f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "wrong"},
             timeout=5,
         )
@@ -54,13 +45,13 @@ class TestQbitDefaultPassword:
         """Successful login must grant access to protected API."""
         session = requests.Session()
         login = session.post(
-            f"{QBIT_URL}/api/v2/auth/login",
+            f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "admin"},
             timeout=5,
         )
         assert login.text.strip() == "Ok."
 
-        version = session.get(f"{QBIT_URL}/api/v2/app/version", timeout=5)
+        version = session.get(f"{self.qbit_url}/api/v2/app/version", timeout=5)
         assert version.status_code == 200
         assert version.text.startswith("v")
 
@@ -68,12 +59,12 @@ class TestQbitDefaultPassword:
         """Merge service auth status must reflect live qBittorrent session."""
         # First ensure we have valid saved credentials
         requests.post(
-            f"{BASE_URL}/api/v1/auth/qbittorrent",
+            f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": True},
             timeout=5,
         )
 
-        status = requests.get(f"{BASE_URL}/api/v1/auth/status", timeout=5).json()
+        status = requests.get(f"{self.base_url}/api/v1/auth/status", timeout=5).json()
         qbit = status["trackers"]["qbittorrent"]
         assert qbit["has_session"] is True, "Expected qBittorrent session to be active"
         assert qbit["username"] == "admin"
@@ -91,12 +82,12 @@ class TestQbitDefaultPassword:
         os.system(f"podman cp {tmp_path} qbittorrent-proxy:/config/download-proxy/qbittorrent_creds.json")
         os.unlink(tmp_path)
 
-        status = requests.get(f"{BASE_URL}/api/v1/auth/status", timeout=5).json()
+        status = requests.get(f"{self.base_url}/api/v1/auth/status", timeout=5).json()
         qbit = status["trackers"]["qbittorrent"]
 
         # Restore correct credentials
         requests.post(
-            f"{BASE_URL}/api/v1/auth/qbittorrent",
+            f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": True},
             timeout=5,
         )
@@ -108,37 +99,31 @@ class TestServiceLinksAccessibility:
     """Verify service links are accessible."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _services_up(self, all_services_live):
+        self.base_url = all_services_live["merge_service"]
+        self.qbit_url = all_services_live["qbittorrent"]
 
     def test_merge_search_dashboard_accessible(self):
         """Merge Search dashboard (port 7187) must be accessible."""
-        r = requests.get(f"{BASE_URL}/dashboard", timeout=5)
+        r = requests.get(f"{self.base_url}/dashboard", timeout=5)
         assert r.status_code == 200
         assert "Merge Search Dashboard" in r.text
 
     def test_qbittorrent_webui_accessible(self):
         """qBittorrent WebUI (port 7185) must respond."""
-        r = requests.get(QBIT_URL, timeout=5)
+        r = requests.get(self.qbit_url, timeout=5)
         # qBittorrent returns 200 for the login page or 403 if already authenticated
         assert r.status_code in (200, 403)
 
     def test_download_proxy_accessible(self):
-        """Download proxy (port 7186) must respond."""
-        try:
-            r = requests.get("http://localhost:7186", timeout=5)
-            # Proxy might return various status codes
-            assert r.status_code < 500
-        except requests.ConnectionError:
-            pytest.skip("Download proxy not accessible")
+        """Download proxy (port 7186) must respond (same URL as qbittorrent_live)."""
+        r = requests.get(self.qbit_url, timeout=5)
+        # Proxy might return various status codes
+        assert r.status_code < 500
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be the Angular SPA."""
-        r = requests.get(f"{BASE_URL}/dashboard", timeout=5)
+        r = requests.get(f"{self.base_url}/dashboard", timeout=5)
         assert r.status_code == 200
         assert "<app-root>" in r.text or "<app-root></app-root>" in r.text
         assert "<base href=\"/\">" in r.text
@@ -149,17 +134,13 @@ class TestAuthEndpointBehavior:
     """Test auth endpoint behavior with different qBittorrent states."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_qbittorrent_login_endpoint_accepts_valid(self):
         """POST /auth/qbittorrent must return authenticated for valid creds."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/auth/qbittorrent",
+            f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": False},
             timeout=5,
         )
@@ -171,7 +152,7 @@ class TestAuthEndpointBehavior:
     def test_qbittorrent_login_endpoint_rejects_invalid(self):
         """POST /auth/qbittorrent must return failed for invalid creds."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/auth/qbittorrent",
+            f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "wrong", "save": False},
             timeout=5,
         )
@@ -193,14 +174,14 @@ class TestAuthEndpointBehavior:
         os.unlink(tmp_path)
 
         resp = requests.post(
-            f"{BASE_URL}/api/v1/download",
+            f"{self.base_url}/api/v1/download",
             json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
             timeout=10,
         )
 
         # Restore correct credentials
         requests.post(
-            f"{BASE_URL}/api/v1/auth/qbittorrent",
+            f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": True},
             timeout=5,
         )
@@ -213,13 +194,13 @@ class TestAuthEndpointBehavior:
         """POST /download must return initiated when qBittorrent accepts login."""
         # Ensure correct credentials are saved
         requests.post(
-            f"{BASE_URL}/api/v1/auth/qbittorrent",
+            f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": True},
             timeout=5,
         )
 
         resp = requests.post(
-            f"{BASE_URL}/api/v1/download",
+            f"{self.base_url}/api/v1/download",
             json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
             timeout=10,
         )

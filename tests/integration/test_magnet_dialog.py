@@ -10,18 +10,14 @@ TDD Tests:
 
 import pytest
 import requests
-import json
-
-
-BASE_URL = "http://localhost:7187"
 
 
 class TestMagnetDialog:
     """Test magnet dialog functionality."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def search_and_get_first_result(self, query="matrix"):
@@ -76,8 +72,8 @@ class TestMagnetDialogBehavior:
     """Test magnet dialog behavior with results."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_doMagnet_is_angular_component(self):
@@ -100,8 +96,8 @@ class TestMobileMagnetExecution:
     """Test mobile magnet execution support."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_magnet_link_can_be_opened(self):
@@ -117,7 +113,7 @@ class TestMobileMagnetExecution:
         )
 
         if not result:
-            pytest.skip("No search results")
+            pytest.skip("No search results")  # allow-skip: data-dependent, not a service availability check
 
         from urllib.parse import quote
 

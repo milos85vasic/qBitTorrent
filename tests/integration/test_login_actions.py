@@ -14,20 +14,14 @@ Tests:
 
 import pytest
 import requests
-import json
-import time
-
-
-BASE_URL = "http://localhost:7187"
-QBIT_URL = "http://localhost:7185"
 
 
 class TestLoginModal:
     """Test login modal functionality."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_login_modal_is_angular_component(self):
@@ -47,72 +41,60 @@ class TestLoginAuthentication:
     """Test login authentication."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
-        self.qbit_url = QBIT_URL
+    def _services_up(self, all_services_live):
+        self.base_url = all_services_live["merge_service"]
+        self.qbit_url = all_services_live["qbittorrent"]
         self.session = requests.Session()
 
     def test_direct_qbittorrent_login(self):
         """Direct qBittorrent login should work."""
-        try:
-            resp = self.session.post(
-                f"{self.qbit_url}/api/v2/auth/login",
-                data={"username": "admin", "password": "admin"},
-                timeout=5,
-            )
-        except requests.ConnectionError:
-            pytest.skip("qBittorrent not available")
-        if resp.text != "Ok.":
-            pytest.skip(f"qBittorrent login failed: {resp.text}")
+        resp = self.session.post(
+            f"{self.qbit_url}/api/v2/auth/login",
+            data={"username": "admin", "password": "admin"},
+            timeout=5,
+        )
+        assert resp.text == "Ok.", f"qBittorrent login failed: {resp.text}"
 
     def test_merge_service_auth_endpoint(self):
         """Merge service auth endpoint should work."""
-        try:
-            resp = self.session.post(
-                f"{self.base_url}/api/v1/auth/qbittorrent",
-                json={"username": "admin", "password": "admin"},
-                headers={"Content-Type": "application/json"},
-                timeout=5,
-            )
-        except requests.ConnectionError:
-            pytest.skip("Merge service not available")
+        resp = self.session.post(
+            f"{self.base_url}/api/v1/auth/qbittorrent",
+            json={"username": "admin", "password": "admin"},
+            headers={"Content-Type": "application/json"},
+            timeout=5,
+        )
         assert resp.status_code == 200, f"Auth endpoint returned {resp.status_code}"
         data = resp.json()
-        if data.get("status") != "authenticated":
-            pytest.skip(f"qBittorrent auth failed: {data}")
+        assert data.get("status") == "authenticated", f"qBittorrent auth failed: {data}"
 
 
 class TestCredentialsPersistence:
     """Test credentials save/load functionality."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_credentials_can_be_saved(self):
         """Credentials should be saved when save is true."""
-        try:
-            resp = self.session.post(
-                f"{self.base_url}/api/v1/auth/qbittorrent",
-                json={"username": "admin", "password": "admin", "save": True},
-                headers={"Content-Type": "application/json"},
-                timeout=5,
-            )
-        except requests.ConnectionError:
-            pytest.skip("Merge service not available")
+        resp = self.session.post(
+            f"{self.base_url}/api/v1/auth/qbittorrent",
+            json={"username": "admin", "password": "admin", "save": True},
+            headers={"Content-Type": "application/json"},
+            timeout=5,
+        )
         data = resp.json()
-        # Either saved or already authenticated; skip if auth failed in env
-        if data.get("status") not in ["authenticated", "saved"]:
-            pytest.skip(f"qBittorrent auth failed, cannot test save: {data}")
+        assert data.get("status") in ["authenticated", "saved"], \
+            f"qBittorrent auth failed, cannot test save: {data}"
 
 
 class TestMagnetDialog:
     """Test magnet dialog operations."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_magnet_dialog_is_angular_component(self):
@@ -134,7 +116,7 @@ class TestMagnetDialog:
         )
         results = resp.json().get("results", [])
         if not results:
-            pytest.skip("No search results")
+            pytest.skip("No search results")  # allow-skip: data-dependent, not a service availability check
 
         name = results[0].get("name", "test")
         from urllib.parse import quote
@@ -147,8 +129,8 @@ class TestMagnetAddToQbit:
     """Test magnet add to qBittorrent functionality."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_add_magnet_via_download_api(self):
@@ -161,7 +143,7 @@ class TestMagnetAddToQbit:
         )
         results = resp.json().get("results", [])
         if not results:
-            pytest.skip("No search results")
+            pytest.skip("No search results")  # allow-skip: data-dependent, not a service availability check
 
         # Try download endpoint
         download_resp = self.session.post(
@@ -177,8 +159,8 @@ class TestDownloadButtons:
     """Test download button functionality."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_doDownload_is_angular_component(self):
@@ -201,8 +183,8 @@ class TestModalStacking:
     """Test modal stacking and dismissal."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_modal_is_angular_component(self):
@@ -225,8 +207,8 @@ class TestFullUserFlows:
     """Test full user flows from search to download."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_search_returns_results(self):
@@ -278,14 +260,15 @@ class TestCredentialStorage:
     """Test credential storage file."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_credentials_file_structure(self):
         """Credentials file should have proper structure."""
         # Test via API - login with save
         resp = self.session.post(
-            f"{BASE_URL}/api/v1/auth/qbittorrent",
+            f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": False},
             headers={"Content-Type": "application/json"},
         )
@@ -293,7 +276,7 @@ class TestCredentialStorage:
         try:
             data = resp.json()
             assert isinstance(data, dict), "Should return JSON object"
-        except:
+        except Exception:
             pytest.fail("Should return valid JSON")
 
 
@@ -301,27 +284,28 @@ class TestDashboardLoads:
     """Test dashboard loads properly."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_dashboard_loads(self):
         """Dashboard should load."""
-        resp = self.session.get(BASE_URL)
+        resp = self.session.get(self.base_url)
         assert resp.status_code == 200, f"Dashboard returned {resp.status_code}"
 
     def test_dashboard_has_angular_styles(self):
         """Dashboard should have Angular styles bundle."""
-        html = self.session.get(BASE_URL).text
+        html = self.session.get(self.base_url).text
         assert "styles-" in html, "Angular styles bundle should be loaded"
 
     def test_dashboard_is_angular_app(self):
         """Dashboard should be Angular app."""
-        html = self.session.get(BASE_URL).text
+        html = self.session.get(self.base_url).text
         assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_dashboard_has_search_form(self):
         """Dashboard should have search form in Angular app."""
-        html = self.session.get(BASE_URL).text
+        html = self.session.get(self.base_url).text
         assert "<app-root>" in html or "<app-root></app-root>" in html
 
 

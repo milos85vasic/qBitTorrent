@@ -14,25 +14,18 @@ import requests
 import html
 
 
-BASE_URL = "http://localhost:7187"
-
-
 class TestXSSProtection:
     """XSS attack vectors must be sanitized or rejected."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_search_query_with_script_tag(self):
         """Search query containing <script> must be returned as text in JSON (not executable)."""
         payload = "<script>alert('xss')</script>"
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": payload, "limit": 5},
             timeout=60,
         )
@@ -47,7 +40,7 @@ class TestXSSProtection:
         """Search query with javascript: protocol must be treated as text."""
         payload = "javascript:alert('xss')"
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": payload, "limit": 5},
             timeout=60,
         )
@@ -55,14 +48,14 @@ class TestXSSProtection:
 
     def test_dashboard_escapes_html_in_results(self):
         """Dashboard HTML must escape result names containing HTML."""
-        dashboard = requests.get(f"{BASE_URL}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
         # The dashboard should use escapeHtml() or equivalent
         assert "escapeHtml" in dashboard or "textContent" in dashboard or "innerText" in dashboard
 
     def test_magnet_link_rejects_javascript_protocol(self):
         """Magnet endpoint must reject javascript: URLs."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/magnet",
+            f"{self.base_url}/api/v1/magnet",
             json={"name": "test", "hash": "abc123"},
             timeout=10,
         )
@@ -79,40 +72,37 @@ class TestXSSProtection:
             "script": "/bin/true",
         }
         resp = requests.post(
-            f"{BASE_URL}/api/v1/hooks",
+            f"{self.base_url}/api/v1/hooks",
             json=payload,
             timeout=10,
         )
         # Should either reject or sanitize
         if resp.status_code in (200, 201):
-            hooks = requests.get(f"{BASE_URL}/api/v1/hooks", timeout=10).json()
+            hooks = requests.get(f"{self.base_url}/api/v1/hooks", timeout=10).json()
             for hook in hooks:
                 assert "<script>" not in hook.get("name", ""), "Hook name must not contain raw script tags"
 
     def test_result_name_with_html_entities(self):
         """Results with HTML special chars must be handled safely."""
-        try:
-            resp = requests.post(
-                f"{BASE_URL}/api/v1/search",
-                json={"query": "test", "limit": 5},
-                timeout=60,
-            )
-            assert resp.status_code == 200
-            data = resp.json()
-            for result in data.get("results", []):
-                name = result.get("name", "")
-                # Names should not contain unescaped HTML that could render
-                if "<" in name or ">" in name:
-                    # If HTML is present, it should be in a context that's escaped
-                    pass  # This is acceptable if dashboard escapes it
-        except requests.ConnectionError:
-            pytest.skip("Service closed connection during search")
+        resp = requests.post(
+            f"{self.base_url}/api/v1/search",
+            json={"query": "test", "limit": 5},
+            timeout=60,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        for result in data.get("results", []):
+            name = result.get("name", "")
+            # Names should not contain unescaped HTML that could render
+            if "<" in name or ">" in name:
+                # If HTML is present, it should be in a context that's escaped
+                pass  # This is acceptable if dashboard escapes it
 
     def test_css_injection_in_search_query(self):
         """CSS injection via <style> tags must be returned as text in JSON."""
         payload = "<style>body{background:red}</style>"
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": payload, "limit": 5},
             timeout=60,
         )
@@ -126,7 +116,7 @@ class TestXSSProtection:
         """img onerror attribute injection must not execute."""
         payload = "<img src=x onerror=alert('xss')>"
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": payload, "limit": 5},
             timeout=60,
         )

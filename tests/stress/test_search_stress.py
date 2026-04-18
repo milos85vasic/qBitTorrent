@@ -14,19 +14,12 @@ import concurrent.futures
 import time
 
 
-BASE_URL = "http://localhost:7187"
-
-
 class TestSearchStress:
     """Search endpoint stress testing."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_rapid_fire_searches(self):
         """50 rapid searches should not crash the service."""
@@ -35,7 +28,7 @@ class TestSearchStress:
         for i in range(50):
             try:
                 resp = requests.post(
-                    f"{BASE_URL}/api/v1/search",
+                    f"{self.base_url}/api/v1/search",
                     json={"query": f"stress{i}", "limit": 3},
                     timeout=5,
                 )
@@ -49,7 +42,7 @@ class TestSearchStress:
         # Should have majority successes
         assert success > 20, f"Only {success}/50 rapid searches succeeded"
         # Service should still be healthy
-        health = requests.get(f"{BASE_URL}/health", timeout=5)
+        health = requests.get(f"{self.base_url}/health", timeout=5)
         assert health.status_code == 200
 
     def test_burst_concurrent_searches(self):
@@ -59,7 +52,7 @@ class TestSearchStress:
         def search(i):
             try:
                 resp = requests.post(
-                    f"{BASE_URL}/api/v1/search",
+                    f"{self.base_url}/api/v1/search",
                     json={"query": f"burst{i}", "limit": 5},
                     timeout=60,
                 )
@@ -87,7 +80,7 @@ class TestSearchStress:
         while time.time() - start < 20:
             try:
                 resp = requests.post(
-                    f"{BASE_URL}/api/v1/search",
+                    f"{self.base_url}/api/v1/search",
                     json={"query": "sustained", "limit": 5},
                     timeout=10,
                 )
@@ -100,7 +93,7 @@ class TestSearchStress:
             time.sleep(0.3)
 
         assert success >= 2, f"Only {success} sustained searches succeeded"
-        health = requests.get(f"{BASE_URL}/health", timeout=5)
+        health = requests.get(f"{self.base_url}/health", timeout=5)
         assert health.status_code == 200
 
     def test_search_with_abort_under_stress(self):
@@ -109,7 +102,7 @@ class TestSearchStress:
         def search_and_maybe_abort(i):
             try:
                 resp = requests.post(
-                    f"{BASE_URL}/api/v1/search",
+                    f"{self.base_url}/api/v1/search",
                     json={"query": f"abort{i}", "limit": 10},
                     timeout=5,  # Short timeout to trigger "aborts"
                 )
@@ -124,7 +117,7 @@ class TestSearchStress:
             results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
         # Should not crash regardless of outcomes
-        health = requests.get(f"{BASE_URL}/health", timeout=5)
+        health = requests.get(f"{self.base_url}/health", timeout=5)
         assert health.status_code == 200
 
     def test_stats_endpoint_under_stress(self):
@@ -132,7 +125,7 @@ class TestSearchStress:
         # Run some searches
         def search(i):
             requests.post(
-                f"{BASE_URL}/api/v1/search",
+                f"{self.base_url}/api/v1/search",
                 json={"query": f"stats{i}", "limit": 5},
                 timeout=30,
             )
@@ -141,7 +134,7 @@ class TestSearchStress:
             futures = [executor.submit(search, i) for i in range(10)]
             # Check stats while searches running
             for _ in range(5):
-                stats = requests.get(f"{BASE_URL}/api/v1/stats", timeout=5)
+                stats = requests.get(f"{self.base_url}/api/v1/stats", timeout=5)
                 assert stats.status_code == 200
                 time.sleep(1)
             for f in concurrent.futures.as_completed(futures):
@@ -152,7 +145,7 @@ class TestSearchStress:
         # Many concurrent connections
         def connect(i):
             try:
-                resp = requests.get(f"{BASE_URL}/health", timeout=5)
+                resp = requests.get(f"{self.base_url}/health", timeout=5)
                 return resp.status_code
             except Exception:
                 return -1

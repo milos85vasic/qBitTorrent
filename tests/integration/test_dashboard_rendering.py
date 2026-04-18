@@ -12,20 +12,12 @@ import requests
 import re
 
 
-BASE_URL = "http://localhost:7187"
-
-
 class TestDashboardHtmlStructure:
     """Verify dashboard HTML is Angular SPA."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
-        try:
-            r = requests.get(f"{self.base_url}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
 
     def test_dashboard_is_angular_app(self):
@@ -50,15 +42,9 @@ class TestSearchApiResponseStructure:
     """Verify search API returns properly structured results."""
 
     @pytest.fixture(scope="class")
-    def search_data(self):
-        base_url = BASE_URL
-        try:
-            r = requests.get(f"{base_url}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def search_data(self, merge_service_live):
         data = requests.post(
-            f"{base_url}/api/v1/search",
+            f"{merge_service_live}/api/v1/search",
             json={"query": "matrix", "limit": 5},
             timeout=30,
         ).json()
@@ -77,7 +63,7 @@ class TestSearchApiResponseStructure:
             size = r.get("size", "")
             assert isinstance(size, str), f"size is {type(size).__name__}, expected str"
             assert size != "NaN undefined", f"size is broken: {size}"
-            assert size != "undefined", f"size is undefined string"
+            assert size != "undefined", "size is undefined string"
             # Should contain a unit or be "0 B"
             assert bool(re.search(r"[KMGT]?B$", size)) or size == "0 B", f"size has no unit: {size}"
 
@@ -134,13 +120,8 @@ class TestDashboardButtonsInHtml:
     """Verify action buttons are rendered by Angular."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
-        try:
-            r = requests.get(f"{self.base_url}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
 
     def test_dashboard_is_angular_app(self):

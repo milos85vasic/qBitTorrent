@@ -10,11 +10,8 @@ Comprehensive UI test with 30+ search queries to validate:
 
 import pytest
 import requests
-import json
-import time
 
 
-BASE_URL = "http://localhost:7187"
 SEARCH_QUERIES = [
     # Movies (various languages and formats)
     "matrix",
@@ -70,13 +67,8 @@ class TestUISearchVariety:
     """Test search with varied queries."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
-        try:
-            r = requests.get(f"{self.base_url}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def search(self, query):
@@ -97,7 +89,7 @@ class TestUISearchVariety:
                 data = self.search(query)
                 count = data.get("total_results", 0)
                 return query, count
-            except Exception as e:
+            except Exception:
                 return query, 0
 
         results = []
@@ -108,7 +100,7 @@ class TestUISearchVariety:
                 results.append((query, count))
                 print(f"Query: '{query}' -> {count} results")
 
-        print(f"\n=== Summary ===")
+        print("\n=== Summary ===")
         print(f"Total queries: {len(results)}")
         print(f"Queries with results: {sum(1 for _, c in results if c > 0)}")
 
@@ -129,7 +121,7 @@ class TestUISearchVariety:
         for field in required_fields:
             assert field in r, f"Missing field: {field}"
 
-        print(f"\n=== Sample result fields ===")
+        print("\n=== Sample result fields ===")
         for field in required_fields:
             print(f"  {field}: {r.get(field)}")
 
@@ -191,7 +183,7 @@ class TestUISearchVariety:
             ("styles-" in html, "Angular styles bundle"),
         ]
 
-        print(f"\n=== UI Structure Checks ===")
+        print("\n=== UI Structure Checks ===")
         all_pass = True
         for passed, name in checks:
             status = "✓" if passed else "✗"
@@ -210,7 +202,7 @@ class TestUISearchVariety:
         assert "<app-root" in html or "<app-root></app-root>" in html, "Angular app-root not found"
         assert "<script src=\"main-" in html, "Angular main script not found"
 
-        print(f"\n=== Sorting functions present in Angular: YES ===")
+        print("\n=== Sorting functions present in Angular: YES ===")
 
     def test_button_group_rendering(self):
         """Action buttons should be rendered by Angular."""
@@ -222,7 +214,7 @@ class TestUISearchVariety:
             ("<script src=\"main-" in html, "Angular main script"),
         ]
 
-        print(f"\n=== Button checks ===")
+        print("\n=== Button checks ===")
         for passed, name in checks:
             status = "✓" if passed else "✗"
             print(f"  {status} {name}")
@@ -244,7 +236,7 @@ class TestUISearchVariety:
         resp = self.session.get(f"{self.base_url}/health")
         assert resp.status_code == 200
         assert resp.json()["status"] == "healthy"
-        print(f"\n=== Health: OK ===")
+        print("\n=== Health: OK ===")
 
 
 if __name__ == "__main__":

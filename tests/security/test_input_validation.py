@@ -13,25 +13,18 @@ import pytest
 import requests
 
 
-BASE_URL = "http://localhost:7187"
-
-
 class TestInputValidation:
     """Invalid/malicious inputs must be rejected safely."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_oversized_search_query_rejected(self):
         """Search queries >1000 chars should be rejected or truncated."""
         payload = "x" * 5000
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": payload, "limit": 5},
             timeout=60,
         )
@@ -47,19 +40,19 @@ class TestInputValidation:
         ]
         for payload in payloads:
             resp = requests.post(
-                f"{BASE_URL}/api/v1/search",
+                f"{self.base_url}/api/v1/search",
                 json={"query": payload, "limit": 5},
                 timeout=60,
             )
             assert resp.status_code in (200, 400), f"SQL injection payload caused error: {payload}"
             # Health check should still pass
-            health = requests.get(f"{BASE_URL}/health", timeout=5)
+            health = requests.get(f"{self.base_url}/health", timeout=5)
             assert health.status_code == 200
 
     def test_path_traversal_in_download_request(self):
         """Path traversal in download requests must be blocked."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/download",
+            f"{self.base_url}/api/v1/download",
             json={
                 "url": "../../../etc/passwd",
                 "name": "test",
@@ -72,7 +65,7 @@ class TestInputValidation:
     def test_invalid_json_handling(self):
         """Invalid JSON body must return 400 or 422, not 500."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             data="not valid json {",
             headers={"Content-Type": "application/json"},
             timeout=10,
@@ -82,7 +75,7 @@ class TestInputValidation:
     def test_empty_json_body(self):
         """Empty JSON body should be handled gracefully."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={},
             timeout=10,
         )
@@ -91,7 +84,7 @@ class TestInputValidation:
     def test_negative_limit_value(self):
         """Negative limit should be rejected or clamped."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "test", "limit": -1},
             timeout=10,
         )
@@ -100,7 +93,7 @@ class TestInputValidation:
     def test_extreme_limit_value(self):
         """Extremely large limit should be rejected or clamped."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "test", "limit": 999999},
             timeout=10,
         )
@@ -109,7 +102,7 @@ class TestInputValidation:
     def test_non_numeric_limit(self):
         """Non-numeric limit should be rejected."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "test", "limit": "abc"},
             timeout=10,
         )
@@ -118,16 +111,13 @@ class TestInputValidation:
     def test_null_bytes_in_input(self):
         """Null bytes in input should be handled safely (no crash)."""
         payload = "test\x00evil"
-        try:
-            resp = requests.post(
-                f"{BASE_URL}/api/v1/search",
-                json={"query": payload, "limit": 5},
-                timeout=5,
-            )
-            # Service should not crash - any response is acceptable
-            assert resp.status_code in (200, 400, 422, 500)
-        except requests.Timeout:
-            pytest.skip("Service busy during null byte test")
+        resp = requests.post(
+            f"{self.base_url}/api/v1/search",
+            json={"query": payload, "limit": 5},
+            timeout=5,
+        )
+        # Service should not crash - any response is acceptable
+        assert resp.status_code in (200, 400, 422, 500)
 
     def test_command_injection_in_hook_script(self):
         """Hook script path must not allow command injection."""
@@ -137,7 +127,7 @@ class TestInputValidation:
             "script": "; rm -rf / ;",
         }
         resp = requests.post(
-            f"{BASE_URL}/api/v1/hooks",
+            f"{self.base_url}/api/v1/hooks",
             json=payload,
             timeout=10,
         )
@@ -145,18 +135,15 @@ class TestInputValidation:
             # Even if created, the script should not be executable with injection
             pass
         # Health check must still pass
-        health = requests.get(f"{BASE_URL}/health", timeout=5)
+        health = requests.get(f"{self.base_url}/health", timeout=5)
         assert health.status_code == 200
 
     def test_unicode_bom_in_json(self):
         """JSON with UTF-8 BOM should be handled gracefully."""
-        try:
-            resp = requests.post(
-                f"{BASE_URL}/api/v1/search",
-                data=b"\xef\xbb\xbf{\"query\": \"test\"}",
-                headers={"Content-Type": "application/json"},
-                timeout=10,
-            )
-            assert resp.status_code in (200, 400, 422)
-        except requests.ConnectionError:
-            pytest.skip("Service closed connection on BOM input")
+        resp = requests.post(
+            f"{self.base_url}/api/v1/search",
+            data=b"\xef\xbb\xbf{\"query\": \"test\"}",
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+        )
+        assert resp.status_code in (200, 400, 422)

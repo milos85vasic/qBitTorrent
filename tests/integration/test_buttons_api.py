@@ -5,20 +5,14 @@ These tests verify buttons trigger correct API calls
 
 import pytest
 import requests
-import json
-import re
-
-
-BASE_URL = "http://localhost:7187"
-QBIT_URL = "http://localhost:7185"
 
 
 class TestMagnetButton:
     """Test Magnet button functionality."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def search_get_result(self, query="matrix"):
@@ -63,20 +57,17 @@ class TestDownloadButton:
     """Test + (Download) button functionality via API."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _services_up(self, all_services_live):
+        self.base_url = all_services_live["merge_service"]
+        self.qbit_url = all_services_live["qbittorrent"]
         self.session = requests.Session()
         # Ensure logged in to qBittorrent
-        try:
-            login = self.session.post(
-                f"{QBIT_URL}/api/v2/auth/login",
-                data={"username": "admin", "password": "admin"},
-                timeout=5,
-            )
-        except requests.ConnectionError:
-            pytest.skip("qBittorrent not available")
-        if login.text != "Ok.":
-            pytest.skip(f"qBittorrent login failed: {login.text}")
+        login = self.session.post(
+            f"{self.qbit_url}/api/v2/auth/login",
+            data={"username": "admin", "password": "admin"},
+            timeout=5,
+        )
+        assert login.text == "Ok.", f"qBittorrent login failed: {login.text}"
 
     def test_download_api_accepts_valid_request(self):
         """/api/v1/download should accept download request."""
@@ -88,7 +79,7 @@ class TestDownloadButton:
         )
         results = resp.json().get("results", [])
         if not results:
-            pytest.skip("No search results")
+            pytest.skip("No search results")  # allow-skip: data-dependent, not a service availability check
 
         result = results[0]
         download_urls = result.get("download_urls", [])
@@ -103,7 +94,7 @@ class TestDownloadButton:
             # Should get a valid response (not 500 error)
             assert download_resp.status_code != 500, "Download API returns 500"
         else:
-            pytest.skip("No download URLs in result")
+            pytest.skip("No download URLs in result")  # allow-skip: data-dependent, not a service availability check
 
     def test_download_api_returns_proper_response(self):
         """Download API should return proper JSON response."""
@@ -136,8 +127,8 @@ class TestScheduleButton:
     """Test Schedule button functionality via API."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_schedule_button_is_angular_app(self):
@@ -155,42 +146,36 @@ class TestQBitLoginButton:
     """Test qBittorrent login button/flow."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
-        self.qbit_url = QBIT_URL
+    def _services_up(self, all_services_live):
+        self.base_url = all_services_live["merge_service"]
+        self.qbit_url = all_services_live["qbittorrent"]
         self.session = requests.Session()
 
     def test_qbit_login_api_works(self):
         """qBittorrent login API should work."""
-        try:
-            resp = self.session.post(
-                f"{self.qbit_url}/api/v2/auth/login",
-                data={"username": "admin", "password": "admin"},
-                timeout=5,
-            )
-        except requests.ConnectionError:
-            pytest.skip("qBittorrent not available")
-        if resp.text != "Ok.":
-            pytest.skip(f"qBittorrent login failed: {resp.text}")
+        resp = self.session.post(
+            f"{self.qbit_url}/api/v2/auth/login",
+            data={"username": "admin", "password": "admin"},
+            timeout=5,
+        )
+        assert resp.text == "Ok.", f"qBittorrent login failed: {resp.text}"
 
     def test_merge_service_auth_endpoint_works(self):
         """Merge service /auth/qbittorrent endpoint should work."""
-        try:
-            resp = self.session.post(
-                f"{self.base_url}/api/v1/auth/qbittorrent",
-                json={"username": "admin", "password": "admin"},
-                headers={"Content-Type": "application/json"},
-                timeout=5,
-            )
-        except requests.ConnectionError:
-            pytest.skip("Merge service not available")
+        resp = self.session.post(
+            f"{self.base_url}/api/v1/auth/qbittorrent",
+            json={"username": "admin", "password": "admin"},
+            headers={"Content-Type": "application/json"},
+            timeout=5,
+        )
 
         data = resp.json()
         # Should either auth successfully or return proper error
         assert resp.status_code in [200, 401, 403], "Unexpected status"
 
-        if resp.status_code == 200 and data.get("status") != "authenticated":
-            pytest.skip(f"qBittorrent auth via merge service failed: {data}")
+        if resp.status_code == 200:
+            assert data.get("status") == "authenticated", \
+                f"qBittorrent auth via merge service failed: {data}"
 
     def test_login_form_is_angular_app(self):
         """Login form should be in Angular app."""
@@ -202,8 +187,8 @@ class TestButtonUIIntegration:
     """Integration tests for button UI."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.base_url = BASE_URL
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
         self.session = requests.Session()
 
     def test_dashboard_loads_without_errors(self):

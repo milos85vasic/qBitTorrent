@@ -11,24 +11,17 @@ import pytest
 import requests
 
 
-BASE_URL = "http://localhost:7187"
-
-
 class TestCSRFProtection:
     """CSRF attack vectors must be blocked."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        try:
-            r = requests.get(f"{BASE_URL}/health", timeout=5)
-            r.raise_for_status()
-        except (requests.ConnectionError, requests.Timeout):
-            pytest.skip("Merge service not available")
+    def _service_up(self, merge_service_live):
+        self.base_url = merge_service_live
 
     def test_post_without_content_type_rejected(self):
         """POST without proper Content-Type should be rejected for state changes."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             data="invalid",
             headers={"Content-Type": "text/plain"},
             timeout=10,
@@ -39,7 +32,7 @@ class TestCSRFProtection:
     def test_cross_origin_post_rejected(self):
         """POST from untrusted origin should be rejected."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             json={"query": "test", "limit": 5},
             headers={
                 "Origin": "https://evil.com",
@@ -54,7 +47,7 @@ class TestCSRFProtection:
         """DELETE requests should require proper authentication/headers."""
         # Try to delete a non-existent hook
         resp = requests.delete(
-            f"{BASE_URL}/api/v1/hooks/nonexistent",
+            f"{self.base_url}/api/v1/hooks/nonexistent",
             timeout=10,
         )
         # Should not succeed blindly
@@ -62,7 +55,7 @@ class TestCSRFProtection:
 
     def test_hooks_endpoint_requires_auth(self):
         """Hook management should not be accessible without auth."""
-        resp = requests.get(f"{BASE_URL}/api/v1/hooks", timeout=10)
+        resp = requests.get(f"{self.base_url}/api/v1/hooks", timeout=10)
         # May be public or require auth; verify it doesn't expose sensitive data
         if resp.status_code == 200:
             hooks = resp.json()
@@ -73,14 +66,14 @@ class TestCSRFProtection:
 
     def test_schedule_endpoint_requires_auth(self):
         """Schedule management should require authentication."""
-        resp = requests.get(f"{BASE_URL}/api/v1/schedules", timeout=10)
+        resp = requests.get(f"{self.base_url}/api/v1/schedules", timeout=10)
         # Should require auth or return empty safely
         assert resp.status_code in (200, 401, 403)
 
     def test_preflight_request_handling(self):
         """CORS preflight OPTIONS requests should be handled correctly."""
         resp = requests.options(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "POST",
@@ -94,7 +87,7 @@ class TestCSRFProtection:
     def test_api_rejects_form_data_for_json_endpoints(self):
         """Endpoints expecting JSON should reject form data."""
         resp = requests.post(
-            f"{BASE_URL}/api/v1/search",
+            f"{self.base_url}/api/v1/search",
             data={"query": "test"},
             timeout=10,
         )

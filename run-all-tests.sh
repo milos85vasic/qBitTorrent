@@ -119,7 +119,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 run_test "Integration Tests" \
-    "python3 -m pytest tests/integration/ --ignore=tests/integration/test_ui_comprehensive.py --ignore=tests/integration/test_ui_quick.py -v --import-mode=importlib"
+    "python3 -m pytest tests/integration/ -v --import-mode=importlib"
 
 # Test Suite 4: Live Container Tests
 echo ""
