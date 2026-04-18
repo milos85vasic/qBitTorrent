@@ -234,8 +234,17 @@ class SearchOrchestrator:
         self._tracker_sessions: Dict[str, Any] = {}
         self._last_merged_results: Dict[str, tuple] = {}
         self._tracker_results: Dict[str, Dict[str, List[Any]]] = {}
-        # No semaphore by default — all trackers run concurrently
-        # Subprocess timeouts limit how long any single tracker can run
+        # Bounded tracker fan-out.  Without this, asyncio.gather spawned one
+        # task per tracker (~40+) with no backpressure, which let subprocess
+        # spawns and aiohttp sessions starve the event loop under load.
+        import os as _os
+
+        self._max_concurrent_trackers: int = max(
+            1, int(_os.getenv("MAX_CONCURRENT_TRACKERS", "5"))
+        )
+        # `_inflight_count` is an instrument for tests and Phase 6 metrics.
+        # It is only meaningful while a search is running.
+        self._inflight_count: int = 0
 
     def _load_env(self):
         import logging
@@ -305,7 +314,17 @@ class SearchOrchestrator:
 
             import asyncio
 
-            search_results = await asyncio.gather(*[_search_one(t) for t in trackers])
+            semaphore = asyncio.Semaphore(self._max_concurrent_trackers)
+
+            async def _bounded(tracker):
+                async with semaphore:
+                    self._inflight_count += 1
+                    try:
+                        return await _search_one(tracker)
+                    finally:
+                        self._inflight_count -= 1
+
+            search_results = await asyncio.gather(*[_bounded(t) for t in trackers])
 
             all_results = []
             for name, results, error in search_results:
