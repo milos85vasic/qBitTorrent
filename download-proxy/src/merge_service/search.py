@@ -230,9 +230,22 @@ class SearchOrchestrator:
 
         self.deduplicator = Deduplicator()
         self.validator = TrackerValidator()
-        self._active_searches: Dict[str, SearchMetadata] = {}
+
+        # Bounded, self-expiring stores so long-running processes don't leak
+        # memory.  Previously these were plain dicts that grew without bound
+        # and kept entries forever.
+        from cachetools import TTLCache as _TTLCache
+        import os as _os_ttl
+
+        _max_searches = max(1, int(_os_ttl.getenv("MAX_ACTIVE_SEARCHES", "256")))
+        _ttl = max(1, int(_os_ttl.getenv("ACTIVE_SEARCH_TTL_SECONDS", "3600")))
+        self._active_searches: "TTLCache[str, SearchMetadata]" = _TTLCache(
+            maxsize=_max_searches, ttl=_ttl
+        )
         self._tracker_sessions: Dict[str, Any] = {}
-        self._last_merged_results: Dict[str, tuple] = {}
+        self._last_merged_results: "TTLCache[str, tuple]" = _TTLCache(
+            maxsize=_max_searches, ttl=_ttl
+        )
         self._tracker_results: Dict[str, Dict[str, List[Any]]] = {}
         # Bounded tracker fan-out.  Without this, asyncio.gather spawned one
         # task per tracker (~40+) with no backpressure, which let subprocess

@@ -21,7 +21,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_pending_captchas: dict = {}
+# Bounded + self-expiring store for outstanding CAPTCHA challenges.
+# Previously a plain dict that grew without bound and kept entries forever,
+# leaking memory over long sessions.
+from cachetools import TTLCache as _TTLCache  # noqa: E402
+
+_PENDING_CAPTCHAS_MAX = int(os.getenv("PENDING_CAPTCHAS_MAX", "1024"))
+_PENDING_CAPTCHAS_TTL = int(os.getenv("PENDING_CAPTCHAS_TTL_SECONDS", "900"))
+_pending_captchas: "TTLCache[str, dict]" = _TTLCache(
+    maxsize=_PENDING_CAPTCHAS_MAX, ttl=_PENDING_CAPTCHAS_TTL
+)
 
 
 def _get_orchestrator():
