@@ -87,6 +87,11 @@ config/download-proxy/src/hooks.json
 # Download-proxy runtime files
 config/download-proxy/hooks.json
 
+# Angular build artifacts and dependencies
+frontend/node_modules/
+frontend/.angular/
+download-proxy/src/ui/dist/
+
 # Scheduler runtime files
 config/merge-service/
 

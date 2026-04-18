@@ -345,6 +345,10 @@ def _load_qbit_credentials():
                 return json.load(f)
         except Exception:
             pass
+    username = os.getenv("QBITTORRENT_USER", os.getenv("QBITTORRENT_USERNAME", ""))
+    password = os.getenv("QBITTORRENT_PASS", os.getenv("QBITTORRENT_PASSWORD", ""))
+    if username and password:
+        return {"username": username, "password": password}
     return None
 
 

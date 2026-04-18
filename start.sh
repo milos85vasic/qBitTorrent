@@ -396,6 +396,7 @@ show_status() {
     $COMPOSE_CMD ps
     echo ""
     print_success "qBitTorrent Web UI: http://localhost:${WEBUI_PORT:-7185}"
+    print_success "Merge Search Dashboard: http://localhost:${MERGE_SERVICE_PORT:-7187}/"
     print_info "Default credentials: admin / admin"
     print_warning "Remember to change the default password!"
     echo ""
@@ -415,6 +416,27 @@ show_status() {
     fi
 }
 
+build_frontend() {
+    if [[ ! -d "$SCRIPT_DIR/frontend" ]]; then
+        print_warning "frontend/ directory not found, skipping Angular build"
+        return 0
+    fi
+
+    if ! command -v ng &> /dev/null; then
+        print_warning "Angular CLI not found, skipping frontend build"
+        return 0
+    fi
+
+    print_info "Building Angular frontend..."
+    cd "$SCRIPT_DIR/frontend"
+    if ng build --configuration production 2>&1; then
+        print_success "Angular frontend built successfully"
+    else
+        print_warning "Angular build failed — container will serve fallback or old assets"
+    fi
+    cd "$SCRIPT_DIR"
+}
+
 show_help() {
     cat << EOF
 Usage: $(basename "$0") [OPTIONS]
@@ -427,6 +449,7 @@ OPTIONS:
     -v, --verbose   Enable verbose output
     -s, --status    Show container status only
     --no-plugins    Skip plugin installation
+    --no-build      Skip Angular frontend build
 
 EXAMPLES:
     $(basename "$0")              Start container
@@ -442,6 +465,7 @@ main() {
     local verbose=false
     local status_only=false
     local install_plugins=true
+    local build_frontend_flag=true
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -462,6 +486,10 @@ main() {
                 ;;
             --no-plugins)
                 install_plugins=false
+                shift
+                ;;
+            --no-build)
+                build_frontend_flag=false
                 shift
                 ;;
             *)
@@ -488,6 +516,10 @@ main() {
     cleanup_stale_config
     update_qbittorrent_config
     create_data_directories
+
+    if [[ "$build_frontend_flag" == true ]]; then
+        build_frontend
+    fi
 
     if [[ "$install_plugins" == true ]]; then
         copy_plugins

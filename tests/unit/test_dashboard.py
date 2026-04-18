@@ -26,11 +26,12 @@ class TestDashboardEndpoint:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_dashboard_contains_results_table(self):
+    def test_dashboard_is_angular_app(self):
         response = client.get("/dashboard")
         html = response.text
-        assert "results-table" in html
-        assert "data-sort=" in html
+        assert "<app-root>" in html
+        assert "</app-root>" in html
+        assert "ng-version=" in html or "main-" in html
 
 
 class TestConfigEndpoint:
@@ -64,16 +65,14 @@ class TestQBitAuthEndpoint:
         data = response.json()
         assert "status" in data
 
-    def test_qbittorrent_login_modal_in_html(self):
+    def test_qbittorrent_login_modal_in_angular(self):
         response = client.get("/dashboard")
         html = response.text
-        assert "qbit-login-modal" in html
-        assert 'id="qbit-username"' in html
-        assert 'id="qbit-password"' in html
+        assert "<app-root>" in html
+        assert "</app-root>" in html
 
-    def test_qbittorrent_login_functions_defined(self):
+    def test_angular_scripts_loaded(self):
         response = client.get("/dashboard")
         html = response.text
-        assert "function openQbitLogin()" in html
-        assert "function closeQbitLogin()" in html
-        assert "function submitQbitLogin()" in html
+        assert "<script src=\"main-" in html or 'src="main-' in html
+        assert "</body>" in html

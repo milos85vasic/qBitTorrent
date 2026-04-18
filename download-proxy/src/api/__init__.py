@@ -11,9 +11,14 @@ _src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+_angular_dist_path = os.path.join(os.path.dirname(__file__), "..", "ui", "dist", "frontend", "browser")
+_angular_dist_path = os.path.normpath(_angular_dist_path)
+_angular_index_path = os.path.join(_angular_dist_path, "index.html")
+_angular_available = os.path.isfile(_angular_index_path)
 
 logger = logging.getLogger(__name__)
 
@@ -89,44 +94,6 @@ async def get_config():
     }
 
 
-@app.get("/")
-@app.get("/dashboard")
-async def dashboard():
-    dashboard_path = os.path.join(os.path.dirname(__file__), "..", "ui", "templates", "dashboard.html")
-    dashboard_path = os.path.normpath(dashboard_path)
-    if os.path.isfile(dashboard_path):
-        return FileResponse(
-            dashboard_path,
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0",
-            },
-        )
-    return {
-        "message": "Merge Search API",
-        "version": "1.0.0",
-        "dashboard": "not found",
-    }
-
-
-@app.get("/theme.css")
-async def theme_css():
-    theme_path = os.path.join(os.path.dirname(__file__), "..", "ui", "templates", "theme.css")
-    theme_path = os.path.normpath(theme_path)
-    if os.path.isfile(theme_path):
-        return FileResponse(
-            theme_path,
-            media_type="text/css",
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0",
-            },
-        )
-    return {"error": "Theme not found"}
-
-
 @app.get("/api/v1/stats")
 async def stats():
     orch = app.state.search_orchestrator if hasattr(app.state, "search_orchestrator") else None
@@ -163,3 +130,40 @@ app.include_router(api_router, prefix="/api/v1")
 app.include_router(hooks_router, prefix="/api/v1/hooks")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(scheduler_router, prefix="/api/v1/schedules")
+
+
+def _serve_index_html():
+    if _angular_available:
+        return FileResponse(
+            _angular_index_path,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+    return {
+        "message": "Merge Search API",
+        "version": "1.0.0",
+        "dashboard": "not found",
+    }
+
+
+@app.get("/")
+async def dashboard():
+    return _serve_index_html()
+
+
+@app.get("/dashboard")
+async def dashboard_page():
+    return _serve_index_html()
+
+
+@app.get("/{path:path}")
+async def spa_catch_all(path: str):
+    if path.startswith("api/") or path == "health":
+        raise HTTPException(status_code=404)
+    file_path = os.path.join(_angular_dist_path, path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    return _serve_index_html()

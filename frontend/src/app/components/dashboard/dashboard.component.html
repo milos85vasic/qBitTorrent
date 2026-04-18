@@ -1,0 +1,191 @@
+<div class="container">
+  <header>
+    <div>
+      <h1>Merge Search Dashboard</h1>
+      <div class="service-links">
+        <a href="http://localhost:7185" target="_blank">qBittorrent WebUI</a>
+        <a href="http://localhost:7186" target="_blank">Download Proxy</a>
+        <a href="http://localhost:7187" class="current">Merge Search</a>
+        <a href="http://localhost:7188" target="_blank">WebUI Bridge</a>
+      </div>
+    </div>
+    <div class="auth-section">
+      <span class="auth-chip" [class.active]="qbitAuthenticated()" (click)="qbitAuthenticated() ? null : qbitDialog.open()">
+        <span class="auth-indicator" [class.active]="qbitAuthenticated()"></span>
+        {{ qbitAuthenticated() ? 'qBit Connected' : 'qBit Login' }}
+      </span>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-value">{{ stats().active_searches }}</div>
+        <div class="stat-label">Active Searches</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">{{ stats().completed_searches }}</div>
+        <div class="stat-label">Completed</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">{{ stats().trackers_count }}</div>
+        <div class="stat-label">Trackers</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Search</h2>
+    <form class="search-form" (submit)="doSearch(); $event.preventDefault()">
+      <input type="text" [(ngModel)]="query" name="query" placeholder="Enter search query (e.g., Ubuntu 22.04)" required />
+      <button type="submit" [class.btn-abort]="isSearching()">
+        {{ isSearching() ? 'Abort' : 'Search' }}
+      </button>
+    </form>
+    <div class="search-status" *ngIf="searchStatus()">
+      <span class="spinner" *ngIf="isSearching()"></span>{{ searchStatus() }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab" [class.active]="activeTab() === 'results'" (click)="switchTab('results')">Results</button>
+      <button class="tab" [class.active]="activeTab() === 'downloads'" (click)="switchTab('downloads')">Active Downloads</button>
+      <button class="tab" [class.active]="activeTab() === 'trackers'" (click)="switchTab('trackers')">Trackers</button>
+      <button class="tab" [class.active]="activeTab() === 'schedules'" (click)="switchTab('schedules')">Schedules</button>
+      <button class="tab" [class.active]="activeTab() === 'hooks'" (click)="switchTab('hooks')">Hooks</button>
+    </div>
+
+    <!-- Results Tab -->
+    <div *ngIf="activeTab() === 'results'">
+      <div *ngIf="results().length === 0 && liveResults().length === 0" class="empty-state">
+        No search results yet. Enter a query above.
+      </div>
+
+      <table class="results-table" *ngIf="results().length > 0 || liveResults().length > 0">
+        <thead>
+          <tr>
+            <th [class]="getSortClass('name')" (click)="sortResults('name')">Name<span class="sort-icon"></span></th>
+            <th [class]="getSortClass('type')" (click)="sortResults('type')">Type<span class="sort-icon"></span></th>
+            <th [class]="getSortClass('size')" (click)="sortResults('size')">Size<span class="sort-icon"></span></th>
+            <th [class]="getSortClass('seeds')" (click)="sortResults('seeds')">Seeds<span class="sort-icon"></span></th>
+            <th [class]="getSortClass('leechers')" (click)="sortResults('leechers')">Leechers<span class="sort-icon"></span></th>
+            <th [class]="getSortClass('quality')" (click)="sortResults('quality')">Quality<span class="sort-icon"></span></th>
+            <th [class]="getSortClass('sources')" (click)="sortResults('sources')">Sources<span class="sort-icon"></span></th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of results(); let i = index">
+            <td>
+              <div>{{ r.name }}</div>
+              <div class="meta-line" *ngIf="r.metadata?.poster_url">
+                <img class="poster-thumb" [src]="r.metadata?.poster_url" loading="lazy">
+                <span *ngIf="r.metadata?.title">{{ r.metadata?.title }}</span>
+                <span *ngIf="r.metadata?.year">({{ r.metadata?.year }})</span>
+                <span *ngIf="r.metadata?.genres?.length">&middot; {{ r.metadata?.genres?.slice(0,3)?.join(', ') }}</span>
+              </div>
+            </td>
+            <td><span class="type-badge" [class]="r.content_type || 'unknown'">{{ r.content_type || 'unknown' }}</span></td>
+            <td>{{ formatSize(r.size) }}</td>
+            <td>{{ r.seeds || 0 }}</td>
+            <td>{{ r.leechers || 0 }}</td>
+            <td><span class="quality-badge" [class]="r.quality || 'unknown'">{{ r.quality || 'unknown' }}</span></td>
+            <td [innerHTML]="trackerHtml(r.sources)"></td>
+            <td>
+              <div class="btn-group">
+                <a class="download-btn btn-magnet" (click)="doMagnet(i); $event.preventDefault()" title="Get Magnet Link">Magnet</a>
+                <button class="download-btn btn-schedule" (click)="doSchedule(i)" title="Send to qBittorrent">qBit</button>
+                <button class="download-btn" (click)="doDownload(i)" title="Download">Download</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Downloads Tab -->
+    <div *ngIf="activeTab() === 'downloads'" style="display:block;">
+      <div *ngIf="activeDownloads().length === 0" class="empty-state">No active downloads</div>
+      <table class="results-table" *ngIf="activeDownloads().length > 0">
+        <thead><tr><th>Name</th><th>Size</th><th>Progress</th><th>Speed</th><th>ETA</th><th>State</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let d of activeDownloads()">
+            <td>{{ d.name }}</td>
+            <td>{{ formatSize(d.size) }}</td>
+            <td>
+              <div class="progress-bar"><div class="fill" [style.width.%]="d.progress"></div></div>
+              {{ d.progress }}%
+            </td>
+            <td>{{ formatSize(d.dlspeed) }}/s</td>
+            <td>{{ formatEta(d.eta) }}</td>
+            <td><span class="status" [class]="downloadStateClass(d.state)">{{ d.state }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Trackers Tab -->
+    <div *ngIf="activeTab() === 'trackers'" style="display:block;">
+      <table class="results-table">
+        <thead><tr><th>Tracker</th><th>URL</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let t of trackers()">
+            <td>{{ t.name }}</td>
+            <td>{{ t.url }}</td>
+            <td><span class="status healthy">Enabled</span></td>
+          </tr>
+          <tr *ngIf="trackers().length === 0"><td colspan="3" class="empty-state">No trackers configured</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Schedules Tab -->
+    <div *ngIf="activeTab() === 'schedules'" style="display:block;">
+      <div style="margin-bottom:15px;">
+        <div class="inline-form">
+          <input type="text" [(ngModel)]="schedName" name="schedName" placeholder="Name" size="12" />
+          <input type="text" [(ngModel)]="schedQuery" name="schedQuery" placeholder="Query" size="20" />
+          <input type="number" [(ngModel)]="schedInterval" name="schedInterval" placeholder="Minutes" min="5" max="10080" size="8" />
+          <button (click)="createSchedule()">Add Schedule</button>
+        </div>
+      </div>
+      <table class="results-table">
+        <thead><tr><th>Name</th><th>Query</th><th>Interval</th><th>Status</th><th>Last Run</th><th>Next Run</th><th>Actions</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let s of schedules()">
+            <td>{{ s.name }}</td>
+            <td>{{ s.query }}</td>
+            <td>{{ s.interval_minutes }}m</td>
+            <td><span class="status" [class]="s.status">{{ s.status }}</span></td>
+            <td>{{ s.last_run ? (s.last_run | date:'short') : '-' }}</td>
+            <td>{{ s.next_run ? (s.next_run | date:'short') : '-' }}</td>
+            <td><button class="delete-btn" (click)="deleteSchedule(s.id)">Delete</button></td>
+          </tr>
+          <tr *ngIf="schedules().length === 0"><td colspan="7" class="empty-state">No scheduled searches</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Hooks Tab -->
+    <div *ngIf="activeTab() === 'hooks'" style="display:block;">
+      <p class="empty-state" style="padding-bottom:10px">Hooks are managed via API. Use <code style="color:#e94560">POST /api/v1/hooks</code> to register scripts.</p>
+      <table class="results-table">
+        <thead><tr><th>Name</th><th>Event</th><th>Script</th><th>Enabled</th><th>Actions</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let h of hooks()">
+            <td>{{ h.name }}</td>
+            <td><code>{{ h.event }}</code></td>
+            <td>{{ h.script_path }}</td>
+            <td><span class="status" [class]="h.enabled ? 'active' : 'unknown'">{{ h.enabled ? 'Yes' : 'No' }}</span></td>
+            <td><button class="delete-btn" (click)="deleteHook(h.hook_id)">Delete</button></td>
+          </tr>
+          <tr *ngIf="hooks().length === 0"><td colspan="5" class="empty-state">No hooks registered</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<app-magnet-dialog></app-magnet-dialog>
+<app-qbit-login-dialog></app-qbit-login-dialog>

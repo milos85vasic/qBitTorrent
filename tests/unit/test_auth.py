@@ -127,3 +127,35 @@ class TestCaptchaParsing:
             r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"', html
         )
         assert match is None
+
+
+class TestQbitCredentialsFallback:
+    def test_load_qbit_credentials_from_env(self):
+        from api.auth import _load_qbit_credentials
+
+        with patch.dict(os.environ, {"QBITTORRENT_USER": "envuser", "QBITTORRENT_PASS": "envpass"}, clear=False):
+            creds = _load_qbit_credentials()
+            assert creds is not None
+            assert creds["username"] == "envuser"
+            assert creds["password"] == "envpass"
+
+    def test_load_qbit_credentials_prefers_json_over_env(self):
+        from api.auth import _load_qbit_credentials
+        import json
+        from io import StringIO
+
+        json_data = json.dumps({"username": "jsonuser", "password": "jsonpass"})
+
+        with patch("api.auth.os.path.exists", return_value=True), \
+             patch("builtins.open", return_value=StringIO(json_data)):
+            creds = _load_qbit_credentials()
+            assert creds["username"] == "jsonuser"
+            assert creds["password"] == "jsonpass"
+
+    def test_load_qbit_credentials_returns_none_when_no_source(self):
+        from api.auth import _load_qbit_credentials
+
+        with patch("api.auth.os.path.exists", return_value=False), \
+             patch("api.auth.os.getenv", return_value=None):
+            creds = _load_qbit_credentials()
+            assert creds is None

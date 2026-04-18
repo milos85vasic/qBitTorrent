@@ -1,0 +1,90 @@
+import { Component, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { DialogService } from '../../services/dialog.service';
+
+@Component({
+  selector: 'app-confirm-dialog',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    @if (dialogService.confirmDialog().visible) {
+      <div class="modal-overlay show" (click)="onBackdrop($event)">
+        <div class="modal">
+          <h3>{{ dialogService.confirmDialog().data.title }}</h3>
+          <p class="modal-message">{{ dialogService.confirmDialog().data.message }}</p>
+          <div class="modal-actions">
+            <button class="cancel-btn" (click)="dialogService.resolveConfirm(false)">
+              {{ dialogService.confirmDialog().data.cancelText || 'Cancel' }}
+            </button>
+            <button
+              class="submit-btn"
+              [class.btn-danger]="dialogService.confirmDialog().data.confirmClass === 'danger'"
+              (click)="dialogService.resolveConfirm(true)">
+              {{ dialogService.confirmDialog().data.confirmText || 'Confirm' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  `,
+  styles: [`
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 10000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #1e2a4a;
+      padding: 28px;
+      border-radius: 12px;
+      border: 1px solid #2a3f6a;
+      max-width: 420px;
+      width: 90%;
+      color: #e0e0e0;
+    }
+    .modal h3 {
+      color: #e94560;
+      margin-bottom: 14px;
+      font-size: 20px;
+    }
+    .modal-message {
+      font-size: 15px;
+      margin-bottom: 22px;
+      line-height: 1.5;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .modal-actions button {
+      flex: 1;
+      min-width: 100px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .cancel-btn { background: #333; color: #ccc; }
+    .cancel-btn:hover { background: #444; }
+    .submit-btn { background: #e94560; color: #fff; }
+    .submit-btn:hover { background: #c73652; }
+    .btn-danger { background: #dc3545 !important; }
+  `]
+})
+export class ConfirmDialogComponent {
+  dialogService = inject(DialogService);
+
+  onBackdrop(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.dialogService.resolveConfirm(false);
+    }
+  }
+}
