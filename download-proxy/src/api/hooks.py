@@ -5,6 +5,8 @@ Single source of truth for hook CRUD + event dispatch.
 Uses JSON file persistence at /config/download-proxy/hooks.json.
 """
 
+import asyncio
+import collections
 import os
 import json
 import uuid
@@ -53,7 +55,24 @@ class HookResponse(BaseModel):
     created_at: str
 
 
-_execution_logs: list[dict] = []
+# Bounded hook-execution log.  Async handlers append to this from multiple
+# coroutines, so we guard it with an asyncio.Lock and use a deque with a
+# maxlen (env HOOK_LOG_MAXLEN, default 500) so it self-bounds.
+_HOOK_LOG_MAXLEN: int = max(1, int(os.getenv("HOOK_LOG_MAXLEN", "500")))
+_execution_logs: collections.deque = collections.deque(maxlen=_HOOK_LOG_MAXLEN)
+_execution_logs_lock: asyncio.Lock = asyncio.Lock()
+
+
+async def append_hook_log(entry: dict) -> None:
+    """Append a single hook-execution record under the module lock."""
+    async with _execution_logs_lock:
+        _execution_logs.append(entry)
+
+
+async def extend_hook_logs(entries: list[dict]) -> None:
+    """Bulk-append helper — serialises against concurrent single appends."""
+    async with _execution_logs_lock:
+        _execution_logs.extend(entries)
 
 
 def _load_hooks() -> list[dict]:
@@ -138,7 +157,9 @@ async def delete_hook(hook_id: str):
 
 @router.get("/logs")
 async def get_execution_logs(limit: int = 50, hook_name: Optional[str] = None):
-    logs = _execution_logs[-limit:]
+    async with _execution_logs_lock:
+        snapshot = list(_execution_logs)
+    logs = snapshot[-limit:]
     if hook_name:
         logs = [l for l in logs if l.get("hook_name") == hook_name]
     return {"logs": logs, "count": len(logs)}
@@ -180,11 +201,9 @@ async def dispatch_event(event_type: str, event_data: dict):
 
     await dispatcher.dispatch(hook_event)
 
-    global _execution_logs
     new_logs = dispatcher.get_execution_log()
-    _execution_logs.extend(new_logs)
-    if len(_execution_logs) > LOGS_MAX:
-        _execution_logs[:] = _execution_logs[-LOGS_MAX:]
+    # Deque's maxlen bounds size — the lock just serialises the extend.
+    await extend_hook_logs(new_logs)
 
 
-__all__ = ["router", "dispatch_event"]
+__all__ = ["router", "dispatch_event", "append_hook_log", "extend_hook_logs"]
