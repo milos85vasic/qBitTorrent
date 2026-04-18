@@ -63,9 +63,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+def _parse_allowed_origins(raw: str | None) -> list[str]:
+    """Parse the ALLOWED_ORIGINS env var into a list.
+
+    Whitespace around each entry is stripped and empty entries are dropped.
+    When the variable is unset or yields no entries we fall back to the
+    wildcard (``"*"``) so existing deployments keep their current behaviour,
+    but we emit a WARNING so operators know to lock it down.
+    """
+    if raw is None:
+        return ["*"]
+    parts = [p.strip() for p in raw.split(",")]
+    parts = [p for p in parts if p]
+    return parts or ["*"]
+
+
+_allowed_origins = _parse_allowed_origins(os.getenv("ALLOWED_ORIGINS"))
+if _allowed_origins == ["*"]:
+    logger.warning("CORS wildcard in use; set ALLOWED_ORIGINS to lock down")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
