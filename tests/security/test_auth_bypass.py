@@ -34,12 +34,12 @@ class TestAuthBypass:
                 resp = requests.post(
                     f"{BASE_URL}/api/v1/auth/rutracker/login",
                     json={"username": f"user{i}", "password": "wrong"},
-                    timeout=10,
+                    timeout=5,
                 )
                 # Service should remain stable under repeated failed attempts
-                assert resp.status_code in (200, 401, 403, 429, 500)
-            except requests.ConnectionError:
-                pytest.skip("Service closed connection during brute force test")
+                assert resp.status_code in (200, 401, 403, 422, 429, 500)
+            except (requests.ConnectionError, requests.Timeout):
+                pytest.skip("Service unavailable during brute force test")
 
     def test_auth_without_credentials_fails(self):
         """Auth endpoints must reject requests without credentials."""

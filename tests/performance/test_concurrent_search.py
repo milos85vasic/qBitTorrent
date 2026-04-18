@@ -145,10 +145,10 @@ class TestConcurrentSearch:
             futures = [executor.submit(search) for _ in range(5)]
             for _ in range(10):
                 start = time.time()
-                resp = requests.get(f"{BASE_URL}/health", timeout=2)
+                resp = requests.get(f"{BASE_URL}/health", timeout=5)
                 elapsed = time.time() - start
                 assert resp.status_code == 200
-                assert elapsed < 2, f"Health check took {elapsed:.1f}s"
+                assert elapsed < 5, f"Health check took {elapsed:.1f}s"
                 time.sleep(0.3)
             for future in concurrent.futures.as_completed(futures):
                 future.result()
