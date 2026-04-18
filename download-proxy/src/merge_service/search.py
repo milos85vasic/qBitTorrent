@@ -463,8 +463,10 @@ class SearchOrchestrator:
         import aiohttp
         import re
         import html
+        import logging
         from urllib.parse import urlencode
 
+        logger = logging.getLogger(__name__)
         results = []
         username = os.getenv("RUTRACKER_USERNAME")
         password = os.getenv("RUTRACKER_PASSWORD")
