@@ -36,10 +36,11 @@ class TestButtonFunctions:
             ("function doMagnet(", "doMagnet function"),
             ("function doSchedule(", "doSchedule function"),
             ("function doDownload(", "doDownload function"),
+            ("function doDownloadTorrent(", "doDownloadTorrent function"),
             ("function generateMagnet(", "generateMagnet function"),
             ('onclick="doMagnet(', "Magnet button onclick"),
             ('onclick="doSchedule(', "Schedule button onclick"),
-            ('onclick="doDownload(', "Download button onclick"),
+            ('onclick="doDownloadTorrent(', "Download button onclick"),
         ]
 
         print("\n=== Button Handlers ===")
@@ -65,7 +66,7 @@ class TestButtonFunctions:
     def test_download_button_present(self):
         """Download button should be in UI."""
         html = self.session.get(self.base_url).text
-        assert 'onclick="doDownload(' in html
+        assert 'onclick="doDownloadTorrent(' in html
         print("Y Download button present")
 
     def test_magnet_generation_logic(self):

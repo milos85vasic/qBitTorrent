@@ -244,7 +244,7 @@ class TestButtonUIIntegration:
 
         buttons = [
             ('onclick="doMagnet(', "Magnet button"),
-            ('onclick="doDownload(', "Download button"),
+            ('onclick="doDownloadTorrent(', "Download button"),
             ('onclick="doSchedule(', "Schedule button"),
         ]
 

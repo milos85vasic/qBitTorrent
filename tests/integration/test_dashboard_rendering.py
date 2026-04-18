@@ -73,8 +73,8 @@ class TestDashboardHtmlStructure:
 
     def test_add_result_to_table_has_plus_button(self):
         """addResultToTable must include + button."""
-        assert 'title="Download">+</button>' in self.dashboard
-        assert 'onclick="doDownload(' in self.dashboard
+        assert 'title="Download .torrent">+</button>' in self.dashboard
+        assert 'onclick="doDownloadTorrent(' in self.dashboard
 
     def test_add_result_to_table_has_magnet_button(self):
         """addResultToTable magnet button must have btn-magnet class."""
@@ -217,7 +217,7 @@ class TestDashboardButtonsInHtml:
         assert 'title="Send to qBittorrent"' in self.dashboard
 
     def test_plus_button_in_render_results(self):
-        assert 'title="Download"' in self.dashboard
+        assert 'title="Download .torrent"' in self.dashboard
         assert ">+</button>" in self.dashboard
 
     def test_all_three_buttons_in_add_result_to_table(self):
@@ -225,4 +225,4 @@ class TestDashboardButtonsInHtml:
         # Count occurrences - both addResultToTable and renderResults should have them
         assert self.dashboard.count('btn-magnet') >= 1
         assert self.dashboard.count('btn-schedule') >= 1
-        assert self.dashboard.count('doDownload(') >= 1
+        assert self.dashboard.count('doDownloadTorrent(') >= 1
