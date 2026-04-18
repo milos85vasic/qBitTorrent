@@ -1,31 +1,57 @@
-# Pytest configuration and fixtures for merge service tests
+"""Pytest configuration and shared fixtures for qBittorrent-Fixed.
+
+Fixture locations:
+
+*   Mocks and sample data — this file.
+*   Live-service fixtures (``merge_service_live``, ``qbittorrent_live``,
+    ``webui_bridge_live``, ``all_services_live``) — :mod:`tests.fixtures.services`.
+
+The live fixtures deliberately error (not skip) when services are down,
+so that CI reports breakage instead of silently passing. See
+docs/superpowers/plans/2026-04-19-completion-initiative.md Phase 0.3.
+"""
+
+from __future__ import annotations
+
+import os
+from unittest.mock import AsyncMock, Mock
 
 import pytest
-import os
-from unittest.mock import Mock, AsyncMock
+
+# Re-export live-service fixtures so that tests can request them by name
+# from any conftest without an explicit import.
+from tests.fixtures.services import (  # noqa: F401 -- re-exported
+    all_services_live,
+    merge_service_endpoint,
+    merge_service_live,
+    qbittorrent_endpoint,
+    qbittorrent_live,
+    webui_bridge_endpoint,
+    webui_bridge_live,
+)
 
 
 @pytest.fixture
-def qbittorrent_host():
-    """Default qBittorrent host URL"""
+def qbittorrent_host() -> str:
+    """Default qBittorrent host."""
     return os.environ.get("QBITTORRENT_HOST", "localhost")
 
 
 @pytest.fixture
-def qbittorrent_port():
-    """Default qBittorrent WebUI port"""
+def qbittorrent_port() -> str:
+    """Default qBittorrent WebUI port (proxy)."""
     return os.environ.get("QBITTORRENT_PORT", "7185")
 
 
 @pytest.fixture
-def qbittorrent_url(qbittorrent_host, qbittorrent_port):
-    """Full qBittorrent WebUI URL"""
+def qbittorrent_url(qbittorrent_host: str, qbittorrent_port: str) -> str:
+    """Full qBittorrent WebUI URL (container-internal)."""
     return f"http://{qbittorrent_host}:{qbittorrent_port}"
 
 
 @pytest.fixture
-def mock_qbittorrent_api():
-    """Mock qBittorrent API client"""
+def mock_qbittorrent_api() -> Mock:
+    """Mock qBittorrent API client for unit tests."""
     api = Mock()
     api.get_torrents = AsyncMock(return_value=[])
     api.add_torrent = AsyncMock(return_value={"hash": "abc123"})
@@ -34,8 +60,8 @@ def mock_qbittorrent_api():
 
 
 @pytest.fixture
-def sample_search_result():
-    """Sample search result for testing"""
+def sample_search_result() -> dict:
+    """One novaprinter-shaped search hit."""
     return {
         "name": "Ubuntu 22.04 LTS",
         "link": "magnet:?xt=urn:btih:abc123",
@@ -48,8 +74,8 @@ def sample_search_result():
 
 
 @pytest.fixture
-def sample_merged_result():
-    """Sample merged search result for testing"""
+def sample_merged_result() -> dict:
+    """One merge-service-shaped merged result."""
     return {
         "canonical_name": "Ubuntu 22.04 LTS",
         "canonical_infohash": "abc123",
