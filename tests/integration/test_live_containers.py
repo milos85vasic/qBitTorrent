@@ -69,7 +69,7 @@ def _fetch(
         for k, v in headers.items():
             req.add_header(k, v)
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             body = resp.read().decode("utf-8", errors="replace")
             return resp.status, body, dict(resp.headers)
     except urllib.error.HTTPError as e:

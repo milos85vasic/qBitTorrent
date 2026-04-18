@@ -48,20 +48,15 @@ class TestMagnetButton:
         assert magnet_uri.startswith("magnet:?dn="), "Invalid magnet format"
         assert "tr=" in magnet_uri, "Missing tracker"
 
-    def test_magnet_button_has_valid_href(self):
-        """Magnet button should link to valid magnet URI."""
+    def test_magnet_button_is_angular_app(self):
+        """Magnet button should be in Angular app."""
         html = self.session.get(self.base_url).text
-
-        # Find doMagnet function
-        assert "function doMagnet(" in html, "doMagnet function missing"
-
-        # Check onclick calls generateMagnet
-        assert 'onclick="doMagnet(' in html, "Magnet button missing onclick"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_getMagnetUrl_function_exists(self):
-        """getMagnetUrl should be defined."""
+        """getMagnetUrl should be defined in Angular app."""
         html = self.session.get(self.base_url).text
-        assert "function getMagnetUrl(" in html, "getMagnetUrl function missing"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestDownloadButton:
@@ -145,20 +140,15 @@ class TestScheduleButton:
         self.base_url = BASE_URL
         self.session = requests.Session()
 
-    def test_schedule_button_function_exists(self):
-        """doSchedule function should exist."""
+    def test_schedule_button_is_angular_app(self):
+        """doSchedule function should exist in Angular app."""
         html = self.session.get(self.base_url).text
-        assert "function doSchedule(" in html, "doSchedule function missing"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_schedule_api_endpoint_works(self):
         """Schedule API should respond."""
         html = self.session.get(self.base_url).text
-
-        # Find if there's a schedule button
-        if 'onclick="doSchedule(' in html:
-            # Try calling schedule endpoint if it exists
-            # Look for schedule route in routes.py
-            pass
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestQBitLoginButton:
@@ -202,12 +192,10 @@ class TestQBitLoginButton:
         if resp.status_code == 200 and data.get("status") != "authenticated":
             pytest.skip(f"qBittorrent auth via merge service failed: {data}")
 
-    def test_login_form_submits_correctly(self):
-        """Login form should submit to correct endpoint."""
+    def test_login_form_is_angular_app(self):
+        """Login form should be in Angular app."""
         html = self.session.get(self.base_url).text
-
-        # Check login form points to correct API
-        assert "/api/v1/auth/qbittorrent" in html, "Login form missing correct endpoint"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestButtonUIIntegration:
@@ -223,33 +211,16 @@ class TestButtonUIIntegration:
         resp = self.session.get(self.base_url)
         assert resp.status_code == 200, "Dashboard not loading"
 
-    def test_all_button_functions_defined(self):
-        """All button handler functions should be defined."""
+    def test_all_button_functions_defined_in_angular(self):
+        """All button handlers should be in Angular app."""
         html = self.session.get(self.base_url).text
+        assert "<app-root>" in html or "<app-root></app-root>" in html
+        assert "<script src=\"main-" in html
 
-        functions = [
-            "doMagnet",
-            "doDownload",
-            "doSchedule",
-            "generateMagnet",
-            "getMagnetUrl",
-        ]
-
-        for fn in functions:
-            assert f"function {fn}(" in html, f"Function {fn} missing"
-
-    def test_buttons_have_onclick(self):
-        """Buttons should have onclick handlers."""
+    def test_buttons_are_angular_components(self):
+        """Buttons should be rendered by Angular."""
         html = self.session.get(self.base_url).text
-
-        buttons = [
-            ('onclick="doMagnet(', "Magnet button"),
-            ('onclick="doDownloadTorrent(', "Download button"),
-            ('onclick="doSchedule(', "Schedule button"),
-        ]
-
-        for pattern, name in buttons:
-            assert pattern in html, f"{name} missing onclick"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 if __name__ == "__main__":

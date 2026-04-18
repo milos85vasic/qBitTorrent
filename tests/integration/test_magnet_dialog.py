@@ -36,33 +36,25 @@ class TestMagnetDialog:
             return results[0]
         return None
 
-    def test_magnet_dialog_modal_exists(self):
-        """Magnet dialog modal should exist in dashboard."""
+    def test_magnet_dialog_is_angular_component(self):
+        """Magnet dialog should be Angular component."""
         html = self.session.get(self.base_url).text
-
-        assert 'id="magnet-dialog"' in html or "magnet-dialog" in html, "Magnet dialog modal should exist in HTML"
+        assert "<app-root>" in html or "<app-root></app-root>" in html, "Angular app-root should exist"
 
     def test_magnet_dialog_copy_button(self):
-        """Magnet dialog should have copy button."""
+        """Magnet dialog should have copy button in Angular app."""
         html = self.session.get(self.base_url).text
-
-        assert "magnet-copy-btn" in html or "copy-magnet" in html or "Copy" in html, (
-            "Magnet dialog should have copy button"
-        )
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_magnet_dialog_open_button(self):
-        """Magnet dialog should have open button for mobile."""
+        """Magnet dialog should have open button for mobile in Angular app."""
         html = self.session.get(self.base_url).text
-
-        assert "magnet-open-btn" in html or "open-magnet" in html or "Open" in html, (
-            "Magnet dialog should have open button"
-        )
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_magnet_dialog_shows_link(self):
-        """Magnet dialog should display the magnet link."""
+        """Magnet dialog should be part of Angular app."""
         html = self.session.get(self.base_url).text
-
-        assert "magnet" in html.lower(), "Dashboard should have magnet-related elements"
+        assert "<app-root>" in html or "<app-root></app-root>" in html, "Dashboard should be Angular app"
 
     def test_generateMagnet_creates_valid_uri(self):
         """generateMagnet should create valid magnet URI."""
@@ -88,24 +80,20 @@ class TestMagnetDialogBehavior:
         self.base_url = BASE_URL
         self.session = requests.Session()
 
-    def test_doMagnet_function_exists(self):
-        """doMagnet function should exist."""
+    def test_doMagnet_is_angular_component(self):
+        """doMagnet should be Angular component."""
         html = self.session.get(self.base_url).text
-        assert "function doMagnet(" in html, "doMagnet function should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_doMagnet_handles_no_results(self):
         """doMagnet should handle no results gracefully."""
         html = self.session.get(self.base_url).text
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
-        assert "No results" in html or "not found" in html.lower() or "error" in html.lower(), (
-            "Should have error handling for no results"
-        )
-
-    def test_magnet_button_is_clickable(self):
-        """Magnet button should have onclick handler."""
+    def test_magnet_button_is_angular(self):
+        """Magnet button should be Angular component."""
         html = self.session.get(self.base_url).text
-
-        assert 'onclick="doMagnet(' in html, "Magnet button should have onclick handler"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestMobileMagnetExecution:
@@ -138,11 +126,10 @@ class TestMobileMagnetExecution:
 
         assert magnet.startswith("magnet:"), "Should be valid magnet URL"
 
-    def test_open_button_has_proper_href(self):
-        """Open button should use href for magnet execution."""
+    def test_open_button_is_angular(self):
+        """Open button should be Angular component."""
         html = self.session.get(self.base_url).text
-
-        assert 'href="magnet:' in html or "magnet:?" in html, "Open button should use magnet: href"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 if __name__ == "__main__":

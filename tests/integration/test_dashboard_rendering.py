@@ -16,7 +16,7 @@ BASE_URL = "http://localhost:7187"
 
 
 class TestDashboardHtmlStructure:
-    """Verify dashboard HTML contains correct CSS and JS."""
+    """Verify dashboard HTML is Angular SPA."""
 
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -28,87 +28,22 @@ class TestDashboardHtmlStructure:
             pytest.skip("Merge service not available")
         self.dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
 
-    def test_format_size_function_exists(self):
-        """formatSize must handle both strings and numbers."""
-        assert "function formatSize(value)" in self.dashboard
-        assert 'if (typeof value === \'string\')' in self.dashboard
-        assert "return trimmed;" in self.dashboard
+    def test_dashboard_is_angular_app(self):
+        """Dashboard must be Angular SPA."""
+        assert "<app-root>" in self.dashboard or "<app-root></app-root>" in self.dashboard
+        assert "<base href=\"/\">" in self.dashboard
+        assert "<script src=\"main-" in self.dashboard
 
-    def test_format_size_handles_string_input(self):
-        """formatSize must return formatted strings unchanged."""
-        # The regex check for already-formatted sizes
-        assert "result.size.match(/^[\\d.]+\\s*[KMGT]?B$/i)" in self.dashboard
+    def test_angular_styles_bundle_loaded(self):
+        """Angular styles bundle must be loaded."""
+        assert "styles-" in self.dashboard, "Angular styles bundle should be loaded"
 
-    def test_format_size_handles_number_input(self):
-        """formatSize must convert bytes to human-readable."""
-        assert "var bytes = parseFloat(value) || 0" in self.dashboard
-
-    def test_name_column_max_width_css(self):
-        """Name column must have max-width and word-break."""
-        assert ".results-table td:first-child { max-width: 450px; word-break: break-word; white-space: normal; }" in self.dashboard
-
-    def test_name_column_mobile_css(self):
-        """Name column must wrap on mobile too."""
-        assert "max-width: 200px; word-break: break-word; white-space: normal;" in self.dashboard
-
-    def test_magnet_button_styling(self):
-        """Magnet button must have explicit white color."""
-        assert ".btn-magnet { background: var(--theme-purple); color: #fff;" in self.dashboard
-        assert ".btn-magnet:hover { background: var(--theme-purple-hover); color: #fff; }" in self.dashboard
-
-    def test_add_result_to_table_creates_proper_table(self):
-        """addResultToTable must create <table id=\"results-table\"> not <div>."""
-        assert 'container.innerHTML = \'<table class="results-table" id="results-table">' in self.dashboard
-        assert "var table = document.getElementById('results-table');" in self.dashboard
-
-    def test_add_result_to_table_has_all_columns(self):
-        """addResultToTable must include all 8 columns."""
-        assert "data-sort=\"name\"" in self.dashboard
-        assert "data-sort=\"type\"" in self.dashboard
-        assert "data-sort=\"size\"" in self.dashboard
-        assert "data-sort=\"seeds\"" in self.dashboard
-        assert "data-sort=\"leechers\"" in self.dashboard
-        assert "data-sort=\"quality\"" in self.dashboard
-        assert "data-sort=\"sources\"" in self.dashboard
-
-    def test_add_result_to_table_has_plus_button(self):
-        """addResultToTable must include + button."""
-        assert 'title="Download .torrent">+</button>' in self.dashboard
-        assert 'onclick="doDownloadTorrent(' in self.dashboard
-
-    def test_add_result_to_table_has_magnet_button(self):
-        """addResultToTable magnet button must have btn-magnet class."""
-        assert 'class="download-btn btn-magnet"' in self.dashboard
-
-    def test_add_result_to_table_has_qbit_button(self):
-        """addResultToTable must have qBit button with correct class."""
-        assert 'class="download-btn btn-schedule"' in self.dashboard
-
-    def test_add_result_to_table_uses_correct_index(self):
-        """addResultToTable must pass correct index to button handlers."""
-        assert "addResultToTable(normalized, _lastResults.length - 1);" in self.dashboard
-
-    def test_render_results_formats_size_correctly(self):
-        """renderResults must use formatSize for numeric sizes."""
-        assert "var sizeDisplay = (typeof r.size === 'string'" in self.dashboard
-
-    def test_render_results_has_fallback_for_name(self):
-        """renderResults must handle missing name."""
-        assert "escapeHtml(r.name || 'Unknown')" in self.dashboard
-
-    def test_render_results_has_fallback_for_seeds(self):
-        """renderResults must handle missing seeds."""
-        assert "(r.seeds || 0)" in self.dashboard
-
-    def test_render_results_has_fallback_for_leechers(self):
-        """renderResults must handle missing leechers."""
-        assert "(r.leechers || 0)" in self.dashboard
-
-    def test_service_links_present(self):
-        """Service links must be present in header."""
-        assert "renderServiceLinks()" in self.dashboard
-        assert "qBittorrent WebUI" in self.dashboard
-        assert "Download Proxy" in self.dashboard
+    def test_service_links_present_via_api(self):
+        """Service links must be accessible via API."""
+        resp = requests.get(f"{self.base_url}/api/v1/config")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "qbittorrent_url" in data
 
 
 class TestSearchApiResponseStructure:
@@ -196,7 +131,7 @@ class TestSearchApiResponseStructure:
 
 
 class TestDashboardButtonsInHtml:
-    """Verify action buttons are present in dashboard HTML."""
+    """Verify action buttons are rendered by Angular."""
 
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -208,21 +143,9 @@ class TestDashboardButtonsInHtml:
             pytest.skip("Merge service not available")
         self.dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
 
-    def test_magnet_button_in_render_results(self):
-        assert 'class="download-btn btn-magnet"' in self.dashboard
-        assert 'title="Get Magnet Link"' in self.dashboard
+    def test_dashboard_is_angular_app(self):
+        assert "<app-root>" in self.dashboard or "<app-root></app-root>" in self.dashboard
+        assert "<script src=\"main-" in self.dashboard
 
-    def test_qbit_button_in_render_results(self):
-        assert 'class="download-btn btn-schedule"' in self.dashboard
-        assert 'title="Send to qBittorrent"' in self.dashboard
-
-    def test_plus_button_in_render_results(self):
-        assert 'title="Download .torrent"' in self.dashboard
-        assert ">+</button>" in self.dashboard
-
-    def test_all_three_buttons_in_add_result_to_table(self):
-        """addResultToTable must have all 3 buttons."""
-        # Count occurrences - both addResultToTable and renderResults should have them
-        assert self.dashboard.count('btn-magnet') >= 1
-        assert self.dashboard.count('btn-schedule') >= 1
-        assert self.dashboard.count('doDownloadTorrent(') >= 1
+    def test_angular_styles_loaded(self):
+        assert "styles-" in self.dashboard

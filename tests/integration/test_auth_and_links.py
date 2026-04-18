@@ -136,23 +136,13 @@ class TestServiceLinksAccessibility:
         except requests.ConnectionError:
             pytest.skip("Download proxy not accessible")
 
-    def test_dashboard_has_service_links(self):
-        """Dashboard must contain service link elements."""
+    def test_dashboard_is_angular_app(self):
+        """Dashboard must be the Angular SPA."""
         r = requests.get(f"{BASE_URL}/dashboard", timeout=5)
         assert r.status_code == 200
-        assert "qBittorrent WebUI" in r.text
-        assert "Download Proxy" in r.text
-        assert "Merge Search" in r.text
-        assert "WebUI Bridge" in r.text
-
-    def test_service_links_use_dynamic_host(self):
-        """Service links must use window.location.hostname for dynamic resolution."""
-        r = requests.get(f"{BASE_URL}/dashboard", timeout=5)
-        assert "window.location.hostname" in r.text
-        assert "http://' + host + ':7185" in r.text
-        assert "http://' + host + ':7186" in r.text
-        assert "http://' + host + ':7187" in r.text
-        assert "http://' + host + ':7188" in r.text
+        assert "<app-root>" in r.text or "<app-root></app-root>" in r.text
+        assert "<base href=\"/\">" in r.text
+        assert "<script src=\"main-" in r.text
 
 
 class TestAuthEndpointBehavior:
@@ -255,7 +245,7 @@ class TestPasswordScripts:
         with open("fix-qbit-password.sh") as f:
             content = f.read()
         assert 'json={"web_ui_password":"admin"}' in content
-        assert "WebUI\\\\Password" not in content, "Old qBittorrent 4.x format detected"
+        assert "WebUI\\Password" not in content, "Old qBittorrent 4.x format detected"
 
     def test_init_script_uses_correct_api(self):
         """init-qbit-password.sh must use qBittorrent 5.x web_ui_password API."""

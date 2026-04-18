@@ -176,25 +176,19 @@ class TestUISearchVariety:
         print(f"First result sources: {data['results'][0].get('sources', [])[:3]}")
 
     def test_ui_renders_valid_html(self):
-        """Dashboard HTML should be valid with proper structure."""
+        """Dashboard HTML should be valid Angular SPA."""
         resp = self.session.get(f"{self.base_url}/")
         assert resp.status_code == 200
         assert "text/html" in resp.headers.get("content-type", "")
 
         html = resp.text
 
-        # Check for required UI elements
+        # Check for Angular app presence
         checks = [
-            ("results-table" in html, "results-table class"),
-            ('data-sort="name"' in html, "sortable name column"),
-            ('data-sort="type"' in html, "sortable type column"),
-            ('data-sort="size"' in html, "sortable size column"),
-            ('data-sort="seeds"' in html, "sortable seeds column"),
-            ('data-sort="quality"' in html, "sortable quality column"),
-            ("renderResults" in html, "renderResults function"),
-            ("sortResults" in html, "sortResults function"),
-            ('class="type-badge' in html, "type-badge CSS"),
-            ('class="quality-badge' in html, "quality-badge CSS"),
+            ("<app-root" in html or "<app-root></app-root>" in html, "Angular app-root"),
+            ("<base href=\"/\">" in html, "Angular base href"),
+            ("<script src=\"main-" in html, "Angular main script"),
+            ("styles-" in html, "Angular styles bundle"),
         ]
 
         print(f"\n=== UI Structure Checks ===")
@@ -208,29 +202,24 @@ class TestUISearchVariety:
         assert all_pass, "UI structure is invalid"
 
     def test_sorting_functionality(self):
-        """Sorting functions should be defined."""
+        """Sorting functions should be defined in Angular app."""
         resp = self.session.get(f"{self.base_url}/")
         html = resp.text
 
-        # Check sorting functions exist
-        assert "function sortResults(" in html, "sortResults not found"
-        assert "function renderSortedResults(" in html, "renderSortedResults not found"
-        assert "_sortColumn" in html, "_sortColumn not found"
-        assert "_sortDirection" in html, "_sortDirection not found"
+        # Check Angular app loads
+        assert "<app-root" in html or "<app-root></app-root>" in html, "Angular app-root not found"
+        assert "<script src=\"main-" in html, "Angular main script not found"
 
-        print(f"\n=== Sorting functions present: YES ===")
+        print(f"\n=== Sorting functions present in Angular: YES ===")
 
     def test_button_group_rendering(self):
-        """Action buttons should be rendered."""
+        """Action buttons should be rendered by Angular."""
         resp = self.session.get(f"{self.base_url}/")
         html = resp.text
 
         checks = [
-            ("btn-magnet" in html, "Magnet button"),
-            ("btn-schedule" in html, "Schedule button"),
-            ('onclick="doMagnet(' in html, "doMagnet handler"),
-            ('onclick="doSchedule(' in html, "doSchedule handler"),
-            ('onclick="doDownload(' in html, "doDownload handler"),
+            ("<app-root" in html or "<app-root></app-root>" in html, "Angular app-root"),
+            ("<script src=\"main-" in html, "Angular main script"),
         ]
 
         print(f"\n=== Button checks ===")

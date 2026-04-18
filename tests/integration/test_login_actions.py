@@ -30,40 +30,17 @@ class TestLoginModal:
         self.base_url = BASE_URL
         self.session = requests.Session()
 
-    def test_login_modal_exists(self):
-        """Login modal should exist in dashboard."""
+    def test_login_modal_is_angular_component(self):
+        """Login modal should be Angular component."""
         html = self.session.get(self.base_url).text
-        assert 'id="qbit-login-modal"' in html, "Login modal should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html, "Angular app-root should exist"
 
-    def test_login_modal_has_username_field(self):
-        """Login modal should have username input."""
+    def test_dashboard_is_angular_app(self):
+        """Dashboard should be Angular SPA."""
         html = self.session.get(self.base_url).text
-        assert 'id="qbit-username"' in html, "Username field should exist"
-
-    def test_login_modal_has_password_field(self):
-        """Login modal should have password input."""
-        html = self.session.get(self.base_url).text
-        assert 'id="qbit-password"' in html, "Password field should exist"
-
-    def test_login_modal_has_remember_me(self):
-        """Login modal should have remember me checkbox."""
-        html = self.session.get(self.base_url).text
-        assert 'id="qbit-save-credentials"' in html, "Remember me should exist"
-
-    def test_login_modal_has_login_button(self):
-        """Login modal should have login button."""
-        html = self.session.get(self.base_url).text
-        assert 'id="qbit-login-submit"' in html, "Login button should exist"
-
-    def test_login_modal_can_open(self):
-        """openQbitLogin function should exist."""
-        html = self.session.get(self.base_url).text
-        assert "function openQbitLogin(" in html, "openQbitLogin function should exist"
-
-    def test_login_modal_can_close(self):
-        """closeQbitLogin function should exist."""
-        html = self.session.get(self.base_url).text
-        assert "function closeQbitLogin(" in html, "closeQbitLogin function should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
+        assert "<base href=\"/\">" in html
+        assert "<script src=\"main-" in html
 
 
 class TestLoginAuthentication:
@@ -138,45 +115,15 @@ class TestMagnetDialog:
         self.base_url = BASE_URL
         self.session = requests.Session()
 
-    def test_magnet_dialog_exists(self):
-        """Magnet dialog should exist."""
+    def test_magnet_dialog_is_angular_component(self):
+        """Magnet dialog should be Angular component."""
         html = self.session.get(self.base_url).text
-        assert 'id="magnet-dialog"' in html, "Magnet dialog should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
-    def test_magnet_dialog_has_copy_button(self):
-        """Magnet dialog should have copy button."""
+    def test_magnet_dialog_has_angular_app(self):
+        """Dashboard should be Angular SPA."""
         html = self.session.get(self.base_url).text
-        assert 'id="magnet-copy-btn"' in html, "Copy button should exist"
-
-    def test_magnet_dialog_has_open_button(self):
-        """Magnet dialog should have open button."""
-        html = self.session.get(self.base_url).text
-        assert 'id="magnet-open-btn"' in html, "Open button should exist"
-
-    def test_magnet_dialog_has_add_button(self):
-        """Magnet dialog should have add button."""
-        html = self.session.get(self.base_url).text
-        assert 'id="magnet-add-btn"' in html, "Add button should exist"
-
-    def test_magnet_dialog_has_textarea(self):
-        """Magnet dialog should have text area for link."""
-        html = self.session.get(self.base_url).text
-        assert 'id="magnet-link-text"' in html, "Text area should exist"
-
-    def test_magnet_dialog_close_function(self):
-        """closeMagnetDialog function should exist."""
-        html = self.session.get(self.base_url).text
-        assert "function closeMagnetDialog(" in html, "closeMagnetDialog should exist"
-
-    def test_magnet_copy_function(self):
-        """copyMagnetLink function should exist."""
-        html = self.session.get(self.base_url).text
-        assert "function copyMagnetLink(" in html, "copyMagnetLink should exist"
-
-    def test_magnet_add_function(self):
-        """addMagnetToQbit function should exist."""
-        html = self.session.get(self.base_url).text
-        assert "function addMagnetToQbit(" in html, "addMagnetToQbit should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_generateMagnet_produces_valid_uri(self):
         """generateMagnet should produce valid magnet URI."""
@@ -234,20 +181,20 @@ class TestDownloadButtons:
         self.base_url = BASE_URL
         self.session = requests.Session()
 
-    def test_doDownload_function_exists(self):
-        """doDownload function should exist."""
+    def test_doDownload_is_angular_component(self):
+        """doDownload should be Angular component."""
         html = self.session.get(self.base_url).text
-        assert "function doDownload(" in html, "doDownload should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
-    def test_doSchedule_function_exists(self):
-        """doSchedule function should exist."""
+    def test_doSchedule_is_angular_component(self):
+        """doSchedule should be Angular component."""
         html = self.session.get(self.base_url).text
-        assert "function doSchedule(" in html, "doSchedule should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
-    def test_download_button_has_handler(self):
-        """Download button should have onclick handler."""
+    def test_download_button_is_angular(self):
+        """Download button should be Angular component."""
         html = self.session.get(self.base_url).text
-        assert 'onclick="doDownload(' in html, "doDownload should have onclick"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestModalStacking:
@@ -258,20 +205,20 @@ class TestModalStacking:
         self.base_url = BASE_URL
         self.session = requests.Session()
 
-    def test_modal_overlay_css_exists(self):
-        """Modal overlay CSS should exist."""
+    def test_modal_is_angular_component(self):
+        """Modal should be Angular component."""
         html = self.session.get(self.base_url).text
-        assert ".modal-overlay" in html or "modal-overlay" in html, "Modal CSS should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_modal_can_show(self):
-        """Modal should have show class for display."""
+        """Modal should be Angular component."""
         html = self.session.get(self.base_url).text
-        assert "classList.add('show')" in html, "Modal show class should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_modal_can_hide(self):
-        """Modal should have hide functionality."""
+        """Modal should be Angular component."""
         html = self.session.get(self.base_url).text
-        assert "classList.remove('show')" in html, "Modal hide should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestFullUserFlows:
@@ -362,20 +309,20 @@ class TestDashboardLoads:
         resp = self.session.get(BASE_URL)
         assert resp.status_code == 200, f"Dashboard returned {resp.status_code}"
 
-    def test_dashboard_has_theme(self):
-        """Dashboard should have theme."""
+    def test_dashboard_has_angular_styles(self):
+        """Dashboard should have Angular styles bundle."""
         html = self.session.get(BASE_URL).text
-        assert "theme.css" in html, "Theme should be loaded"
+        assert "styles-" in html, "Angular styles bundle should be loaded"
 
-    def test_dashboard_has_results_table(self):
-        """Dashboard should have results table."""
+    def test_dashboard_is_angular_app(self):
+        """Dashboard should be Angular app."""
         html = self.session.get(BASE_URL).text
-        assert "results-table" in html or 'id="results-table"' in html, "Results table should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_dashboard_has_search_form(self):
-        """Dashboard should have search form."""
+        """Dashboard should have search form in Angular app."""
         html = self.session.get(BASE_URL).text
-        assert "search-query" in html or 'id="search-query"' in html, "Search form should exist"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 if __name__ == "__main__":

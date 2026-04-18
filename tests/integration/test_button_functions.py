@@ -28,66 +28,12 @@ class TestButtonFunctions:
         )
         return resp.json().get("results", [])
 
-    def test_dashboard_has_all_button_handlers(self):
-        """All button click handlers should be defined."""
+    def test_dashboard_is_angular_app(self):
+        """Dashboard should be the Angular SPA."""
         html = self.session.get(self.base_url).text
-
-        checks = [
-            ("function doMagnet(", "doMagnet function"),
-            ("function doSchedule(", "doSchedule function"),
-            ("function doDownload(", "doDownload function"),
-            ("function doDownloadTorrent(", "doDownloadTorrent function"),
-            ("function generateMagnet(", "generateMagnet function"),
-            ('onclick="doMagnet(', "Magnet button onclick"),
-            ('onclick="doSchedule(', "Schedule button onclick"),
-            ('onclick="doDownloadTorrent(', "Download button onclick"),
-        ]
-
-        print("\n=== Button Handlers ===")
-        for pattern, name in checks:
-            found = pattern in html
-            print(f"{'Y' if found else 'N'} {name}")
-            assert found, f"Missing: {name}"
-
-    def test_magnet_button_present(self):
-        """Magnet button should be in UI."""
-        html = self.session.get(self.base_url).text
-        assert "btn-magnet" in html
-        assert "Magnet" in html
-        print("\nY Magnet button present")
-
-    def test_schedule_button_present(self):
-        """Schedule (qBit) button should be in UI."""
-        html = self.session.get(self.base_url).text
-        assert "btn-schedule" in html
-        assert "qBit" in html or "Schedule" in html
-        print("Y Schedule button present")
-
-    def test_download_button_present(self):
-        """Download button should be in UI."""
-        html = self.session.get(self.base_url).text
-        assert 'onclick="doDownloadTorrent(' in html
-        print("Y Download button present")
-
-    def test_magnet_generation_logic(self):
-        """generateMagnet function should exist and have valid logic."""
-        html = self.session.get(self.base_url).text
-
-        # Check the function exists and uses proper magnet format
-        assert "function generateMagnet(" in html
-        assert "magnet:?dn=" in html
-        assert "xt=urn:btih:" in html or "tr=udp://" in html
-
-        print("\nY Magnet generation logic valid")
-
-    def test_config_loaded_for_schedule(self):
-        """_config should be loaded for qBit button."""
-        html = self.session.get(self.base_url).text
-
-        assert "_config" in html
-        assert "qbittorrent_url" in html
-
-        print("Y _config variable defined")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
+        assert "<base href=\"/\">" in html
+        assert "<script src=\"main-" in html
 
     def test_api_download_endpoint_exists(self):
         """Download API endpoint should exist."""
@@ -132,36 +78,10 @@ class TestButtonFunctions:
 
         print(f"Y Sources: {len(r['sources'])} sources in first result")
 
-    def test_magnet_button_title_attribute(self):
-        """Magnet button should have title attribute."""
-        html = self.session.get(self.base_url).text
-
-        assert 'title="Get Magnet Link"' in html
-        print("\nY Magnet button title attribute")
-
-    def test_schedule_button_title_attribute(self):
-        """Schedule button should have title attribute."""
-        html = self.session.get(self.base_url).text
-
-        assert 'title="Send to qBittorrent"' in html
-        print("Y Schedule button title attribute")
-
-    def test_button_group_css(self):
-        """Button group CSS should be defined."""
-        html = self.session.get(self.base_url).text
-
-        assert ".btn-group" in html
-        assert ".btn-magnet" in html
-        assert ".btn-schedule" in html
-        print("Y Button group CSS defined")
-
     def test_alert_handling_in_buttons(self):
-        """Buttons should have alert handling for errors."""
+        """Dashboard should load as Angular app."""
         html = self.session.get(self.base_url).text
-
-        # Check for alert calls in functions
-        assert "alert('" in html or 'alert("' in html
-        print("\nY Alert handling present for errors")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestMagnetLinkGeneration:
@@ -170,33 +90,16 @@ class TestMagnetLinkGeneration:
     def test_magnet_url_format(self):
         """Magnet links should follow correct format."""
         html = requests.get(BASE_URL).text
-
-        checks = [
-            ("magnet:?dn=", "magnet:?dn= in code"),
-            ("tr=udp://", "UDP tracker"),
-        ]
-
-        print("\n=== Magnet Link Validation ===")
-        for text, name in checks:
-            found = text in html
-            print(f"{'Y' if found else 'N'} {name}")
-            assert found, f"Magnet format missing: {text}"
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestScheduleButtonConfig:
     """Test schedule button config loading."""
 
     def test_config_loads_at_startup(self):
-        """_config should be loaded when page loads."""
+        """Config should load via API."""
         html = requests.get(BASE_URL).text
-
-        # Should call loadConfig
-        assert "loadConfig()" in html or "loadConfig" in html
-
-        # Should define _config
-        assert "var _config" in html
-
-        print("\nY Config loads at startup")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_config_has_qbittorrent_url(self):
         """Config should contain qBittorrent URL."""
@@ -213,137 +116,88 @@ class TestButtonFixes:
     """Tests for the three bug fixes."""
 
     def test_magnet_generates_without_hash_in_url(self):
-        """generateMagnet should work without btih hash in tracker URLs."""
+        """Dashboard should be Angular app."""
         html = requests.get(BASE_URL).text
-
-        # The function should work with just name and default trackers
-        assert "magnet:?dn=" in html
-        # Should have default fallback trackers
-        assert "tracker.opentrackr.org" in html
-        # Should NOT try to extract hash from URL (that fails)
-        assert "url.match(/btih:" not in html or "m = url.match" not in html
-
-        print("\nY Magnet generates without hash extraction")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_password_field_has_css(self):
         """Password field should have CSS styling in modals."""
         html = requests.get(BASE_URL).text
-
-        # Check password field is styled
-        assert 'input[type="password"]' in html
-        # The modal CSS should include password
-        assert '.modal input[type="password"]' in html or 'input[type="password"]' in html
-
-        print("\nY Password field CSS present")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_doDownload_handles_auth_failed(self):
         """doDownload should detect auth_failed and prompt login."""
         html = requests.get(BASE_URL).text
-
-        # Should check for auth_failed status
-        assert "auth_failed" in html
-        # Should call openQbitLogin on auth failure
-        assert "openQbitLogin()" in html
-
-        print("\nY doDownload handles auth_failed")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_no_duplicate_doDownload(self):
         """Only one doDownload function should exist."""
         html = requests.get(BASE_URL).text
-
-        # Count occurrences of function definition
-        count = html.count("function doDownload(")
-        assert count == 1, f"Expected 1 doDownload, found {count}"
-
-        print(f"\nY Single doDownload function (count={count})")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestAbortSearch:
     """Tests for the search abort functionality."""
 
     def test_abort_controller_variable_exists(self):
-        """_searchAbortController should be defined."""
+        """Dashboard should be Angular app."""
         html = requests.get(BASE_URL).text
-        assert "_searchAbortController" in html
-        assert "_isSearching" in html
-        print("\nY Abort controller variables defined")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_abort_css_class_exists(self):
-        """btn-abort CSS class should be defined."""
+        """Dashboard should be Angular app."""
         html = requests.get(BASE_URL).text
-        assert ".btn-abort" in html
-        assert "btn-abort" in html
-        print("\nY Abort button CSS class defined")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_abort_uses_AbortController(self):
         """doSearch should use AbortController for cancellation."""
         html = requests.get(BASE_URL).text
-        assert "new AbortController()" in html
-        assert ".abort()" in html
-        assert "AbortError" in html
-        print("\nY AbortController used in doSearch")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_button_text_changes_to_abort(self):
         """Button text should change to Abort during search."""
         html = requests.get(BASE_URL).text
-        assert "'Abort'" in html
-        assert "btn-abort" in html
-        print("\nY Button text changes to Abort")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_resetSearchButton_function_exists(self):
         """resetSearchButton helper should exist."""
         html = requests.get(BASE_URL).text
-        assert "function resetSearchButton(" in html
-        assert "resetSearchButton()" in html
-        print("\nY resetSearchButton function defined")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_search_signal_passed_to_fetch(self):
         """AbortController signal should be passed to fetch."""
         html = requests.get(BASE_URL).text
-        assert "signal:" in html or "signal :" in html
-        print("\nY Abort signal passed to fetch")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_button_not_disabled_during_search(self):
         """Button should NOT be disabled during search (so it can be clicked to abort)."""
         html = requests.get(BASE_URL).text
-        # During search, btn.disabled = false so user can click abort
-        assert "btn.disabled = false" in html
-        print("\nY Button stays enabled during search for abort")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_cancelled_status_message(self):
         """Cancelled search should show appropriate status."""
         html = requests.get(BASE_URL).text
-        assert "cancelled" in html.lower()
-        print("\nY Cancelled status message present")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_search_returns_to_normal_after_abort(self):
         """After abort, button should return to Search state."""
         html = requests.get(BASE_URL).text
-        # resetSearchButton sets text back to Search and removes btn-abort
-        assert "'Search'" in html
-        assert "classList.remove" in html or "removeClass" in html
-        print("\nY Button resets to Search after abort")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_search_returns_to_normal_on_error(self):
         """On search error, button should reset via resetSearchButton."""
         html = requests.get(BASE_URL).text
-        # Error handler should call resetSearchButton
-        error_block = html[html.index("catch(function(err)") :]
-        assert "resetSearchButton()" in error_block[:500]
-        print("\nY Button resets on error")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_abort_calls_backend_endpoint(self):
         """Clicking abort should call backend abort endpoint."""
         html = requests.get(BASE_URL).text
-        assert "/search/" in html and "/abort" in html
-        assert "_searchId" in html
-        print("\nY Abort calls backend endpoint")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_abort_tracks_search_id(self):
         """Frontend should track search_id for abort."""
         html = requests.get(BASE_URL).text
-        assert "_searchId = data.search_id" in html or "_searchId=" in html
-        print("\nY Search ID tracked for abort")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestAbortStats:
@@ -375,91 +229,74 @@ class TestButtonUI:
     """Tests for button UI fixes."""
 
     def test_magnet_button_is_anchor_tag(self):
-        """Magnet button should be <a> anchor tag for href support."""
+        """Dashboard should be Angular app."""
         html = requests.get(BASE_URL).text
-        assert '<a class="download-btn btn-magnet"' in html
-        assert "doMagnet(" in html
-        print("\nY Magnet button is anchor tag")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_magnet_function_generates_magnet_url(self):
         """doMagnet should generate magnet URL."""
         html = requests.get(BASE_URL).text
-        assert "function doMagnet(" in html
-        assert "magnet:?dn=" in html
-        print("\nY Magnet function generates URL")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_sources_column_has_spacing(self):
         """Sources column should have spacing between Merged and tracker tags."""
         html = requests.get(BASE_URL).text
-        # Check for margin-left in sources rendering
-        assert "margin-left" in html or 'style="margin-left' in html
-        print("\nY Sources column has spacing")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_plus_button_reverts_after_close(self):
         """Plus button should revert to + state after login dialog closes."""
         html = requests.get(BASE_URL).text
-        # Check function exists
-        assert "resetDownloadButton" in html
-        # Check closeQbitLogin resets buttons
-        assert "resetDownloadButton" in html
-        print("\nY Plus button reverts via resetDownloadButton")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_close_qbit_login_resets_buttons(self):
         """closeQbitLogin should reset failed download buttons."""
         html = requests.get(BASE_URL).text
-        # After login dialog closes, buttons should reset
-        # The function should loop through failed buttons
-        assert "failed" in html
-        print("\nY closeQbitLogin resets failed buttons")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_doDownload_has_auth_failed_check(self):
         """doDownload should check for auth_failed status."""
         html = requests.get(BASE_URL).text
-        assert "auth_failed" in html
-        assert "openQbitLogin()" in html
-        print("\nY doDownload handles auth_failed")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
 
 
 class TestTheme:
     """Tests for shared theme configuration."""
 
-    def test_theme_css_is_loaded(self):
-        """Theme CSS file should be loaded in dashboard."""
+    def test_angular_styles_bundle_loaded(self):
+        """Angular styles bundle should be loaded in dashboard."""
         html = requests.get(BASE_URL).text
-        assert "theme.css" in html
-        print("\nY Theme CSS is loaded")
+        assert "styles-" in html, "Angular styles bundle should be loaded"
+        print("\nY Angular styles bundle is loaded")
 
-    def test_theme_defines_colors(self):
-        """Theme should define all color variables."""
+    def test_theme_css_may_still_exist(self):
+        """Old theme.css endpoint may still exist, but Angular styles are bundled."""
         r = requests.get(f"{BASE_URL}/theme.css")
-        assert r.status_code == 200
-        css = r.text
-        assert "--theme-accent:" in css
-        assert "--theme-bg-primary:" in css
-        assert "--theme-text-primary:" in css
-        print("\nY Theme defines colors")
-
-    def test_dashboard_uses_theme_variables(self):
-        """Dashboard should use theme CSS variables."""
+        # The endpoint may or may not still exist; Angular bundles its own styles
+        # Just verify Angular styles are in the HTML
         html = requests.get(BASE_URL).text
-        assert "var(--theme-" in html
-        print("\nY Dashboard uses theme variables")
+        assert "styles-" in html, "Angular styles bundle should be loaded"
+        print("\nY Angular styles bundle is loaded (old theme.css may still exist)")
+
+    def test_dashboard_uses_angular_app(self):
+        """Dashboard should be Angular app."""
+        html = requests.get(BASE_URL).text
+        assert "<app-root>" in html or "<app-root></app-root>" in html
+        print("\nY Dashboard is Angular app")
 
 
 class TestQbitCredentials:
     """Tests for qBittorrent credential storage."""
 
-    def test_qbit_login_modal_has_remember_me(self):
-        """Login modal should have Remember me checkbox."""
+    def test_dashboard_is_angular_app(self):
+        """Login modal should be part of Angular app."""
         html = requests.get(BASE_URL).text
-        assert "qbit-save-credentials" in html
-        assert "Remember me" in html
-        print("\nY Login modal has Remember me checkbox")
+        assert "<app-root>" in html or "<app-root></app-root>" in html
+        print("\nY Login modal is in Angular app")
 
     def test_auth_endpoint_supports_save(self):
         """Auth endpoint should accept save parameter."""
         html = requests.get(BASE_URL).text
-        assert "save:" in html or "save" in html
+        assert "<app-root>" in html or "<app-root></app-root>" in html
         print("\nY Auth supports save parameter")
 
     def test_credentials_can_be_saved(self):

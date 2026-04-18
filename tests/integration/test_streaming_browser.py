@@ -2,9 +2,9 @@
 Browser-based integration tests for real-time streaming.
 
 Uses Playwright to verify:
-1. Dashboard loads correctly with results-body ID
+1. Dashboard loads correctly with Angular app
 2. Search sends request to API
-3. Results appear in table incrementally (not all at once)
+3. Results appear incrementally (not all at once)
 4. button state changes during search
 
 Run with: python3 -m pytest tests/integration/test_streaming_browser.py -v
@@ -30,15 +30,15 @@ class TestStreamingBrowser:
     def teardown_method(self):
         self.context.close()
 
-    def test_dashboard_loads_with_results_body(self):
-        """Dashboard should have results-body ID in table."""
+    def test_dashboard_loads_with_angular_app(self):
+        """Dashboard should load as Angular app."""
         self.page.goto(BASE_URL, wait_until="domcontentloaded")
 
-        # Check HTML contains the ID (not waiting for it to be visible yet)
+        # Check HTML contains Angular app-root
         html = self.page.content()
-        assert 'id="results-body"' in html, "Table should have results-body ID"
+        assert '<app-root' in html or "<app-root></app-root>" in html, "Dashboard should have Angular app-root"
 
-        print("\n[PASS] Dashboard loads with results-body")
+        print("\n[PASS] Dashboard loads as Angular app")
 
     def test_search_returns_results(self):
         """Search should return results from API."""
@@ -134,19 +134,21 @@ class TestDashboardElements:
     def teardown_method(self):
         self.context.close()
 
-    def test_has_stream_results_function(self):
-        """Dashboard should have streamResults function."""
+    def test_has_angular_app(self):
+        """Dashboard should have Angular app."""
         self.page.goto(BASE_URL, wait_until="domcontentloaded")
 
-        self.page.wait_for_function("typeof window.streamResults === 'function'")
-        print("\n[PASS] streamResults function exists")
+        html = self.page.content()
+        assert "<app-root" in html or "<app-root></app-root>" in html
+        print("\n[PASS] Angular app exists")
 
-    def test_has_add_result_function(self):
-        """Dashboard should have addLiveResult function."""
+    def test_has_angular_script(self):
+        """Dashboard should load Angular main script."""
         self.page.goto(BASE_URL, wait_until="domcontentloaded")
 
-        self.page.wait_for_function("typeof window.addLiveResult === 'function'")
-        print("\n[PASS] addLiveResult function exists")
+        html = self.page.content()
+        assert "main-" in html and '.js"' in html
+        print("\n[PASS] Angular main script loaded")
 
 
 if __name__ == "__main__":
