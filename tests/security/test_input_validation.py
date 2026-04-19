@@ -30,8 +30,15 @@ class TestInputValidation:
         )
         assert resp.status_code in (200, 400, 413), f"Unexpected status: {resp.status_code}"
 
+    @pytest.mark.timeout(300)
     def test_sql_injection_in_search_query(self):
-        """SQL injection patterns must not affect backend."""
+        """SQL injection patterns must not affect backend.
+
+        Each /api/v1/search POST kicks off a live multi-tracker fan-out
+        (no relational DB here — the real defence is that the search
+        layer never assembles SQL at all), which can take up to a
+        minute per payload. Four payloads × up to 60s ≈ 4 min budget.
+        """
         payloads = [
             "'; DROP TABLE results; --",
             "1' OR '1'='1",
@@ -108,13 +115,20 @@ class TestInputValidation:
         )
         assert resp.status_code in (400, 422)
 
+    @pytest.mark.timeout(120)
     def test_null_bytes_in_input(self):
-        """Null bytes in input should be handled safely (no crash)."""
+        """Null bytes in input should be handled safely (no crash).
+
+        Hits the live /api/v1/search endpoint which fans out to
+        multiple trackers. 60s per-request timeout gives each tracker
+        time to respond; 120s pytest timeout gives the whole call a
+        ceiling independent of network jitter.
+        """
         payload = "test\x00evil"
         resp = requests.post(
             f"{self.base_url}/api/v1/search",
             json={"query": payload, "limit": 5},
-            timeout=5,
+            timeout=60,
         )
         # Service should not crash - any response is acceptable
         assert resp.status_code in (200, 400, 422, 500)
@@ -138,12 +152,17 @@ class TestInputValidation:
         health = requests.get(f"{self.base_url}/health", timeout=5)
         assert health.status_code == 200
 
+    @pytest.mark.timeout(120)
     def test_unicode_bom_in_json(self):
-        """JSON with UTF-8 BOM should be handled gracefully."""
+        """JSON with UTF-8 BOM should be handled gracefully.
+
+        If the BOM passes FastAPI's JSON decoder, this triggers a live
+        search, hence the longer timeout.
+        """
         resp = requests.post(
             f"{self.base_url}/api/v1/search",
             data=b"\xef\xbb\xbf{\"query\": \"test\"}",
             headers={"Content-Type": "application/json"},
-            timeout=10,
+            timeout=60,
         )
         assert resp.status_code in (200, 400, 422)

@@ -48,10 +48,25 @@ class TestXSSProtection:
         assert resp.status_code == 200
 
     def test_dashboard_escapes_html_in_results(self):
-        """Dashboard HTML must escape result names containing HTML."""
-        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
-        # The dashboard should use escapeHtml() or equivalent
-        assert "escapeHtml" in dashboard or "textContent" in dashboard or "innerText" in dashboard
+        """Dashboard HTML must escape result names containing HTML.
+
+        The dashboard is now an Angular SPA (``<app-root>``). Template
+        bindings like ``{{ result.name }}`` interpolate via textContent
+        by default (Angular's contextual escaping), so raw HTML from
+        server responses never renders as markup. Instead of grepping
+        for a specific escape helper, we assert:
+
+        1. The root index.html ships the Angular shell with
+           ``<app-root>``.
+        2. No inline scripts on the landing page construct DOM from
+           server data (i.e. no ``innerHTML`` / ``document.write`` /
+           ``eval``).
+        """
+        dashboard = requests.get(f"{self.base_url}/", timeout=10).text
+        assert "<app-root>" in dashboard, "Angular shell missing"
+        bad_patterns = ["innerHTML", "document.write", "eval("]
+        for bad in bad_patterns:
+            assert bad not in dashboard, f"unsafe DOM sink in landing page: {bad!r}"
 
     def test_magnet_link_rejects_javascript_protocol(self):
         """Magnet endpoint must reject javascript: URLs."""
@@ -83,8 +98,12 @@ class TestXSSProtection:
             for hook in hooks:
                 assert "<script>" not in hook.get("name", ""), "Hook name must not contain raw script tags"
 
+    @pytest.mark.timeout(120)
     def test_result_name_with_html_entities(self):
-        """Results with HTML special chars must be handled safely."""
+        """Results with HTML special chars must be handled safely.
+
+        Live search; budget raised above the default 30s.
+        """
         resp = requests.post(
             f"{self.base_url}/api/v1/search",
             json={"query": "test", "limit": 5},

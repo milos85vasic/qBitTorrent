@@ -72,8 +72,12 @@ class TestAuthBypass:
                 assert "secret" not in text, f"Secret leaked in {endpoint}"
                 assert "token" not in text or "search_id" in text, f"Unexpected token in {endpoint}"
 
+    @pytest.mark.timeout(120)
     def test_parameter_tampering_privilege_escalation(self):
-        """Tampering with user-related parameters must not escalate privileges."""
+        """Tampering with user-related parameters must not escalate privileges.
+
+        Live multi-tracker search; budget raised to cover fan-out.
+        """
         # Try to access admin functionality with normal user parameters
         resp = requests.post(
             f"{self.base_url}/api/v1/search",

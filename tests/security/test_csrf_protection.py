@@ -29,8 +29,13 @@ class TestCSRFProtection:
         # Should return 400 or 415 for invalid content type
         assert resp.status_code in (200, 400, 415, 422), f"Unexpected status: {resp.status_code}"
 
+    @pytest.mark.timeout(120)
     def test_cross_origin_post_rejected(self):
-        """POST from untrusted origin should be rejected."""
+        """POST from untrusted origin should be rejected.
+
+        Live search triggered by the POST; pytest budget raised to
+        120s to cover tracker fan-out.
+        """
         resp = requests.post(
             f"{self.base_url}/api/v1/search",
             json={"query": "test", "limit": 5},
