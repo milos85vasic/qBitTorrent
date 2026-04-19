@@ -1,3 +1,7 @@
+// Smoke spec for the scaffolding `App` class left over from Angular CLI generation.
+// The actually-bootstrapped root is `AppComponent` (see main.ts + app.component.ts);
+// its coverage lives in app.component.spec.ts. Per-feature specs for every
+// component / service / model live alongside each source file.
 import { TestBed } from '@angular/core/testing';
 import { App } from './app';
 
