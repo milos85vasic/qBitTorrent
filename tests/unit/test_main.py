@@ -7,10 +7,11 @@ Scenarios:
 - Port configuration
 """
 
-import pytest
-import sys
 import os
-from unittest.mock import MagicMock, patch, call
+import sys
+from unittest.mock import patch
+
+import pytest
 
 # Add source to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
@@ -22,7 +23,6 @@ class TestMainStartup:
     def test_import_main(self):
         """main.py should be importable without errors."""
         try:
-            import main
             assert True
         except Exception as e:
             pytest.fail(f"Failed to import main.py: {e}")
@@ -57,19 +57,19 @@ class TestMainStartup:
     def test_main_starts_both_services_mocked(self):
         """main() should attempt to start both services (mocked)."""
         import main
-        with patch('threading.Thread') as mock_thread:
-            with patch('time.sleep', side_effect=KeyboardInterrupt()):
-                try:
-                    main.main()
-                except KeyboardInterrupt:
-                    pass
-                # Should have created threads for both services
-                assert mock_thread.call_count >= 1
+        with patch('threading.Thread') as mock_thread, patch('time.sleep', side_effect=KeyboardInterrupt()):
+            try:
+                main.main()
+            except KeyboardInterrupt:
+                pass
+            # Should have created threads for both services
+            assert mock_thread.call_count >= 1
 
     def test_port_env_vars(self):
         """Port should be configurable via environment."""
         with patch.dict(os.environ, {"PROXY_PORT": "9999", "MERGE_SERVICE_PORT": "9998"}):
             import importlib
+
             import main
             importlib.reload(main)
             # Should read from environment

@@ -2,10 +2,9 @@
 Tests for the auth module — CAPTCHA proxy and tracker authentication.
 """
 
-import sys
 import os
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+import sys
+from unittest.mock import patch
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src")
@@ -145,9 +144,10 @@ class TestQbitCredentialsFallback:
             assert creds["password"] == "envpass"
 
     def test_load_qbit_credentials_prefers_json_over_env(self):
-        from api.auth import _load_qbit_credentials
         import json
         from io import StringIO
+
+        from api.auth import _load_qbit_credentials
 
         json_data = json.dumps({"username": "jsonuser", "password": "jsonpass"})
 

@@ -11,7 +11,6 @@ Comprehensive UI test with 30+ search queries to validate:
 import pytest
 import requests
 
-
 SEARCH_QUERIES = [
     # Movies (various languages and formats)
     "matrix",

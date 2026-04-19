@@ -31,7 +31,7 @@ class _MkDocsSafeLoader(yaml.SafeLoader):
     """
 
 
-def _ignore_unknown(loader: yaml.Loader, tag_suffix: str, node: yaml.Node):  # noqa: ARG001
+def _ignore_unknown(loader: yaml.Loader, tag_suffix: str, node: yaml.Node):
     if isinstance(node, yaml.ScalarNode):
         return loader.construct_scalar(node)
     if isinstance(node, yaml.SequenceNode):

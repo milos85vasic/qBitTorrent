@@ -1,10 +1,11 @@
-import sys
 import os
+import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 
-from api.routes import _parse_size_to_bytes, _detect_quality, _is_tracker_url
+from api.routes import _detect_quality, _is_tracker_url, _parse_size_to_bytes
 
 
 class TestSortBySeeds:

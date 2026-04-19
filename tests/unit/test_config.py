@@ -1,13 +1,12 @@
-import sys
 import os
-import pytest
+import sys
 from unittest.mock import patch
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src")
 )
 
-from config import EnvConfig, load_env, get_config, reload_config
+from config import get_config, load_env, reload_config
 
 
 class TestEnvConfig:

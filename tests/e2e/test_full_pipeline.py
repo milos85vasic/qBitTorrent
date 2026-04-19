@@ -7,25 +7,24 @@ These tests verify the complete workflow:
 3. Download initiation to qBittorrent
 """
 
-import sys
 import os
+import sys
+from unittest.mock import patch
+
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime
 
 _src = os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src")
 _src = os.path.abspath(_src)
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
+from merge_service.deduplicator import Deduplicator
 from merge_service.search import (
-    SearchOrchestrator,
     SearchMetadata,
+    SearchOrchestrator,
     SearchResult,
     TrackerSource,
 )
-from merge_service.deduplicator import Deduplicator
 
 
 class TestFullPipeline:

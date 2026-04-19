@@ -1,8 +1,6 @@
-import sys
-import os
-import json
 import asyncio
-import pytest
+import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 
@@ -226,18 +224,18 @@ class TestSSEFormatCompliance:
         from api.streaming import SSEHandler
 
         event = SSEHandler.format_event("result_found", {"name": "test"})
-        assert event.endswith("\n\n"), f"Event should end with \\n\\n, got: {repr(event)}"
+        assert event.endswith("\n\n"), f"Event should end with \\n\\n, got: {event!r}"
 
     def test_empty_event_ends_with_double_newline(self):
         """Even empty events must end with two newlines."""
         from api.streaming import SSEHandler
 
         event = SSEHandler.format_event("", {"data": "value"})
-        assert event.endswith("\n\n"), f"Empty event should end with \\n\\n, got: {repr(event)}"
+        assert event.endswith("\n\n"), f"Empty event should end with \\n\\n, got: {event!r}"
 
     def test_multiline_data_ends_with_double_newline(self):
         """Multiline data events must end with two newlines."""
         from api.streaming import SSEHandler
 
         event = SSEHandler.format_event("update", {"key": "line1\nline2"})
-        assert event.endswith("\n\n"), f"Multiline event should end with \\n\\n, got: {repr(event)}"
+        assert event.endswith("\n\n"), f"Multiline event should end with \\n\\n, got: {event!r}"

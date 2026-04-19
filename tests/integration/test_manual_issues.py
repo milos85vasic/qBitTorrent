@@ -9,9 +9,10 @@ Issues:
 5. Sorting is broken (case-sensitive name, wrong quality/type ordering)
 """
 
+import time
+
 import pytest
 import requests
-import time
 
 
 class TestIssue1DownloadButton:

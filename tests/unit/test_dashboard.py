@@ -1,6 +1,5 @@
-import sys
 import os
-import importlib
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 
@@ -8,9 +7,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download
 if "api" in sys.modules and not getattr(sys.modules.get("api"), "__file__", None):
     del sys.modules["api"]
 
-from api import app
 from fastapi.testclient import TestClient
 
+from api import app
 
 client = TestClient(app)
 

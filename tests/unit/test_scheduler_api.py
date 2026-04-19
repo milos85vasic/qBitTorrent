@@ -2,8 +2,9 @@
 Unit tests for the scheduler API endpoints.
 """
 
-import sys
 import os
+import sys
+
 import pytest
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -25,7 +26,6 @@ _sched_api_mod = importlib.util.module_from_spec(_sched_api_spec)
 sys.modules["api.scheduler"] = _sched_api_mod
 _sched_api_spec.loader.exec_module(_sched_api_mod)
 
-from unittest.mock import MagicMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

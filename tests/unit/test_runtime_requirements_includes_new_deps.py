@@ -13,7 +13,6 @@ from __future__ import annotations
 import os
 import re
 
-
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 _REQS = os.path.join(_REPO_ROOT, "download-proxy", "requirements.txt")
 

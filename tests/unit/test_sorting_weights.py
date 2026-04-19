@@ -4,8 +4,8 @@ Unit tests for sorting weights and logic.
 Issue 5: Sorting by columns is broken.
 """
 
-import sys
 import os
+import sys
 
 _src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 if _src not in sys.path:

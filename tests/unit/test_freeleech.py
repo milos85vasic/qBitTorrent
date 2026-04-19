@@ -9,17 +9,16 @@ Verifies:
 5. Kinozal credentials fall back to IPTorrents credentials
 """
 
-import sys
 import os
-import pytest
+import sys
 
 _src = os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src")
 _src = os.path.abspath(_src)
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from merge_service.search import SearchResult, MergedResult
 from merge_service.deduplicator import Deduplicator
+from merge_service.search import SearchResult
 
 
 class TestFreeleechSuffix:

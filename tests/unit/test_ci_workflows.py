@@ -40,9 +40,7 @@ def test_workflow_triggers(name: str, spec: dict) -> None:
     # PyYAML turns the `on:` key into Python True (boolean) because YAML 1.1.
     triggers = data.get(True, data.get("on"))
     assert triggers, f"{name} has no `on:` triggers"
-    if isinstance(triggers, dict):
-        actual = set(triggers)
-    elif isinstance(triggers, list):
+    if isinstance(triggers, dict) or isinstance(triggers, list):
         actual = set(triggers)
     else:
         actual = {triggers}

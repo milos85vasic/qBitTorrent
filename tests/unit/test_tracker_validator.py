@@ -9,16 +9,16 @@ Scenarios:
 - Connection refused handling
 """
 
-import pytest
-import sys
 import os
-from unittest.mock import MagicMock, patch, AsyncMock
-import asyncio
+import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Add source to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 
-from merge_service.validator import TrackerValidator, TrackerStatus, ScrapeResult
+from merge_service.validator import ScrapeResult, TrackerStatus, TrackerValidator
 
 
 def _make_mock_response(content=b"", status=200):
@@ -74,7 +74,7 @@ class TestTrackerValidator:
     async def test_validate_http_timeout(self, validator):
         """HTTP tracker timeout should return OFFLINE."""
         mock_session = MagicMock()
-        mock_session.get = MagicMock(side_effect=asyncio.TimeoutError())
+        mock_session.get = MagicMock(side_effect=TimeoutError())
         mock_session.closed = False
 
         with patch.object(validator, '_get_session', AsyncMock(return_value=mock_session)):
@@ -133,11 +133,10 @@ class TestTrackerValidator:
         with patch.object(validator, '_http_scrape', AsyncMock(return_value=ScrapeResult(
             tracker="udp://tracker.example.com:1337",
             status=TrackerStatus.OFFLINE,
-        ))):
-            with patch.object(validator, '_udp_scrape', AsyncMock(return_value=mock_udp_result)) as mock_udp:
-                result = await validator.validate_tracker("udp://tracker.example.com:1337")
-                mock_udp.assert_called_once()
-                assert result.status == TrackerStatus.HEALTHY
+        ))), patch.object(validator, '_udp_scrape', AsyncMock(return_value=mock_udp_result)) as mock_udp:
+            result = await validator.validate_tracker("udp://tracker.example.com:1337")
+            mock_udp.assert_called_once()
+            assert result.status == TrackerStatus.HEALTHY
 
     def test_announce_to_scrape(self, validator):
         """Announce URL should convert to scrape URL."""

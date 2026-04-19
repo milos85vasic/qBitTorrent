@@ -10,12 +10,9 @@ rollout.
 
 from __future__ import annotations
 
-import importlib
 import logging
 import os
 import sys
-
-import pytest
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 _SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")
@@ -48,7 +45,7 @@ def test_default_uses_wildcard_and_warns(monkeypatch, caplog):
 
     caplog.set_level(logging.WARNING, logger="api")
 
-    import api  # noqa: F401 -- triggers module-level CORS setup
+    import api
 
     assert _cors_middleware_origins(api.app) == ["*"]
 
@@ -69,7 +66,7 @@ def test_explicit_origins_are_respected(monkeypatch, caplog):
 
     caplog.set_level(logging.WARNING, logger="api")
 
-    import api  # noqa: F401
+    import api
 
     assert _cors_middleware_origins(api.app) == [
         "https://a.example",
@@ -93,7 +90,7 @@ def test_whitespace_is_stripped_and_empties_dropped(monkeypatch):
     )
     _purge_api_module()
 
-    import api  # noqa: F401
+    import api
 
     assert _cors_middleware_origins(api.app) == [
         "https://a.example",

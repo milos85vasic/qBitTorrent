@@ -5,11 +5,11 @@ Issue 4: Search hangs / returns 0 results from public trackers because
 the subprocess script contains an undefined variable reference.
 """
 
-import sys
-import os
-import pytest
 import asyncio
-import json
+import os
+import sys
+
+import pytest
 
 _src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 if _src not in sys.path:
@@ -41,7 +41,7 @@ class TestPublicTrackerSubprocessScript:
         import inspect
         source = inspect.getsource(SearchOrchestrator._search_public_tracker)
         # Should have direct interpolation like 'engines.{tracker_name}'
-        assert "'engines.{tracker_name}'" in source or f'"engines.{{tracker_name}}"' in source, \
+        assert "'engines.{tracker_name}'" in source or '"engines.{tracker_name}"' in source, \
             "Fix: tracker name must be hardcoded in subprocess script"
 
     @pytest.mark.asyncio

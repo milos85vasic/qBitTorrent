@@ -9,9 +9,10 @@ Scenarios:
 - Metadata fields (title, overview) must be escaped
 """
 
+import html
+
 import pytest
 import requests
-import html
 
 
 class TestXSSProtection:

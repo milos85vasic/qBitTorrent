@@ -39,17 +39,15 @@ def test_probe_succeeds_when_endpoint_returns_200_and_matches_substring() -> Non
 def test_probe_fails_when_substring_missing() -> None:
     ep = svc.ServiceEndpoint(name="x", url="http://x:1", health_path="/h", expect_substring="ok")
     bad = MagicMock(status_code=200, text='{"status":"bad"}')
-    with patch.object(svc.requests, "get", return_value=bad):
-        with pytest.raises(RuntimeError):
-            svc._probe(ep, timeout=0.01, retries=1)
+    with patch.object(svc.requests, "get", return_value=bad), pytest.raises(RuntimeError):
+        svc._probe(ep, timeout=0.01, retries=1)
 
 
 def test_probe_fails_on_non_2xx() -> None:
     ep = svc.ServiceEndpoint(name="x", url="http://x:1", health_path="/h")
     bad = MagicMock(status_code=503, text="")
-    with patch.object(svc.requests, "get", return_value=bad):
-        with pytest.raises(RuntimeError) as exc:
-            svc._probe(ep, timeout=0.01, retries=1)
+    with patch.object(svc.requests, "get", return_value=bad), pytest.raises(RuntimeError) as exc:
+        svc._probe(ep, timeout=0.01, retries=1)
     assert "HTTP 503" in str(exc.value)
 
 

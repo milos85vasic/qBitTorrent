@@ -3,11 +3,12 @@ Integration tests for the merge service API endpoints.
 Uses FastAPI TestClient with mocked SearchOrchestrator.
 """
 
-import sys
 import os
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+import sys
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 _SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")
@@ -23,8 +24,9 @@ _ms.__path__.insert(0, os.path.join(_SRC_PATH, "merge_service"))
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from api.routes import router as api_router
+
 from api.hooks import router as hooks_router
+from api.routes import router as api_router
 
 
 def _create_test_client():
@@ -48,7 +50,7 @@ def client():
 def _reset_hooks_state(tmp_path, monkeypatch):
     hooks_file = str(tmp_path / "hooks.json")
     monkeypatch.setattr("api.hooks.HOOKS_FILE", hooks_file)
-    yield
+    return
 
 
 class TestHealthEndpoint:

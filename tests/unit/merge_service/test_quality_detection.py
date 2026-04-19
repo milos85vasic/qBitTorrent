@@ -2,9 +2,8 @@
 Unit tests for quality detection and size parsing functions in routes.py.
 """
 
-import sys
 import os
-import pytest
+import sys
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 _SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")

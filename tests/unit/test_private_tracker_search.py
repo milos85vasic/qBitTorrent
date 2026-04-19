@@ -11,11 +11,11 @@ Scenarios:
 - Invalid HTML handling
 """
 
-import pytest
-import sys
 import os
-from unittest.mock import MagicMock, patch, AsyncMock
-import asyncio
+import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Add source to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
@@ -148,7 +148,7 @@ class TestPrivateTrackerSearch:
     async def test_search_timeout(self, orchestrator):
         """Search timeout should return empty list."""
         session_cm = MagicMock()
-        session_cm.__aenter__ = AsyncMock(side_effect=asyncio.TimeoutError())
+        session_cm.__aenter__ = AsyncMock(side_effect=TimeoutError())
         session_cm.__aexit__ = AsyncMock(return_value=False)
 
         with patch("aiohttp.ClientSession", return_value=session_cm):

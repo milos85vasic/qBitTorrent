@@ -16,7 +16,6 @@ import importlib.util
 import os
 import sys
 
-import pytest
 from cachetools import TTLCache
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))

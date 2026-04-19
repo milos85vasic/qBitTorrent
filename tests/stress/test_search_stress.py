@@ -8,10 +8,11 @@ Scenarios:
 - Resource exhaustion prevention
 """
 
-import pytest
-import requests
 import concurrent.futures
 import time
+
+import pytest
+import requests
 
 
 class TestSearchStress:

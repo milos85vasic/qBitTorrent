@@ -10,9 +10,9 @@ Uses Playwright to verify:
 Run with: python3 -m pytest tests/integration/test_streaming_browser.py -v
 """
 
-import pytest
 import time
 
+import pytest
 
 BASE_URL = "http://localhost:7187"
 SEARCH_QUERY = "linux"
@@ -54,8 +54,9 @@ class TestStreamingBrowser:
 
     def test_sse_streaming_integration(self):
         """SSE endpoint should stream individual results."""
-        import requests
         import threading
+
+        import requests
 
         # Start search
         resp = requests.post(f"{BASE_URL}/api/v1/search", json={"query": SEARCH_QUERY, "limit": 20}, timeout=60)

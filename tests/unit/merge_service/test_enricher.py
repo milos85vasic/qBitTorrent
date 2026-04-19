@@ -2,11 +2,11 @@
 Unit tests for the metadata enricher module.
 """
 
-import sys
-import os
-import pytest
 import importlib.util
-from unittest.mock import patch, AsyncMock
+import os
+import sys
+
+import pytest
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 _SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")

@@ -9,12 +9,9 @@ Scenarios:
 - qBittorrent connection failure
 """
 
-import pytest
-import sys
-import os
-from unittest.mock import MagicMock, patch
-from io import BytesIO
 import importlib.util
+import os
+from unittest.mock import MagicMock
 
 # Load webui-bridge.py as a module (has hyphen in filename)
 _webui_bridge_path = os.path.join(os.path.dirname(__file__), "..", "..", "webui-bridge.py")

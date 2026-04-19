@@ -21,7 +21,6 @@ import inspect
 import os
 import sys
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
 

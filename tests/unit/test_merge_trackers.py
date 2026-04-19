@@ -1,16 +1,17 @@
 import os
 import sys
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 
 from merge_service.search import (
-    SearchOrchestrator,
-    TrackerSource,
-    PUBLIC_TRACKERS,
     PRIVATE_TRACKERS,
+    PUBLIC_TRACKERS,
+    SearchOrchestrator,
     SearchResult,
+    TrackerSource,
 )
 
 
@@ -250,11 +251,10 @@ class TestSearchPublicTracker:
 
     @pytest.mark.asyncio
     async def test_plugin_timeout(self):
-        import asyncio
 
         with patch("asyncio.create_subprocess_exec") as mock_exec:
             mock_proc = AsyncMock()
-            mock_proc.communicate = AsyncMock(side_effect=asyncio.TimeoutError())
+            mock_proc.communicate = AsyncMock(side_effect=TimeoutError())
             mock_exec.return_value = mock_proc
 
             results = await self.orch._search_public_tracker("slowtracker", "test", "all")

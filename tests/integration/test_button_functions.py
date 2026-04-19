@@ -2,11 +2,9 @@
 Tests for button functionality: Magnet, qBit, Download
 """
 
+
 import pytest
 import requests
-import json
-import re
-
 
 BASE_URL = "http://localhost:7187"
 

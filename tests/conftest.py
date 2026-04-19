@@ -19,7 +19,6 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-
 _POLLUTING_ROOTS = ("api", "merge_service", "config")
 
 

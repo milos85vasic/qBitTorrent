@@ -4,8 +4,8 @@ Unit tests for quality detection.
 Issue 3: Quality column shows Unknown for most results.
 """
 
-import sys
 import os
+import sys
 
 _src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 if _src not in sys.path:
@@ -67,8 +67,8 @@ class TestQualityDetection:
 
     def test_merged_result_best_quality_set(self):
         """MergedResult.best_quality should be populated after deduplication."""
-        from merge_service.search import SearchResult, MergedResult, CanonicalIdentity, QualityTier
         from merge_service.deduplicator import Deduplicator
+        from merge_service.search import SearchResult
 
         results = [
             SearchResult(name="Movie 2024 1080p", link="magnet:x", size="5 GB", seeds=100, leechers=20, engine_url="http://a", tracker="a"),

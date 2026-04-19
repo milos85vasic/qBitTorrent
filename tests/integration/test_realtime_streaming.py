@@ -10,13 +10,12 @@ Tests verify that:
 These tests will FAIL until streaming is properly implemented.
 """
 
+import json
+import threading
+import time
+
 import pytest
 import requests
-import json
-import time
-import threading
-import queue
-
 
 BASE_URL = "http://localhost:7187"
 

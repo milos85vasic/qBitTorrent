@@ -4,17 +4,17 @@ Unit tests for merged download functionality.
 Issue 1: Plus button must become Download button and produce merged sources.
 """
 
-import sys
 import os
+import sys
 
 _src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from api.routes import generate_magnet as routes_generate_magnet
-from fastapi import Request
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from fastapi import Request
 
 
 class TestDownloadButtonLabel:
@@ -78,6 +78,7 @@ class TestMergedMagnetGeneration:
     def test_merged_magnet_function_exists(self):
         """There should be a function to generate merged magnets."""
         import inspect
+
         from api import routes
         assert hasattr(routes, 'generate_magnet') or 'generate_magnet' in inspect.getsource(routes)
 
@@ -88,8 +89,9 @@ class TestDownloadFileEndpoint:
     @pytest.mark.asyncio
     async def test_download_file_returns_merged_magnet_with_all_trackers(self):
         """For magnet URLs, /download/file should return a merged magnet with all trackers."""
-        from api.routes import download_torrent_file
         from unittest.mock import patch
+
+        from api.routes import download_torrent_file
 
         mock_request = MagicMock(spec=Request)
         mock_request.app.state.enricher = None

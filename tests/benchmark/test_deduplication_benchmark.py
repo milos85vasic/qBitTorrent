@@ -8,9 +8,8 @@ Scenarios:
 - Content type detection throughput
 """
 
-import pytest
-import sys
 import os
+import sys
 import time
 
 # Add source to path

@@ -7,9 +7,10 @@ Scenarios:
 - Memory usage with large result sets
 """
 
+import time
+
 import pytest
 import requests
-import time
 
 
 class TestSearchBenchmark:

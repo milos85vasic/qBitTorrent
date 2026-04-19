@@ -2,11 +2,11 @@
 Unit tests for the scheduler module.
 """
 
-import sys
-import os
-import pytest
 import asyncio
-import json
+import os
+import sys
+
+import pytest
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 _SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")

@@ -5,9 +5,10 @@ These tests verify the dashboard UI and API behavior end-to-end
 with the actual running service.
 """
 
+import time
+
 import pytest
 import requests
-import time
 
 
 class TestDashboardIssue1DownloadButton:

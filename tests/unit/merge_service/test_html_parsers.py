@@ -5,10 +5,11 @@ Tests _parse_rutracker_html, _parse_kinozal_html, and _parse_nnmclub_html
 with sample HTML fragments and edge cases.
 """
 
-import sys
-import os
-import pytest
 import importlib.util
+import os
+import sys
+
+import pytest
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 _SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")

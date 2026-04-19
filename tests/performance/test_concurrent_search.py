@@ -8,11 +8,12 @@ Scenarios:
 - Response time degradation under load
 """
 
+import concurrent.futures
+import statistics
+import time
+
 import pytest
 import requests
-import concurrent.futures
-import time
-import statistics
 
 
 class TestConcurrentSearch:

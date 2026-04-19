@@ -7,9 +7,10 @@ Comprehensive tests for dashboard rendering fixes:
 - Proper table structure in both SSE and polling paths
 """
 
+import re
+
 import pytest
 import requests
-import re
 
 
 class TestDashboardHtmlStructure:

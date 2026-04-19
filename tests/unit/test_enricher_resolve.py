@@ -4,12 +4,12 @@ Unit tests for MetadataEnricher with mocked APIs.
 Tests individual lookup methods directly since resolve() has a fixed API order.
 """
 
-import pytest
-import sys
-import os
 import json
-from unittest.mock import MagicMock, patch, AsyncMock
-import asyncio
+import os
+import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Add source to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
@@ -89,7 +89,7 @@ class TestEnricherLookupOMDb:
     async def test_lookup_omdb_timeout(self, enricher):
         """OMDb lookup timeout returns None."""
         mock_session_cm = MagicMock()
-        mock_session_cm.__aenter__ = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_session_cm.__aenter__ = AsyncMock(side_effect=TimeoutError())
         mock_session_cm.__aexit__ = AsyncMock(return_value=False)
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cm):
