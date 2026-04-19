@@ -386,13 +386,62 @@ h1 {
 }
 
 .disabled-link {
-  opacity: 0.5;
+  opacity: 0.65;
   cursor: not-allowed;
   .bridge-down-hint {
     font-size: 11px;
     color: var(--color-danger);
     margin-left: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
+}
+
+/* Unknown / probing state — link still looks interactive but muted. */
+.service-links a.checking {
+  opacity: 0.8;
+  cursor: progress;
+  .bridge-down-hint {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-left: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+.mini-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid transparent;
+  border-top-color: var(--color-accent);
+  border-right-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+.bridge-retry {
+  background: var(--color-bg-tertiary);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  line-height: 1;
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 4px;
+  box-shadow: var(--shadow-elev-1);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  &:hover:not(:disabled) {
+    box-shadow: var(--shadow-elev-2);
+    transform: rotate(120deg);
+  }
+  &:disabled { opacity: 0.5; cursor: progress; }
 }
 
 .tracker-errors {

@@ -124,8 +124,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
   expandedChip = signal<string | null>(null);
   pendingAction?: { type: 'schedule' | 'addMagnet'; index: number };
 
-  // Bridge health
-  bridgeHealthy = signal(true);
+  // Bridge health. `null` = probe has not run yet (don't lie on first
+  // render); `true` = bridge responded 200-ish; `false` = probe failed.
+  // Separate interval from stats so a slow-to-start bridge self-heals
+  // quickly without waiting for the 30-second stats tick.
+  bridgeHealthy = signal<boolean | null>(null);
+  bridgeChecking = signal(false);
 
   // Config
   config = signal({ qbittorrent_url: 'http://localhost:7186' });
@@ -133,6 +137,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private sseSub?: any;
   private pollInterval?: any;
   private statsInterval?: any;
+  private bridgeInterval?: any;
 
   ngOnInit(): void {
     this.loadStats();
@@ -143,14 +148,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.loadStats();
       this.loadAuthStatus();
       this.loadDownloads();
-      this.loadBridgeHealth();
     }, 30000);
+    // Bridge re-probe every 10 s — independent of the 30 s stats
+    // cadence so a late-starting bridge flips to "up" within one
+    // cycle instead of up to half a minute.
+    this.bridgeInterval = setInterval(() => this.loadBridgeHealth(), 10000);
   }
 
   ngOnDestroy(): void {
     this.sse.disconnect();
     if (this.pollInterval) clearInterval(this.pollInterval);
     if (this.statsInterval) clearInterval(this.statsInterval);
+    if (this.bridgeInterval) clearInterval(this.bridgeInterval);
     if (this.sseSub) this.sseSub.unsubscribe();
   }
 
@@ -183,10 +192,38 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   loadBridgeHealth(): void {
+    this.bridgeChecking.set(true);
     this.http.get<{ healthy: boolean }>('/api/v1/bridge/health').subscribe({
-      next: (r) => this.bridgeHealthy.set(!!r.healthy),
-      error: () => this.bridgeHealthy.set(false),
+      next: (r) => {
+        this.bridgeHealthy.set(!!r.healthy);
+        this.bridgeChecking.set(false);
+      },
+      error: () => {
+        this.bridgeHealthy.set(false);
+        this.bridgeChecking.set(false);
+      },
     });
+  }
+
+  /** User clicked the WebUI Bridge link while it's marked down.
+   * Re-probe once — if the bridge came up in the meantime, let the
+   * navigation proceed; otherwise keep the click suppressed so they
+   * don't land on a dead page.
+   */
+  onBridgeLinkClick(event: Event): void {
+    if (this.bridgeHealthy() === true) return; // healthy — let anchor navigate
+    event.preventDefault();
+    this.loadBridgeHealth();
+    this.toast.info('Re-probing WebUI Bridge…');
+  }
+
+  /** Manual "retry" affordance — same as onBridgeLinkClick but also
+   * fires from the small refresh button next to the down hint.
+   */
+  retryBridgeProbe(event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.loadBridgeHealth();
   }
 
   // Per-tracker chip interactions

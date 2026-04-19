@@ -13,11 +13,27 @@
       <a href="http://localhost:7186" target="_blank">Download Proxy</a>
       <a href="http://localhost:7187" class="current">Merge Search</a>
       <a href="http://localhost:7188" target="_blank"
-         [class.disabled-link]="!bridgeHealthy()"
-         [title]="bridgeHealthy() ? 'WebUI Bridge' : 'Bridge not running — see docs/OUT_OF_SANDBOX.md'"
-         (click)="!bridgeHealthy() && $event.preventDefault()">
+         [class.disabled-link]="bridgeHealthy() === false"
+         [class.checking]="bridgeHealthy() === null"
+         [title]="
+           bridgeHealthy() === true ? 'WebUI Bridge' :
+           bridgeHealthy() === false ? 'Bridge not running — click retry or see docs/OUT_OF_SANDBOX.md' :
+           'Probing WebUI Bridge…'
+         "
+         (click)="onBridgeLinkClick($event)">
         WebUI Bridge
-        <span *ngIf="!bridgeHealthy()" class="bridge-down-hint">(down)</span>
+        <span *ngIf="bridgeHealthy() === null" class="bridge-down-hint">
+          <span class="mini-spinner" aria-hidden="true"></span>checking…
+        </span>
+        <span *ngIf="bridgeHealthy() === false" class="bridge-down-hint">
+          (down)
+          <button type="button"
+                  class="bridge-retry"
+                  [disabled]="bridgeChecking()"
+                  [title]="'Retry probe'"
+                  aria-label="Retry WebUI Bridge probe"
+                  (click)="retryBridgeProbe($event)">↻</button>
+        </span>
       </a>
     </div>
     <div class="auth-section">

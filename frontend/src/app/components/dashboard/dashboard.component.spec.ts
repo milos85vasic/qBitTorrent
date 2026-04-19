@@ -153,6 +153,50 @@ describe('DashboardComponent', () => {
       expect(bridgeLink?.classList.contains('disabled-link')).toBe(true);
       expect(bridgeLink?.textContent).toContain('down');
     });
+
+    it('starts with bridgeHealthy=null (probing) and flips to true on first success', () => {
+      const fx = TestBed.createComponent(DashboardComponent);
+      // Signal defaults to null — initial render shows the "checking…" affordance.
+      expect(fx.componentInstance.bridgeHealthy()).toBeNull();
+      fx.detectChanges();
+      http.expectOne('/api/v1/stats').flush({ active_searches: 0, completed_searches: 0, trackers_count: 0, trackers: [] });
+      http.expectOne('/api/v1/auth/status').flush({ trackers: {} });
+      http.expectOne('/api/v1/bridge/health').flush({ healthy: true });
+      http.expectOne('/api/v1/config').flush({ qbittorrent_url: '' });
+      fx.detectChanges();
+      expect(fx.componentInstance.bridgeHealthy()).toBe(true);
+    });
+
+    it('retryBridgeProbe re-fires /api/v1/bridge/health', () => {
+      const fx = bootstrap();
+      expect(fx.componentInstance.bridgeHealthy()).toBe(true);
+      fx.componentInstance.bridgeHealthy.set(false);
+      const stopSpy = vi.fn();
+      const prevSpy = vi.fn();
+      fx.componentInstance.retryBridgeProbe({ stopPropagation: stopSpy, preventDefault: prevSpy } as any);
+      http.expectOne('/api/v1/bridge/health').flush({ healthy: true });
+      expect(fx.componentInstance.bridgeHealthy()).toBe(true);
+      expect(stopSpy).toHaveBeenCalled();
+      expect(prevSpy).toHaveBeenCalled();
+    });
+
+    it('onBridgeLinkClick re-probes when marked down and suppresses the nav', () => {
+      const fx = bootstrap();
+      fx.componentInstance.bridgeHealthy.set(false);
+      const prevSpy = vi.fn();
+      fx.componentInstance.onBridgeLinkClick({ preventDefault: prevSpy } as any);
+      http.expectOne('/api/v1/bridge/health').flush({ healthy: false });
+      expect(prevSpy).toHaveBeenCalled();
+    });
+
+    it('onBridgeLinkClick lets the anchor navigate when bridge is healthy', () => {
+      const fx = bootstrap();
+      fx.componentInstance.bridgeHealthy.set(true);
+      const prevSpy = vi.fn();
+      fx.componentInstance.onBridgeLinkClick({ preventDefault: prevSpy } as any);
+      // No new HTTP call, and preventDefault must NOT be called.
+      expect(prevSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('loadStats / loadAuthStatus / loadDownloads / loadSchedules / loadHooks', () => {
