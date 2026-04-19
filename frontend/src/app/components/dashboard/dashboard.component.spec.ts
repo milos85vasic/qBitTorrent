@@ -7,7 +7,7 @@ import { DashboardComponent } from './dashboard.component';
 import { SseService } from '../../services/sse.service';
 import { DialogService } from '../../services/dialog.service';
 import { ToastService } from '../../services/toast.service';
-import type { SearchResult, Source } from '../../models/search.model';
+import type { SearchResult, Source, TrackerSearchStat } from '../../models/search.model';
 
 function makeResult(over: Partial<SearchResult> = {}): SearchResult {
   return {
@@ -861,6 +861,196 @@ describe('DashboardComponent', () => {
       fx.componentInstance.doMagnet(0);
       http.expectOne('/api/v1/magnet').flush({ magnet: 'magnet:?xt=urn:btih:abc', hashes: ['abc'] });
       expect(openSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('tracker stats bar', () => {
+    function makeStat(over: Partial<TrackerSearchStat> = {}): TrackerSearchStat {
+      return {
+        name: 'rutracker',
+        tracker_url: 'https://rutracker.org',
+        status: 'pending',
+        results_count: 0,
+        started_at: null,
+        completed_at: null,
+        duration_ms: null,
+        error: null,
+        error_type: null,
+        authenticated: true,
+        attempt: 1,
+        http_status: null,
+        category: 'all',
+        query: 'ubuntu',
+        notes: {},
+        ...over,
+      };
+    }
+
+    it('trackerStatsSummary computes bucket counts across all statuses', () => {
+      const fx = bootstrap();
+      fx.componentInstance.trackerStats.set([
+        makeStat({ name: 'a', status: 'success' }),
+        makeStat({ name: 'b', status: 'success' }),
+        makeStat({ name: 'c', status: 'empty' }),
+        makeStat({ name: 'd', status: 'error' }),
+        makeStat({ name: 'e', status: 'timeout' }),
+        makeStat({ name: 'f', status: 'running' }),
+        makeStat({ name: 'g', status: 'pending' }),
+      ]);
+      const s = fx.componentInstance.trackerStatsSummary();
+      expect(s.successCount).toBe(2);
+      expect(s.emptyCount).toBe(1);
+      expect(s.errorCount).toBe(2); // error + timeout
+      expect(s.runningCount).toBe(2); // running + pending
+      expect(s.completedCount).toBe(5); // everything except pending/running
+    });
+
+    it('doSearch seeds trackerStats from the POST /search response', () => {
+      const fx = bootstrap();
+      fx.componentInstance.query.set('ubuntu');
+      fx.componentInstance.doSearch();
+      const tr = http.expectOne('/api/v1/search');
+      tr.flush({
+        search_id: 's1',
+        query: 'ubuntu',
+        status: 'running',
+        results: [],
+        total_results: 0,
+        merged_results: 0,
+        trackers_searched: ['rutracker', 'kinozal'],
+        tracker_stats: [
+          makeStat({ name: 'kinozal', status: 'pending' }),
+          makeStat({ name: 'rutracker', status: 'pending' }),
+        ],
+        started_at: 'now',
+      });
+      const stats = fx.componentInstance.trackerStats();
+      expect(stats).toHaveLength(2);
+      expect(stats.map(s => s.name)).toEqual(['kinozal', 'rutracker']);
+    });
+
+    it('SSE tracker_started flips a stat to running', () => {
+      const fx = bootstrap();
+      fx.componentInstance.trackerStats.set([
+        makeStat({ name: 'rutracker', status: 'pending' }),
+      ]);
+      fx.componentInstance.onTrackerStarted({ name: 'rutracker', started_at: '2026-04-19T12:00:00Z' });
+      const stat = fx.componentInstance.trackerStats().find(s => s.name === 'rutracker');
+      expect(stat?.status).toBe('running');
+      expect(stat?.started_at).toBe('2026-04-19T12:00:00Z');
+    });
+
+    it('SSE tracker_started adds a new chip when the name is unknown', () => {
+      const fx = bootstrap();
+      fx.componentInstance.trackerStats.set([]);
+      fx.componentInstance.onTrackerStarted({ name: 'eztv', tracker_url: 'https://eztv' });
+      const stats = fx.componentInstance.trackerStats();
+      expect(stats).toHaveLength(1);
+      expect(stats[0].name).toBe('eztv');
+      expect(stats[0].status).toBe('running');
+    });
+
+    it('SSE tracker_completed replaces the full stat object', () => {
+      const fx = bootstrap();
+      fx.componentInstance.trackerStats.set([
+        makeStat({ name: 'rutracker', status: 'running' }),
+      ]);
+      fx.componentInstance.onTrackerCompleted({
+        name: 'rutracker',
+        status: 'success',
+        results_count: 5,
+        duration_ms: 320,
+      });
+      const s = fx.componentInstance.trackerStats().find(x => x.name === 'rutracker');
+      expect(s?.status).toBe('success');
+      expect(s?.results_count).toBe(5);
+      expect(s?.duration_ms).toBe(320);
+    });
+
+    it('SSE tracker_completed on error captures error_type/message', () => {
+      const fx = bootstrap();
+      fx.componentInstance.trackerStats.set([
+        makeStat({ name: 'rutracker', status: 'running' }),
+      ]);
+      fx.componentInstance.onTrackerCompleted({
+        name: 'rutracker',
+        status: 'error',
+        error: 'boom',
+        error_type: 'RuntimeError',
+      });
+      const s = fx.componentInstance.trackerStats().find(x => x.name === 'rutracker');
+      expect(s?.status).toBe('error');
+      expect(s?.error).toBe('boom');
+      expect(s?.error_type).toBe('RuntimeError');
+    });
+
+    it('openTrackerStatDialog delegates to the ViewChild dialog', () => {
+      const fx = bootstrap();
+      const openSpy = vi.fn();
+      (fx.componentInstance as any).trackerStatDialog = { open: openSpy };
+      const stat = makeStat();
+      fx.componentInstance.openTrackerStatDialog(stat);
+      expect(openSpy).toHaveBeenCalledWith(stat);
+    });
+
+    it('trackStatByName returns the stat name as identity key', () => {
+      const fx = bootstrap();
+      expect(fx.componentInstance.trackStatByName(0, makeStat({ name: 'eztv' }))).toBe('eztv');
+    });
+
+    it('connectSse routes tracker_started / tracker_completed into the signal', () => {
+      const fx = bootstrap();
+      fx.componentInstance.query.set('u');
+      fx.componentInstance.doSearch();
+      http.expectOne('/api/v1/search').flush({
+        search_id: 's1',
+        query: 'u',
+        status: 'running',
+        results: [],
+        total_results: 0,
+        merged_results: 0,
+        trackers_searched: ['rutracker'],
+        tracker_stats: [makeStat({ name: 'rutracker', status: 'pending' })],
+        started_at: 'now',
+      });
+      sseEvents?.next({ event: 'tracker_started', data: { name: 'rutracker', started_at: 't0' } });
+      expect(fx.componentInstance.trackerStats()[0].status).toBe('running');
+      sseEvents?.next({ event: 'tracker_completed', data: { name: 'rutracker', status: 'success', results_count: 3 } });
+      expect(fx.componentInstance.trackerStats()[0].status).toBe('success');
+      expect(fx.componentInstance.trackerStats()[0].results_count).toBe(3);
+    });
+
+    it('renders one chip per stat in the Results tab', () => {
+      const fx = bootstrap();
+      fx.componentInstance.trackerStats.set([
+        makeStat({ name: 'alpha', status: 'success', results_count: 2 }),
+        makeStat({ name: 'beta', status: 'error', error_type: 'RuntimeError', error: 'boom' }),
+      ]);
+      fx.detectChanges();
+      const chips = (fx.nativeElement as HTMLElement).querySelectorAll('.tracker-stat-chip');
+      expect(chips.length).toBe(2);
+      expect(chips[0].textContent).toContain('alpha');
+      expect(chips[1].textContent).toContain('beta');
+    });
+
+    it('loadSearchResults populates tracker_stats when present on the response', () => {
+      const fx = bootstrap();
+      fx.componentInstance.loadSearchResults('sX');
+      http.expectOne('/api/v1/search/sX').flush({
+        search_id: 'sX',
+        query: 'u',
+        status: 'completed',
+        results: [],
+        total_results: 0,
+        merged_results: 0,
+        trackers_searched: ['rutracker', 'kinozal'],
+        tracker_stats: [
+          makeStat({ name: 'kinozal', status: 'success', results_count: 1 }),
+          makeStat({ name: 'rutracker', status: 'empty' }),
+        ],
+        started_at: 'now',
+      });
+      expect(fx.componentInstance.trackerStats()).toHaveLength(2);
     });
   });
 });
