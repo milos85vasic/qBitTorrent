@@ -170,7 +170,18 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
             return False
 
     def proxy_to_qbittorrent(self):
-        """Proxy request to qBittorrent."""
+        """Proxy request to qBittorrent.
+
+        Header hygiene:
+
+        * ``Host`` and ``Content-Length`` are recomputed by urllib.
+        * ``Referer`` and ``Origin`` are rewritten to
+          ``http://localhost:$QBITTORRENT_PORT``. qBittorrent's WebUI
+          enforces same-origin by default on state-changing endpoints
+          (``/api/v2/auth/login`` returns 401 if the Referer does not
+          match its host), and without this rewrite every login
+          attempt through the bridge would fail.
+        """
         try:
             target = f"http://{QBITTORRENT_HOST}:{QBITTORRENT_PORT}{self.path}"
 
@@ -183,19 +194,41 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
 
             req = urllib.request.Request(target, data=body, method=self.command)
 
+            qbit_origin = f"http://localhost:{QBITTORRENT_PORT}"
             for header, value in self.headers.items():
-                if header.lower() not in ["host", "content-length"]:
-                    req.add_header(header, value)
+                header_lower = header.lower()
+                if header_lower in ("host", "content-length"):
+                    continue
+                if header_lower == "referer":
+                    value = qbit_origin
+                elif header_lower == "origin":
+                    value = qbit_origin
+                req.add_header(header, value)
 
             with urllib.request.urlopen(req, timeout=30) as resp:
                 self.send_response(resp.status)
                 for header, value in resp.headers.items():
+                    # Let urllib handle chunked encoding bookkeeping.
+                    if header.lower() == "transfer-encoding":
+                        continue
                     self.send_header(header, value)
                 self.end_headers()
                 self.wfile.write(resp.read())
 
         except urllib.error.HTTPError as e:
-            self.send_error(e.code, e.reason)
+            # Forward qBittorrent's status/headers/body so auth failures
+            # surface as 401 with ``Fails.`` body instead of being
+            # rewritten to BaseHTTPRequestHandler's generic 401 HTML.
+            try:
+                self.send_response(e.code)
+                for header, value in (e.headers or {}).items():
+                    if header.lower() == "transfer-encoding":
+                        continue
+                    self.send_header(header, value)
+                self.end_headers()
+                self.wfile.write(e.read() or e.reason.encode("utf-8"))
+            except Exception:
+                self.send_error(e.code, e.reason)
 
 
 def run_bridge():
