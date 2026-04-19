@@ -1053,4 +1053,137 @@ describe('DashboardComponent', () => {
       expect(fx.componentInstance.trackerStats()).toHaveLength(2);
     });
   });
+
+  describe('live result streaming', () => {
+    function primeRunningSearch(fx: ReturnType<typeof bootstrap>): void {
+      fx.componentInstance.query.set('linux');
+      fx.componentInstance.doSearch();
+      http.expectOne('/api/v1/search').flush({
+        search_id: 'live-1',
+        query: 'linux',
+        status: 'running',
+        results: [],
+        total_results: 0,
+        merged_results: 0,
+        trackers_searched: [],
+        tracker_stats: [],
+        started_at: 'now',
+      });
+    }
+
+    it('sortedResults reflects each result_found event during search', () => {
+      const fx = bootstrap();
+      primeRunningSearch(fx);
+      expect(fx.componentInstance.isSearching()).toBe(true);
+      // Initial state: nothing rendered.
+      expect(fx.componentInstance.sortedResults()).toHaveLength(0);
+
+      sseEvents?.next({
+        event: 'result_found',
+        data: {
+          name: 'Ubuntu 22.04 LTS',
+          size: '3.5 GB',
+          seeds: 120,
+          leechers: 4,
+          tracker: 'rutracker',
+          link: 'magnet:?xt=urn:btih:a',
+        },
+      });
+      expect(fx.componentInstance.sortedResults()).toHaveLength(1);
+      expect(fx.componentInstance.sortedResults()[0].name).toBe('Ubuntu 22.04 LTS');
+
+      sseEvents?.next({
+        event: 'result_found',
+        data: {
+          name: 'Debian 12',
+          size: '600 MB',
+          seeds: 200,
+          leechers: 5,
+          tracker: 'kinozal',
+          link: 'magnet:?xt=urn:btih:b',
+        },
+      });
+      expect(fx.componentInstance.sortedResults()).toHaveLength(2);
+      // Sort is seeds-desc by default, so Debian (200) comes first.
+      expect(fx.componentInstance.sortedResults()[0].name).toBe('Debian 12');
+    });
+
+    it('live rows dedup by tracker|link|name so duplicate events do not flash twice', () => {
+      const fx = bootstrap();
+      primeRunningSearch(fx);
+      const evt = {
+        event: 'result_found',
+        data: { name: 'dup', size: '1 GB', seeds: 1, leechers: 0, tracker: 't', link: 'magnet:x' },
+      };
+      sseEvents?.next(evt);
+      sseEvents?.next(evt);
+      sseEvents?.next(evt);
+      expect(fx.componentInstance.liveResults()).toHaveLength(1);
+      expect(fx.componentInstance.sortedResults()).toHaveLength(1);
+    });
+
+    it('searchStatus reports the live-row count while streaming', () => {
+      const fx = bootstrap();
+      primeRunningSearch(fx);
+      for (let i = 0; i < 3; i++) {
+        sseEvents?.next({
+          event: 'result_found',
+          data: { name: `n${i}`, size: '1 GB', seeds: i, leechers: 0, tracker: 't', link: `magnet:${i}` },
+        });
+      }
+      expect(fx.componentInstance.searchStatus()).toMatch(/Found 3 results/);
+    });
+
+    it('search_complete swaps sortedResults over to the final merged list', () => {
+      const fx = bootstrap();
+      primeRunningSearch(fx);
+      // Two live hits, from two different trackers for the same content.
+      sseEvents?.next({
+        event: 'result_found',
+        data: { name: 'same', size: '1 GB', seeds: 10, leechers: 0, tracker: 'ta', link: 'magnet:z' },
+      });
+      sseEvents?.next({
+        event: 'result_found',
+        data: { name: 'same', size: '1 GB', seeds: 5, leechers: 0, tracker: 'tb', link: 'magnet:z' },
+      });
+      expect(fx.componentInstance.sortedResults()).toHaveLength(2);
+
+      // The completion event triggers a GET /search/{id} for the
+      // merged view — return a single deduped row.
+      sseEvents?.next({
+        event: 'search_complete',
+        data: { total_results: 2, merged_results: 1, trackers_searched: ['ta', 'tb'] },
+      });
+      http.expectOne('/api/v1/search/live-1').flush({
+        search_id: 'live-1',
+        query: 'linux',
+        status: 'completed',
+        results: [
+          {
+            name: 'same',
+            size: '1 GB',
+            seeds: 15,
+            leechers: 0,
+            download_urls: ['magnet:z'],
+            quality: 'hd',
+            content_type: 'software',
+            sources: [
+              { tracker: 'ta', seeds: 10, leechers: 0 },
+              { tracker: 'tb', seeds: 5, leechers: 0 },
+            ],
+            metadata: null,
+            freeleech: false,
+          },
+        ],
+        total_results: 2,
+        merged_results: 1,
+        trackers_searched: ['ta', 'tb'],
+        started_at: 'now',
+      });
+
+      expect(fx.componentInstance.isSearching()).toBe(false);
+      expect(fx.componentInstance.sortedResults()).toHaveLength(1);
+      expect(fx.componentInstance.sortedResults()[0].seeds).toBe(15);
+    });
+  });
 });

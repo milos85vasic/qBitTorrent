@@ -63,8 +63,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
   sortDirection = signal<'asc' | 'desc'>('desc');
 
   // Memoised sorted view for fast rendering of thousands of rows.
+  //
+  // While the search is running, stream the liveResults signal so the
+  // table fills in as every `result_found` SSE event arrives. The
+  // moment the search completes, `loadSearchResults` populates the
+  // `results` signal with the final merged/deduplicated list and the
+  // table swaps over. If the search completes and returned nothing
+  // live (e.g. a purely synchronous completion came back on the POST),
+  // still fall back to the merged `results` so we never render an
+  // empty grid when we have data.
   readonly sortedResults = computed(() => {
-    const rows = this.results();
+    const searching = this.isSearching();
+    const live = this.liveResults();
+    const merged = this.results();
+    const rows = searching && live.length > 0
+      ? live
+      : (merged.length > 0 ? merged : live);
     const col = this.sortColumn();
     const dir = this.sortDirection();
     return this._sort(rows, col, dir);
@@ -398,7 +412,23 @@ export class DashboardComponent implements OnInit, OnDestroy {
       metadata: null,
       freeleech: false
     };
-    this.liveResults.update(r => [...r, normalized]);
+    // Deduplicate live results on the fly. The SSE stream can emit
+    // the same result twice if a poll cycle racing a client
+    // reconnection fires — we don't want duplicate rows flashing in
+    // the live table. Dedup key: link (primary, magnet hash unique) +
+    // tracker + name.
+    this.liveResults.update(rows => {
+      const key = (r: SearchResult) => `${r.tracker}|${r.download_urls[0] || ''}|${r.name}`;
+      const seen = new Set(rows.map(key));
+      if (seen.has(key(normalized))) return rows;
+      return [...rows, normalized];
+    });
+    // Keep the running status-line honest with the actual count the
+    // UI is showing, not just the backend's total.
+    if (this.isSearching()) {
+      const n = this.liveResults().length;
+      this.searchStatus.set(`Found ${n} result${n === 1 ? '' : 's'}…`);
+    }
   }
 
   // Sorting
