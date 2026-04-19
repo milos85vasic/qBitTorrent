@@ -17,7 +17,12 @@ except ImportError:  # pragma: no cover
     yaml = None  # type: ignore[assignment]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
+# Per owner directive (2026-04-19) all GitHub Actions were disabled.
+# The YAMLs still live in .github/workflows-disabled/ so they can be
+# re-enabled with a single `git mv`. Until then, this test validates
+# their presence + shape at the DISABLED location so silent removal
+# or accidental re-introduction of triggers is caught.
+WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows-disabled"
 
 REQUIRED_WORKFLOWS: dict[str, dict] = {
     "syntax.yml": {"on": {"push", "pull_request"}},
@@ -26,6 +31,18 @@ REQUIRED_WORKFLOWS: dict[str, dict] = {
     "nightly.yml": {"on": {"schedule"}},
     "security.yml": {"on": {"schedule"}},
 }
+
+
+def test_active_workflows_directory_is_empty() -> None:
+    """GitHub Actions directory must not contain active YAML triggers
+    while workflows are disabled. A stray file here would re-activate
+    CI by accident.
+    """
+    active = REPO_ROOT / ".github" / "workflows"
+    if not active.exists():
+        return
+    yamls = [p for p in active.iterdir() if p.suffix in (".yml", ".yaml")]
+    assert yamls == [], f".github/workflows/ must be empty while disabled, found: {yamls}"
 
 
 @pytest.mark.parametrize("name", sorted(REQUIRED_WORKFLOWS))
