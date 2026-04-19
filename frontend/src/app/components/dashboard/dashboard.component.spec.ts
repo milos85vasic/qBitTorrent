@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { Subject } from 'rxjs';
 import { DashboardComponent } from './dashboard.component';
 import { SseService } from '../../services/sse.service';
 import { DialogService } from '../../services/dialog.service';
@@ -27,24 +28,22 @@ function makeResult(over: Partial<SearchResult> = {}): SearchResult {
 describe('DashboardComponent', () => {
   let http: HttpTestingController;
   let sse: Pick<SseService, 'connect' | 'disconnect' | 'events'>;
-  let sseEvents: { next: (e: { event: string; data: any }) => void } | null;
+  let sseEvents: Subject<{ event: string; data: any }> | null;
   let connectSpy: ReturnType<typeof vi.fn>;
   let disconnectSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     connectSpy = vi.fn();
     disconnectSpy = vi.fn();
-    sseEvents = null;
+    // Use a real Subject so the component can .subscribe() with either
+    // an observer literal OR a bare callback — and the spec can call
+    // .next() to push events of both shapes.
+    sseEvents = new Subject<{ event: string; data: any }>();
 
     const sseStub = {
       connect: connectSpy,
       disconnect: disconnectSpy,
-      events: {
-        subscribe: (observer: any) => {
-          sseEvents = observer;
-          return { unsubscribe: vi.fn() };
-        },
-      },
+      events: sseEvents.asObservable(),
     };
     sse = sseStub as any;
 

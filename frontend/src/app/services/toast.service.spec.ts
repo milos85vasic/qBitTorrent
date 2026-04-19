@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
 import { ToastService } from './toast.service';
 
 describe('ToastService', () => {
@@ -62,20 +62,35 @@ describe('ToastService', () => {
     expect(svc.toasts()).toEqual([]);
   });
 
-  it('auto-dismisses after the supplied duration', fakeAsync(() => {
-    svc.show('gone', 'info', 500);
-    expect(svc.toasts()).toHaveLength(1);
-    tick(499);
-    expect(svc.toasts()).toHaveLength(1);
-    tick(1);
-    expect(svc.toasts()).toHaveLength(0);
-  }));
+  it('auto-dismisses after the supplied duration', () => {
+    // Using vitest's fake timers instead of Angular's fakeAsync/tick
+    // because zone-testing's ProxyZone is not reliably installed when
+    // Angular's unit-test builder runs under vitest (as of @angular/
+    // build 21.x). vi.useFakeTimers() drives the underlying setTimeout
+    // directly, which is what ToastService.show() uses anyway.
+    vi.useFakeTimers();
+    try {
+      svc.show('gone', 'info', 500);
+      expect(svc.toasts()).toHaveLength(1);
+      vi.advanceTimersByTime(499);
+      expect(svc.toasts()).toHaveLength(1);
+      vi.advanceTimersByTime(1);
+      expect(svc.toasts()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
-  it('duration=0 keeps the toast indefinitely', fakeAsync(() => {
-    svc.show('sticky', 'info', 0);
-    tick(60000);
-    expect(svc.toasts()).toHaveLength(1);
-  }));
+  it('duration=0 keeps the toast indefinitely', () => {
+    vi.useFakeTimers();
+    try {
+      svc.show('sticky', 'info', 0);
+      vi.advanceTimersByTime(60000);
+      expect(svc.toasts()).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it('multiple toasts get unique ids', () => {
     svc.show('a', 'info', 0);

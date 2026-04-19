@@ -79,6 +79,16 @@ describe('MagnetDialogComponent', () => {
       configurable: true,
       value: { writeText },
     });
+    // jsdom does not ship document.execCommand; define the property
+    // before spying. The shim only needs to exist + be spy-able; the
+    // component's fallback path calls it and we assert the invocation.
+    if (!('execCommand' in document)) {
+      Object.defineProperty(document, 'execCommand', {
+        configurable: true,
+        writable: true,
+        value: () => true,
+      });
+    }
     const execSpy = vi.spyOn(document, 'execCommand').mockReturnValue(true);
     const fx = TestBed.createComponent(MagnetDialogComponent);
     fx.detectChanges();

@@ -20,7 +20,11 @@ describe('App', () => {
 
   it('should render title', async () => {
     const fixture = TestBed.createComponent(App);
+    // Signals need an explicit change-detection tick before the
+    // template interpolation `{{ title() }}` lands in the DOM.
+    fixture.detectChanges();
     await fixture.whenStable();
+    fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('h1')?.textContent).toContain('Hello, frontend');
   });
