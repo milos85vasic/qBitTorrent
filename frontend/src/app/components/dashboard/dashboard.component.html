@@ -1,19 +1,24 @@
 <div class="container">
   <header>
-    <div>
-      <h1>Merge Search Dashboard</h1>
-      <div class="service-links">
-        <a [attr.href]="config().qbittorrent_url" target="_blank">qBittorrent WebUI</a>
-        <a href="http://localhost:7186" target="_blank">Download Proxy</a>
-        <a href="http://localhost:7187" class="current">Merge Search</a>
-        <a href="http://localhost:7188" target="_blank"
-           [class.disabled-link]="!bridgeHealthy()"
-           [title]="bridgeHealthy() ? 'WebUI Bridge' : 'Bridge not running — see docs/OUT_OF_SANDBOX.md'"
-           (click)="!bridgeHealthy() && $event.preventDefault()">
-          WebUI Bridge
-          <span *ngIf="!bridgeHealthy()" class="bridge-down-hint">(down)</span>
-        </a>
+    <div class="brand">
+      <img class="brand-logo" src="logo-header.png" alt="qBittorrent-Fixed logo"
+           width="48" height="48" loading="eager" decoding="async">
+      <div class="brand-text">
+        <h1>Merge Search Dashboard</h1>
+        <p class="tagline">Multi-tracker meta-search with private-tracker bridge</p>
       </div>
+    </div>
+    <div class="service-links">
+      <a [attr.href]="config().qbittorrent_url" target="_blank">qBittorrent WebUI</a>
+      <a href="http://localhost:7186" target="_blank">Download Proxy</a>
+      <a href="http://localhost:7187" class="current">Merge Search</a>
+      <a href="http://localhost:7188" target="_blank"
+         [class.disabled-link]="!bridgeHealthy()"
+         [title]="bridgeHealthy() ? 'WebUI Bridge' : 'Bridge not running — see docs/OUT_OF_SANDBOX.md'"
+         (click)="!bridgeHealthy() && $event.preventDefault()">
+        WebUI Bridge
+        <span *ngIf="!bridgeHealthy()" class="bridge-down-hint">(down)</span>
+      </a>
     </div>
     <div class="auth-section">
       <!-- qBit chip -->
