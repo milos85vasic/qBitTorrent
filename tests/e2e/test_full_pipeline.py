@@ -128,6 +128,64 @@ class TestFullPipeline:
             assert metadata.query == "Ubuntu"
             assert metadata.status in ["running", "completed", "failed"]
 
+    @pytest.mark.asyncio
+    async def test_start_search_returns_immediately(self, sample_trackers):
+        """start_search() must return before any tracker is fanned out.
+
+        This is the core of the real-time search feature — callers get
+        back a search_id synchronously and then attach to SSE, instead
+        of blocking on the slowest tracker.
+        """
+        orch = SearchOrchestrator()
+        with patch.object(orch, "_get_enabled_trackers", return_value=sample_trackers):
+            metadata = orch.start_search("Ubuntu", category="linux")
+
+        assert metadata.search_id is not None
+        assert metadata.query == "Ubuntu"
+        assert metadata.status == "running"
+        # The search is registered and discoverable right away — SSE
+        # consumers can attach before any tracker reports.
+        assert orch.get_search_status(metadata.search_id) is metadata
+        # No tracker has reported yet.
+        assert metadata.total_results == 0
+
+    @pytest.mark.asyncio
+    async def test_run_search_populates_results_incrementally(self, sample_trackers):
+        """_run_search pushes per-tracker results as each one completes.
+
+        Verified via ``_tracker_results`` being populated for at least
+        one tracker by the time the task finishes.
+        """
+        orch = SearchOrchestrator()
+
+        async def _fake_search_tracker(tracker, query, category):
+            # Pretend each tracker returns a single result.
+            return [
+                SearchResult(
+                    name=f"{tracker.name} result",
+                    link="magnet:?xt=urn:btih:abc",
+                    size="1 GB",
+                    seeds=10,
+                    leechers=1,
+                    engine_url=tracker.url,
+                    tracker=tracker.name,
+                )
+            ]
+
+        with patch.object(orch, "_get_enabled_trackers", return_value=sample_trackers), \
+             patch.object(orch, "_search_tracker", side_effect=_fake_search_tracker):
+            metadata = orch.start_search("Ubuntu", category="linux")
+            await orch._run_search(metadata.search_id, "Ubuntu", "linux")
+
+        assert metadata.status == "completed"
+        # One result per fake tracker.
+        assert metadata.total_results == len(sample_trackers)
+        # Per-tracker buckets are filled.
+        per_tracker = orch._tracker_results[metadata.search_id]
+        assert len(per_tracker) == len(sample_trackers)
+        for t in sample_trackers:
+            assert per_tracker[t.name]  # non-empty
+
 
 class TestDeduplication:
     """Tests for the deduplication logic."""

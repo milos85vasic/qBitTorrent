@@ -289,21 +289,54 @@ class SearchOrchestrator:
                     except Exception as e:
                         logger.debug(f"Could not load env from {path}: {e}")
 
-    async def search(
+    def start_search(
         self,
         query: str,
         category: str = "all",
         enable_metadata: bool = True,
         validate_trackers: bool = True,
     ) -> SearchMetadata:
+        """Kick off a search and return metadata synchronously.
+
+        This does NOT block on tracker fan-out — use ``_run_search`` as an
+        asyncio task to populate results as they stream in.  The returned
+        metadata is immediately available at ``get_search_status`` and in
+        ``_active_searches`` so SSE consumers can attach before any
+        tracker completes.
+        """
         import uuid
+
+        search_id = str(uuid.uuid4())
+        metadata = SearchMetadata(search_id=search_id, query=query, category=category)
+        metadata.status = "running"
+        self._active_searches[search_id] = metadata
+        self._tracker_results[search_id] = {}
+        # Seed a mutable placeholder so SSE clients can read partial
+        # merged/all_results as trackers complete.
+        self._last_merged_results[search_id] = ([], [])
+        return metadata
+
+    async def _run_search(
+        self,
+        search_id: str,
+        query: str,
+        category: str = "all",
+    ) -> None:
+        """Execute the tracker fan-out for a previously-started search.
+
+        This is the body of the old monolithic ``search()`` method, but
+        it pushes per-tracker results into ``_tracker_results[search_id]``
+        immediately as each tracker finishes so SSE streams them in real
+        time.  At the end it runs a single dedup pass and flips the
+        metadata to ``completed``/``failed``.
+        """
+        import asyncio
         import logging
 
         logger = logging.getLogger(__name__)
-        search_id = str(uuid.uuid4())
-        metadata = SearchMetadata(search_id=search_id, query=query, category=category)
-        self._active_searches[search_id] = metadata
-        self._tracker_results[search_id] = {}
+        metadata = self._active_searches.get(search_id)
+        if metadata is None:
+            return
 
         try:
             trackers = self._get_enabled_trackers()
@@ -313,19 +346,14 @@ class SearchOrchestrator:
                 try:
                     results = await self._search_tracker(tracker, query, category)
                     logger.info(f"Tracker {tracker.name}: {len(results)} results for '{query}'")
-                    # Store results incrementally for streaming
+                    # Push as soon as the tracker is done so SSE can see it.
                     self._tracker_results[search_id][tracker.name] = results
-
-                    # Store raw results for final deduplication
-                    # Incremental deduplication removed for performance —
-                    # O(n²) cost per tracker is too slow for queries with many results
-
+                    # Bump running totals for SSE results_update event.
+                    metadata.total_results += len(results)
                     return tracker.name, results, None
                 except Exception as e:
                     logger.error(f"Tracker {tracker.name} error: {e}")
                     return tracker.name, [], str(e)
-
-            import asyncio
 
             semaphore = asyncio.Semaphore(self._max_concurrent_trackers)
 
@@ -342,7 +370,6 @@ class SearchOrchestrator:
             all_results = []
             for name, results, error in search_results:
                 all_results.extend(results)
-                metadata.total_results += len(results)
                 if error:
                     metadata.errors.append(f"{name}: {error}")
 
@@ -356,6 +383,27 @@ class SearchOrchestrator:
             metadata.errors.append(str(e))
             metadata.completed_at = datetime.now(timezone.utc)
 
+    async def search(
+        self,
+        query: str,
+        category: str = "all",
+        enable_metadata: bool = True,
+        validate_trackers: bool = True,
+    ) -> SearchMetadata:
+        """Blocking variant (legacy entry-point) — runs start + run in one
+        call and waits for full completion.  Kept for the scheduler and
+        for tests that expect the old synchronous-looking behaviour.
+        """
+        metadata = self.start_search(
+            query=query,
+            category=category,
+            enable_metadata=enable_metadata,
+            validate_trackers=validate_trackers,
+        )
+        # total_results is bumped incrementally inside _run_search now, so
+        # reset it first — the legacy callers expect the final number.
+        metadata.total_results = 0
+        await self._run_search(metadata.search_id, query, category)
         return metadata
 
     def _get_enabled_trackers(self) -> List[TrackerSource]:

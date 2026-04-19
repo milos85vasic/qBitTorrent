@@ -108,6 +108,59 @@ class TestRealTimeStreaming:
                 break
         return results
 
+    def test_streaming_seeks_live_results_while_status_running(self):
+        """SSE must emit result_found events while status=running.
+
+        Regression guard for issue #6: the old POST /search blocked
+        until all trackers finished, so by the time the SSE consumer
+        attached the status was already ``completed``.  With the
+        start_search + background-task split, SSE now sees intermediate
+        status and emits results as they arrive.
+        """
+
+        class FakeResult:
+            hash = "xyz"
+            name = "Debian 12"
+            seeds = 42
+            leechers = 1
+            tracker = "rutracker"
+            size = 1024
+            link = "magnet:?xt=urn:btih:xyz"
+
+        call_count = [0]
+
+        class FakeMeta:
+            def __init__(self, status):
+                self.status = status
+                self.total_results = 1
+                self.merged_results = 0
+                self.trackers_searched = ["rutracker"]
+
+            def to_dict(self):
+                return {"status": self.status, "total_results": 1}
+
+        class FakeOrchestrator:
+            def get_search_status(self, sid):
+                call_count[0] += 1
+                # First two polls: still running. After that: completed.
+                if call_count[0] >= 3:
+                    return FakeMeta("completed")
+                return FakeMeta("running")
+
+            def get_live_results(self, sid):
+                return [FakeResult()]
+
+        gen = SSEHandler.search_results_stream("sid", FakeOrchestrator(), poll_interval=0)
+        events = asyncio.run(self._collect_limit(gen))
+        result_events = [e for e in events if "result_found" in e]
+        complete_events = [e for e in events if "search_complete" in e]
+        assert result_events, "Expected at least one result_found event"
+        # result_found must come before search_complete.
+        first_result_idx = next(i for i, e in enumerate(events) if "result_found" in e)
+        first_complete_idx = next(i for i, e in enumerate(events) if "search_complete" in e)
+        assert first_result_idx < first_complete_idx
+        assert complete_events, "Expected search_complete event"
+
     def test_streaming_yields_individual_results(self):
         """Test that search_results_stream yields individual results as they arrive, not just counts."""
 

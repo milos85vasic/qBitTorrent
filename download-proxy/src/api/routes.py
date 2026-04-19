@@ -63,6 +63,10 @@ class SearchResponse(BaseModel):
     total_results: int
     merged_results: int
     trackers_searched: List[str] = Field(default_factory=list)
+    errors: List[str] = Field(
+        default_factory=list,
+        description="Per-tracker error strings (e.g. 'rutracker: HTTP 503')",
+    )
     started_at: str
     completed_at: Optional[str] = None
 
@@ -140,6 +144,76 @@ def _to_response(r, content_type: Optional[str] = None) -> SearchResultResponse:
 
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest, req: Request):
+    """Kick off a search and return immediately.
+
+    The endpoint returns ``status: "running"`` as soon as the search
+    metadata is created — the actual tracker fan-out runs in a
+    background ``asyncio.Task`` so the client can attach to
+    ``/api/v1/search/stream/{search_id}`` and see results arrive
+    live instead of waiting for the slowest tracker.
+    """
+    from .hooks import dispatch_event
+    import asyncio
+
+    orch = _get_orchestrator(req)
+
+    await dispatch_event("search_start", {"query": request.query})
+
+    metadata = orch.start_search(
+        query=request.query,
+        category=request.category,
+        enable_metadata=False,
+        validate_trackers=request.validate_trackers,
+    )
+
+    # Fire-and-forget: the task populates _tracker_results incrementally
+    # and flips metadata.status to 'completed' when done.
+    async def _background():
+        try:
+            await orch._run_search(
+                metadata.search_id,
+                request.query,
+                request.category,
+            )
+            await dispatch_event(
+                "search_complete",
+                {
+                    "search_id": metadata.search_id,
+                    "query": metadata.query,
+                    "total_results": metadata.total_results,
+                    "merged_results": metadata.merged_results,
+                    "trackers_searched": metadata.trackers_searched,
+                },
+            )
+        except Exception as e:
+            logger.error(f"Background search {metadata.search_id} failed: {e}")
+
+    asyncio.create_task(_background())
+
+    # Return immediately — the caller should attach to SSE for real-time
+    # results.  Any callers that want the old blocking behaviour can hit
+    # GET /api/v1/search/{search_id} once status goes to 'completed'.
+    return SearchResponse(
+        search_id=metadata.search_id,
+        query=metadata.query,
+        status="running",
+        results=[],
+        total_results=0,
+        merged_results=0,
+        trackers_searched=metadata.trackers_searched,
+        started_at=metadata.started_at.isoformat(),
+        completed_at=None,
+    )
+
+
+@router.post("/search/sync", response_model=SearchResponse)
+async def search_sync(request: SearchRequest, req: Request):
+    """Blocking search (legacy behaviour).
+
+    Preserved for tests and schedulers that need the full merged result
+    set in a single response.  Real-time clients should use
+    ``POST /search`` + ``GET /search/stream/{search_id}``.
+    """
     from .hooks import dispatch_event
     import asyncio
 
@@ -246,6 +320,7 @@ async def search(request: SearchRequest, req: Request):
         total_results=metadata.total_results,
         merged_results=len(merged),
         trackers_searched=metadata.trackers_searched,
+        errors=metadata.errors,
         started_at=metadata.started_at.isoformat(),
         completed_at=metadata.completed_at.isoformat() if metadata.completed_at else None,
     )
@@ -305,6 +380,7 @@ async def get_search(search_id: str, req: Request):
         total_results=metadata.total_results,
         merged_results=metadata.merged_results,
         trackers_searched=metadata.trackers_searched,
+        errors=metadata.errors,
         started_at=metadata.started_at.isoformat(),
         completed_at=metadata.completed_at.isoformat() if metadata.completed_at else None,
     )
@@ -547,7 +623,11 @@ async def initiate_download(request: DownloadRequest, req: Request):
                                     data=form,
                                     cookies=qbit_cookies,
                                 ) as add_resp:
-                                    if add_resp.status in (200, 201):
+                                    # qBittorrent returns 200 with body
+                                    # ``Ok.`` on success and ``Fails.`` on
+                                    # rejection — so status alone lies.
+                                    body = (await add_resp.text()).strip()
+                                    if add_resp.status in (200, 201) and body.lower().startswith("ok"):
                                         results.append(
                                             {
                                                 "url": url,
@@ -556,12 +636,11 @@ async def initiate_download(request: DownloadRequest, req: Request):
                                             }
                                         )
                                     else:
-                                        text = await add_resp.text()
                                         results.append(
                                             {
                                                 "url": url,
                                                 "status": "failed",
-                                                "detail": text[:200],
+                                                "detail": body[:200] or f"HTTP {add_resp.status}",
                                             }
                                         )
                         finally:
@@ -572,15 +651,15 @@ async def initiate_download(request: DownloadRequest, req: Request):
                             data={"urls": url},
                             cookies=qbit_cookies,
                         ) as resp:
-                            if resp.status in (200, 201):
+                            body = (await resp.text()).strip()
+                            if resp.status in (200, 201) and body.lower().startswith("ok"):
                                 results.append({"url": url, "status": "added"})
                             else:
-                                text = await resp.text()
                                 results.append(
                                     {
                                         "url": url,
                                         "status": "failed",
-                                        "detail": text[:200],
+                                        "detail": body[:200] or f"HTTP {resp.status}",
                                     }
                                 )
                 except Exception as e:
