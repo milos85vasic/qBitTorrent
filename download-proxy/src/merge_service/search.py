@@ -592,27 +592,58 @@ class SearchOrchestrator:
         logger = logging.getLogger(__name__)
         results = []
 
+        # Stream results as NDJSON so a subprocess kill at timeout still
+        # leaves every completed row captured on stdout. Patch the top-level
+        # `novaprinter` module because every plugin does
+        # `from novaprinter import prettyPrinter` — patching engines.novaprinter
+        # leaves that binding untouched and was the 37-empty-trackers bug.
         script = (
             "import sys, os, json as _json\n"
             "sys.path.insert(0, '/config/qBittorrent/nova3')\n"
             "os.chdir('/config/qBittorrent/nova3')\n"
             "import importlib\n"
-            "_results = []\n"
             "try:\n"
-            "    import engines.novaprinter as _np\n"
+            "    import novaprinter as _np\n"
             "    def _capture(d):\n"
-            "        _results.append(d)\n"
+            "        sys.stdout.write(_json.dumps(d) + '\\n')\n"
+            "        sys.stdout.flush()\n"
             "    _np.prettyPrinter = _capture\n"
             f"    _mod = importlib.import_module('engines.{tracker_name}')\n"
             f"    _cls = getattr(_mod, '{tracker_name}')\n"
             "    _engine = _cls()\n"
             f"    _engine.search({query!r}, {category!r})\n"
             "except Exception as _e:\n"
-            "    print(_json.dumps({'error': str(_e)}), file=sys.stderr)\n"
-            "print(_json.dumps(_results))\n"
+            "    print(_json.dumps({'__error__': str(_e)}), file=sys.stderr)\n"
         )
 
+        # Deadline-based streaming. `asyncio.wait_for(proc.communicate())`
+        # discards buffered stdout on cancellation, so we read stdout
+        # line-by-line with a per-read deadline. On timeout, every NDJSON
+        # line already flushed is preserved.
         proc = None
+        deadline = asyncio.get_event_loop().time() + 25.0
+
+        def _append(r: dict) -> None:
+            if not isinstance(r, dict) or "__error__" in r:
+                if isinstance(r, dict) and "__error__" in r:
+                    logger.debug(f"Plugin {tracker_name} error: {r['__error__']}")
+                return
+            try:
+                results.append(
+                    SearchResult(
+                        name=r.get("name", ""),
+                        size=r.get("size", "0 B"),
+                        seeds=int(r.get("seeds", 0)),
+                        leechers=int(r.get("leech", 0)),
+                        link=r.get("link", ""),
+                        desc_link=r.get("desc_link", ""),
+                        tracker=tracker_name,
+                        engine_url=PUBLIC_TRACKERS.get(tracker_name, ""),
+                    )
+                )
+            except Exception as e:
+                logger.debug(f"Skipping malformed {tracker_name} result: {e}")
+
         try:
             proc = await asyncio.create_subprocess_exec(
                 "python3",
@@ -621,49 +652,42 @@ class SearchOrchestrator:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
-
-            if proc.returncode != 0:
-                err = stderr.decode(errors="replace").strip()
-                if err:
-                    logger.debug(f"Plugin {tracker_name} stderr: {err}")
-                return results
-
-            raw = stdout.decode(errors="replace").strip()
-            if not raw:
-                return results
-
-            plugin_results = json.loads(raw)
-            if isinstance(plugin_results, dict) and "error" in plugin_results:
-                logger.debug(f"Plugin {tracker_name} error: {plugin_results['error']}")
-                return results
-
-            for r in plugin_results:
+            while True:
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    break
                 try:
-                    results.append(
-                        SearchResult(
-                            name=r.get("name", ""),
-                            size=r.get("size", "0 B"),
-                            seeds=int(r.get("seeds", 0)),
-                            leechers=int(r.get("leech", 0)),
-                            link=r.get("link", ""),
-                            desc_link=r.get("desc_link", ""),
-                            tracker=tracker_name,
-                            engine_url=PUBLIC_TRACKERS.get(tracker_name, ""),
-                        )
+                    line = await asyncio.wait_for(
+                        proc.stdout.readline(), timeout=remaining
                     )
-                except Exception as e:
-                    logger.debug(f"Skipping malformed {tracker_name} result: {e}")
+                except asyncio.TimeoutError:
+                    break
+                if not line:  # EOF
+                    break
+                line_s = line.decode(errors="replace").strip()
+                if not line_s:
+                    continue
+                try:
+                    _append(json.loads(line_s))
+                except Exception:
                     continue
 
-        except asyncio.TimeoutError:
-            logger.debug(f"Plugin {tracker_name} timed out")
-            if proc and proc.returncode is None:
+            if proc.returncode is None:
                 try:
                     proc.kill()
-                    await proc.wait()
                 except Exception:
                     pass
+            try:
+                err = (await proc.stderr.read()).decode(errors="replace").strip()
+                if err:
+                    logger.debug(f"Plugin {tracker_name} stderr: {err[:300]}")
+            except Exception:
+                pass
+            try:
+                await proc.wait()
+            except Exception:
+                pass
+
         except Exception as e:
             logger.debug(f"Plugin {tracker_name} execution error: {e}")
             if proc and proc.returncode is None:

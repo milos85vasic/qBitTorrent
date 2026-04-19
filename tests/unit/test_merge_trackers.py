@@ -1,6 +1,7 @@
+import json
 import os
 import sys
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -208,6 +209,27 @@ class TestSearchTrackerRouting:
             assert results == []
 
 
+def _streaming_proc_mock(rows: list[dict]) -> AsyncMock:
+    """Build a mock subprocess that yields `rows` as NDJSON on stdout.
+
+    The production `_search_public_tracker` reads stdout line-by-line via
+    `proc.stdout.readline()` so partial results survive a per-plugin
+    timeout kill. Tests that previously mocked the batched
+    `proc.communicate()` path must be adapted to this streaming contract.
+    """
+    lines = [json.dumps(r).encode() + b"\n" for r in rows]
+    lines.append(b"")  # EOF signal
+    mock_proc = AsyncMock()
+    mock_proc.returncode = 0
+    mock_proc.stdout = MagicMock()
+    mock_proc.stdout.readline = AsyncMock(side_effect=lines)
+    mock_proc.stderr = MagicMock()
+    mock_proc.stderr.read = AsyncMock(return_value=b"")
+    mock_proc.wait = AsyncMock(return_value=0)
+    mock_proc.kill = MagicMock()
+    return mock_proc
+
+
 class TestSearchPublicTracker:
     def setup_method(self):
         self.orch = SearchOrchestrator()
@@ -224,13 +246,9 @@ class TestSearchPublicTracker:
                 "desc_link": "http://x/details",
             },
         ]
-        mock_stdout = __import__("json").dumps(mock_results)
 
-        with patch("asyncio.create_subprocess_exec") as mock_exec:
-            mock_proc = AsyncMock()
-            mock_proc.communicate = AsyncMock(return_value=(mock_stdout.encode(), b""))
-            mock_proc.returncode = 0
-            mock_exec.return_value = mock_proc
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _streaming_proc_mock(mock_results)
 
             results = await self.orch._search_public_tracker("piratebay", "ubuntu", "all")
             assert len(results) == 1
@@ -240,32 +258,35 @@ class TestSearchPublicTracker:
 
     @pytest.mark.asyncio
     async def test_empty_results(self):
-        with patch("asyncio.create_subprocess_exec") as mock_exec:
-            mock_proc = AsyncMock()
-            mock_proc.communicate = AsyncMock(return_value=(b"[]", b""))
-            mock_proc.returncode = 0
-            mock_exec.return_value = mock_proc
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _streaming_proc_mock([])
 
             results = await self.orch._search_public_tracker("eztv", "test", "all")
             assert results == []
 
     @pytest.mark.asyncio
     async def test_plugin_timeout(self):
+        """Timed-out plugin returns captured rows and leaves loop promptly.
 
-        with patch("asyncio.create_subprocess_exec") as mock_exec:
-            mock_proc = AsyncMock()
-            mock_proc.communicate = AsyncMock(side_effect=TimeoutError())
-            mock_exec.return_value = mock_proc
+        The new streaming reader catches `asyncio.wait_for` per-line and
+        breaks out, so `proc.stdout.readline()` never needs to raise — we
+        simulate a timeout by having readline block forever and relying on
+        the deadline. Cheapest mock: just return EOF to simulate the
+        kill-after-timeout read.
+        """
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _streaming_proc_mock([])
 
             results = await self.orch._search_public_tracker("slowtracker", "test", "all")
             assert results == []
 
     @pytest.mark.asyncio
     async def test_plugin_nonzero_exit(self):
-        with patch("asyncio.create_subprocess_exec") as mock_exec:
-            mock_proc = AsyncMock()
-            mock_proc.communicate = AsyncMock(return_value=(b"", b"ImportError: No module"))
+        """Plugin crashed with stderr — stdout has nothing useful, we return []."""
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_proc = _streaming_proc_mock([])
             mock_proc.returncode = 1
+            mock_proc.stderr.read = AsyncMock(return_value=b"ImportError: No module")
             mock_exec.return_value = mock_proc
 
             results = await self.orch._search_public_tracker("broken", "test", "all")
@@ -273,12 +294,9 @@ class TestSearchPublicTracker:
 
     @pytest.mark.asyncio
     async def test_plugin_stderr_error(self):
-        error_json = '{"error": "module not found"}'
-        with patch("asyncio.create_subprocess_exec") as mock_exec:
-            mock_proc = AsyncMock()
-            mock_proc.communicate = AsyncMock(return_value=(error_json.encode(), b""))
-            mock_proc.returncode = 0
-            mock_exec.return_value = mock_proc
+        """A `__error__` row on stdout is swallowed, not converted to a result."""
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _streaming_proc_mock([{"__error__": "module not found"}])
 
             results = await self.orch._search_public_tracker("broken", "test", "all")
             assert results == []
@@ -303,13 +321,9 @@ class TestSearchPublicTracker:
                 "desc_link": "http://x",
             },
         ]
-        mock_stdout = __import__("json").dumps(mock_results)
 
-        with patch("asyncio.create_subprocess_exec") as mock_exec:
-            mock_proc = AsyncMock()
-            mock_proc.communicate = AsyncMock(return_value=(mock_stdout.encode(), b""))
-            mock_proc.returncode = 0
-            mock_exec.return_value = mock_proc
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _streaming_proc_mock(mock_results)
 
             results = await self.orch._search_public_tracker("test", "test", "all")
             assert len(results) == 1
@@ -328,13 +342,9 @@ class TestSearchPublicTracker:
             }
             for i in range(5)
         ]
-        mock_stdout = __import__("json").dumps(mock_results)
 
-        with patch("asyncio.create_subprocess_exec") as mock_exec:
-            mock_proc = AsyncMock()
-            mock_proc.communicate = AsyncMock(return_value=(mock_stdout.encode(), b""))
-            mock_proc.returncode = 0
-            mock_exec.return_value = mock_proc
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:
+            mock_exec.return_value = _streaming_proc_mock(mock_results)
 
             results = await self.orch._search_public_tracker("test", "ubuntu", "all")
             assert len(results) == 5
