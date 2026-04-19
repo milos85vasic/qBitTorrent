@@ -1,7 +1,7 @@
 <h1 align="center">
-  <img src="docs/assets/logo.png" alt="qBittorrent-Fixed" width="160" />
+  <img src="docs/assets/logo.png" alt="qBittorrent" width="160" />
   <br>
-  qBittorrent-Fixed
+  qBittorrent
 </h1>
 
 <p align="center">
