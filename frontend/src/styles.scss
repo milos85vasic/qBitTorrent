@@ -25,6 +25,55 @@
   --color-info:           #6897bb;
   --color-purple:         #9876aa;
   --color-shadow:         rgba(0,0,0,0.55);
+
+  /* ---------------------------------------------------------------- *
+   *  Elevation & text-shadow tokens                                   *
+   *                                                                    *
+   *  These give accent-coloured text and interactive surfaces a       *
+   *  black drop-shadow so they don't disappear into the background    *
+   *  regardless of which palette + mode is active.                    *
+   *                                                                    *
+   *  Intensity scales with alpha only — hue is always black — so the  *
+   *  shadow reads legibly on every palette we ship without per-       *
+   *  palette tuning.                                                   *
+   *                                                                    *
+   *  Per-element guidance:                                             *
+   *    --shadow-text-xs    chip labels, small accent links            *
+   *    --shadow-text-sm    body-size accent spans, tab labels         *
+   *    --shadow-text-md    card titles, mid-size headings             *
+   *    --shadow-text-lg    page hero title (H1), large stat values    *
+   *    --shadow-elev-1     subtle raise on chips, merged indicator    *
+   *    --shadow-elev-2     CTA buttons (Search, qBit, Magnet)         *
+   *    --shadow-elev-3     cards + dialogs                             *
+   *    --shadow-glow-dot   status-indicator dots (auth, tracker chip) *
+   * ---------------------------------------------------------------- */
+  --shadow-text-xs:    0 1px 1px rgba(0, 0, 0, 0.35);
+  --shadow-text-sm:    0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-text-md:    0 2px 3px rgba(0, 0, 0, 0.50);
+  --shadow-text-lg:    0 2px 4px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-elev-1:     0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-elev-2:     0 3px 6px rgba(0, 0, 0, 0.40), 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-elev-3:     0 8px 18px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.30);
+  --shadow-glow-dot:   0 0 0 1px rgba(0, 0, 0, 0.30), 0 0 5px rgba(0, 0, 0, 0.45);
+}
+
+/* Light palettes don't benefit from heavy drops because the canvas is
+ * bright — the same shape with lighter alphas reads cleaner. */
+html[data-mode="light"] {
+  --shadow-text-xs:  0 1px 1px rgba(0, 0, 0, 0.12);
+  --shadow-text-sm:  0 1px 2px rgba(0, 0, 0, 0.18);
+  --shadow-text-md:  0 1px 3px rgba(0, 0, 0, 0.22);
+  --shadow-text-lg:  0 2px 4px rgba(0, 0, 0, 0.25), 0 1px 1px rgba(0, 0, 0, 0.12);
+  --shadow-elev-1:   0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-elev-2:   0 2px 6px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.08);
+  --shadow-elev-3:   0 6px 16px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.10);
+  --shadow-glow-dot: 0 0 0 1px rgba(0, 0, 0, 0.15), 0 0 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Respect reduced-motion; drop shadows are static so this is only a
+ * hook for future animated shadows. */
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
 
 html, body {

@@ -42,12 +42,16 @@ import { Component, ChangeDetectionStrategy } from '@angular/core';
       margin: 0 2px;
       display: inline-block;
       animation: footer-heart-pulse 1.6s ease-in-out infinite;
+      /* Blood-red heart on any palette — small shadow so it keeps
+       * contrast against the muted footer text. */
+      text-shadow: var(--shadow-text-sm);
     }
     .site-footer .vd-link {
       color: var(--color-accent);
       text-decoration: none;
       font-weight: 600;
       margin-left: 4px;
+      text-shadow: var(--shadow-text-sm);
     }
     .site-footer .vd-link:hover,
     .site-footer .vd-link:focus-visible {

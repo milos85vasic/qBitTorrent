@@ -25,7 +25,8 @@
   max-height: 88vh;
   overflow-y: auto;
   color: var(--color-text-primary);
-  box-shadow: 0 10px 35px var(--color-shadow);
+  /* Dialog — highest elevation to separate it from the backdrop. */
+  box-shadow: var(--shadow-elev-3);
 }
 
 .dialog-header {
@@ -48,6 +49,7 @@
     margin: 0;
     color: var(--color-accent);
     font-size: 18px;
+    text-shadow: var(--shadow-text-md);
   }
 
   .close-x {
@@ -67,6 +69,7 @@
   height: 10px;
   border-radius: 50%;
   background: var(--color-text-secondary);
+  box-shadow: var(--shadow-glow-dot);
   &.dot-success { background: var(--color-success); }
   &.dot-empty { background: var(--color-warning); }
   &.dot-error,
@@ -85,6 +88,8 @@
   text-transform: uppercase;
   background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
+  box-shadow: var(--shadow-elev-1);
+  text-shadow: var(--shadow-text-xs);
   &.status-success { background: color-mix(in srgb, var(--color-success) 30%, transparent); color: var(--color-success); }
   &.status-empty { background: color-mix(in srgb, var(--color-warning) 22%, transparent); color: var(--color-warning); }
   &.status-error,

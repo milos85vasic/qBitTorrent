@@ -21,8 +21,10 @@
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
-  transition: border-color 0.12s ease, background 0.12s ease;
-  &:hover { border-color: var(--color-accent); }
+  box-shadow: var(--shadow-elev-1);
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease, transform 0.08s ease;
+  &:hover { border-color: var(--color-accent); box-shadow: var(--shadow-elev-2); transform: translateY(-1px); }
+  &:active { transform: translateY(0); box-shadow: var(--shadow-elev-1); }
   &:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
@@ -57,7 +59,8 @@
   list-style: none;
   min-width: 220px;
   max-width: 280px;
-  box-shadow: 0 8px 20px var(--color-shadow);
+  /* Floating menu — lift it so it reads as an overlay. */
+  box-shadow: var(--shadow-elev-3);
 
   li {
     display: flex;

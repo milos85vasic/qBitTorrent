@@ -35,9 +35,11 @@ import { ToastService } from '../../services/toast.service';
       border-radius: 8px;
       color: #fff;
       font-size: 14px;
-      box-shadow: 0 4px 12px var(--color-shadow);
+      /* Floating overlay — elevation-3 matches dialogs. */
+      box-shadow: var(--shadow-elev-3);
       animation: slideIn 0.3s ease;
       backdrop-filter: blur(4px);
+      text-shadow: var(--shadow-text-xs);
     }
     .toast-success { background: color-mix(in srgb, var(--color-success) 95%, transparent); border: 1px solid var(--color-success); }
     .toast-error { background: color-mix(in srgb, var(--color-danger) 95%, transparent); border: 1px solid var(--color-danger); }

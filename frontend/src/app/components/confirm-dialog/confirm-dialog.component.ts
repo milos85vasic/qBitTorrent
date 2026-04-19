@@ -46,11 +46,13 @@ import { DialogService } from '../../services/dialog.service';
       max-width: 420px;
       width: 90%;
       color: var(--color-text-primary);
+      box-shadow: var(--shadow-elev-3);
     }
     .modal h3 {
       color: var(--color-accent);
       margin-bottom: 14px;
       font-size: 20px;
+      text-shadow: var(--shadow-text-md);
     }
     .modal-message {
       font-size: 15px;
@@ -71,7 +73,11 @@ import { DialogService } from '../../services/dialog.service';
       cursor: pointer;
       font-size: 15px;
       font-weight: 500;
+      box-shadow: var(--shadow-elev-1);
+      transition: box-shadow 0.12s ease, transform 0.08s ease, background 0.12s ease;
     }
+    .modal-actions button:hover { box-shadow: var(--shadow-elev-2); transform: translateY(-1px); }
+    .modal-actions button:active { transform: translateY(0); box-shadow: var(--shadow-elev-1); }
     .cancel-btn { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
     .cancel-btn:hover { background: var(--color-border); }
     .submit-btn { background: var(--color-accent); color: #fff; }

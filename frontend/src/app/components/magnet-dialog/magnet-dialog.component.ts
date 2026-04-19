@@ -26,12 +26,14 @@ import { CommonModule } from '@angular/common';
   styles: [`
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10001; justify-content: center; align-items: center; }
     .modal-overlay.show { display: flex; }
-    .modal { background: var(--color-bg-secondary); padding: 28px; border-radius: 12px; border: 1px solid var(--color-border); max-width: 480px; width: 90%; color: var(--color-text-primary); }
-    .modal h3 { color: var(--color-accent); margin-bottom: 6px; font-size: 20px; }
+    .modal { background: var(--color-bg-secondary); padding: 28px; border-radius: 12px; border: 1px solid var(--color-border); max-width: 480px; width: 90%; color: var(--color-text-primary); box-shadow: var(--shadow-elev-3); }
+    .modal h3 { color: var(--color-accent); margin-bottom: 6px; font-size: 20px; text-shadow: var(--shadow-text-md); }
     .hint { color: var(--color-text-secondary); font-size: 13px; margin-bottom: 16px; }
     textarea { width: 100%; height: 80px; padding: 10px; background: var(--color-bg-primary); border: 1px solid var(--color-border); color: var(--color-text-primary); font-family: monospace; font-size: 12px; border-radius: 6px; resize: none; margin-bottom: 16px; }
     .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .modal-actions > * { flex: 1; min-width: 80px; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; text-align: center; }
+    .modal-actions > * { flex: 1; min-width: 80px; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; text-align: center; box-shadow: var(--shadow-elev-1); transition: box-shadow 0.12s ease, transform 0.08s ease, opacity 0.12s ease; }
+    .modal-actions > *:hover { box-shadow: var(--shadow-elev-2); transform: translateY(-1px); }
+    .modal-actions > *:active { transform: translateY(0); box-shadow: var(--shadow-elev-1); }
     .cancel-btn { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
     .submit-btn { background: var(--color-accent); color: #fff; }
     .btn-open { background: var(--color-purple); color: #fff; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }

@@ -48,7 +48,15 @@ header {
   }
 }
 
-h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
+h1 {
+  color: var(--color-accent);
+  font-size: 24px;
+  margin: 0;
+  font-weight: 700;
+  /* Large hero title on a dark bg — strongest shadow so the blood-red
+   * reads cleanly against the header card. */
+  text-shadow: var(--shadow-text-lg);
+}
 
 .service-links {
   display: flex;
@@ -107,6 +115,9 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
 .auth-indicator {
   width: 10px; height: 10px; border-radius: 50%;
   background: var(--color-danger);
+  /* Status dot gets a tight dark ring + shadow so it reads on both
+   * the solid chip and the lighter expanded state. */
+  box-shadow: var(--shadow-glow-dot);
   &.active { background: var(--color-success); }
 }
 
@@ -116,7 +127,15 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
   border-radius: 16px;
   margin-bottom: 24px;
   border: 1px solid var(--color-border);
-  h2 { color: var(--color-accent); font-size: 22px; margin-bottom: 16px; margin-top: 0; }
+  /* Lift cards off the page — softer / larger shadow than buttons. */
+  box-shadow: var(--shadow-elev-3);
+  h2 {
+    color: var(--color-accent);
+    font-size: 22px;
+    margin-bottom: 16px;
+    margin-top: 0;
+    text-shadow: var(--shadow-text-md);
+  }
 }
 
 .stats-bar {
@@ -130,7 +149,14 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
   padding: 14px 24px;
   border-radius: 12px;
   border: 1px solid var(--color-border);
-  .stat-value { font-size: 28px; font-weight: 700; color: var(--color-accent); }
+  box-shadow: var(--shadow-elev-1);
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--color-accent);
+    /* Big accent number — strong shadow to match h1's weight. */
+    text-shadow: var(--shadow-text-lg);
+  }
   .stat-label { font-size: 14px; color: var(--color-text-secondary); }
 }
 
@@ -156,8 +182,22 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
     border-radius: 10px;
     cursor: pointer;
     font-size: 18px;
-    &:hover { background: var(--color-accent-hover); }
-    &:disabled { background: var(--color-text-secondary); cursor: not-allowed; }
+    /* CTA — must feel like a raised affordance. Elevation-2 shadow
+     * lifts it off the card and darkens on hover. */
+    box-shadow: var(--shadow-elev-2);
+    transition: transform 0.08s ease, box-shadow 0.12s ease, background 0.12s ease;
+    &:hover {
+      background: var(--color-accent-hover);
+      box-shadow: var(--shadow-elev-3);
+      transform: translateY(-1px);
+    }
+    &:active { transform: translateY(0); box-shadow: var(--shadow-elev-1); }
+    &:disabled {
+      background: var(--color-text-secondary);
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
     &.btn-abort { background: var(--color-danger); }
   }
 }
@@ -201,6 +241,9 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
     border-bottom: 2px solid var(--color-accent);
     color: var(--color-accent);
     font-weight: 600;
+    /* Active tab label is accent-coloured — small shadow lifts it
+     * off the tab bar so it's unmistakable. */
+    text-shadow: var(--shadow-text-sm);
   }
 }
 
@@ -226,6 +269,9 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
     font-weight: 600;
     cursor: pointer;
     user-select: none;
+    /* Column headers are accent-coloured; small shadow keeps them
+     * readable when the table row beneath them is the hover state. */
+    text-shadow: var(--shadow-text-sm);
     &.sortable:hover { color: color-mix(in srgb, var(--color-accent) 85%, white); }
     &.asc .sort-icon::after { content: ' ▲'; }
     &.desc .sort-icon::after { content: ' ▼'; }
@@ -241,8 +287,11 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
-  &:hover { opacity: 0.9; }
-  &:disabled { background: var(--color-text-secondary); cursor: not-allowed; }
+  box-shadow: var(--shadow-elev-1);
+  transition: box-shadow 0.12s ease, transform 0.08s ease, opacity 0.12s ease;
+  &:hover { opacity: 0.92; box-shadow: var(--shadow-elev-2); transform: translateY(-1px); }
+  &:active { transform: translateY(0); box-shadow: var(--shadow-elev-1); }
+  &:disabled { background: var(--color-text-secondary); cursor: not-allowed; box-shadow: none; transform: none; }
 }
 
 .btn-group {
@@ -276,6 +325,10 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
   font-size: 11px;
   font-weight: 700;
   text-transform: lowercase;
+  /* Small chips — tightest shadow keeps them crisp without bulking
+   * up the row height. */
+  box-shadow: var(--shadow-elev-1);
+  text-shadow: var(--shadow-text-xs);
 }
 
 .type-badge {
@@ -307,9 +360,11 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
   color: var(--color-text-primary);
   margin-right: 8px;
   margin-bottom: 4px;
+  box-shadow: var(--shadow-elev-1);
   &.freeleech {
     background: color-mix(in srgb, var(--color-warning) 25%, transparent);
     color: var(--color-warning);
+    text-shadow: var(--shadow-text-xs);
   }
 }
 
@@ -325,6 +380,9 @@ h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
   color: var(--color-accent);
   margin-right: 8px;
   margin-bottom: 4px;
+  /* Accent-coloured pill — tight shadow so it pops from the row. */
+  box-shadow: var(--shadow-elev-1);
+  text-shadow: var(--shadow-text-xs);
 }
 
 .disabled-link {
