@@ -133,3 +133,33 @@ If anything in this phase breaks qBittorrent WebUI functionality,
 set env `DISABLE_THEME_INJECTION=1` and restart the proxy — the
 injector becomes a passthrough. Documented in
 [`docs/TOKENS_AND_KEYS.md`](TOKENS_AND_KEYS.md) §7.
+
+## Outcome (shipped 2026-04-19)
+
+Landed in four commits on `main`:
+
+* `feat(backend): shared theme state + /api/v1/theme SSE for cross-app sync`
+* `feat(proxy): inject theme CSS+JS into qBittorrent WebUI at :7186`
+* `feat(frontend): ThemeService syncs to backend + subscribes to SSE`
+* `fix(proxy): decompress gzip + relax CSP connect-src for theme bridge`
+
+Two live-debug discoveries that the plan had not anticipated:
+
+* **gzip** — qBittorrent returns `Content-Encoding: gzip` when the
+  browser sends `Accept-Encoding: gzip`. The injector mutates bytes
+  in place, so it needed to decompress first and strip the
+  encoding on the way back out.
+* **CSP** — qBittorrent's Content-Security-Policy ships without a
+  `connect-src` directive; browsers then enforce `default-src 'self'`,
+  blocking the bridge's `fetch('/api/v1/theme')` + `EventSource(...)`
+  calls cross-origin. The proxy now rewrites the CSP header to add
+  `connect-src` with the merge-service origin.
+
+Verification (2026-04-19 @ main):
+
+* 837 Python tests green (`tests/unit tests/e2e tests/contract tests/property
+  tests/memory tests/concurrency tests/observability`).
+* 255 frontend tests green (`npx ng test --watch=false`).
+* The Playwright e2e **passed** — not skipped. Real palette swap on
+  both :7187 and :7186, verified via `getComputedStyle(...)` on the
+  proxied WebUI + the `window.__qbitTheme` side-channel.
