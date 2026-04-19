@@ -14,6 +14,7 @@ import {
 import { MagnetDialogComponent } from '../magnet-dialog/magnet-dialog.component';
 import { QbitLoginDialogComponent } from '../qbit-login-dialog/qbit-login-dialog.component';
 import { TrackerStatDialogComponent } from '../tracker-stat-dialog/tracker-stat-dialog.component';
+import { ThemePickerComponent } from '../theme-picker/theme-picker.component';
 
 export interface TrackerChip {
   name: string;
@@ -30,7 +31,7 @@ export interface SourceStats {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScrollingModule, MagnetDialogComponent, QbitLoginDialogComponent, TrackerStatDialogComponent],
+  imports: [CommonModule, FormsModule, ScrollingModule, MagnetDialogComponent, QbitLoginDialogComponent, TrackerStatDialogComponent, ThemePickerComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })

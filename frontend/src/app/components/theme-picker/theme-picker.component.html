@@ -1,0 +1,30 @@
+<div class="theme-picker">
+  <button class="theme-toggle" type="button" (click)="toggleMode()"
+          [attr.aria-label]="mode() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+          [title]="mode() === 'dark' ? 'Light mode' : 'Dark mode'">
+    {{ mode() === 'dark' ? '☀' : '☾' }}
+  </button>
+  <button class="palette-dropdown" type="button" (click)="toggleOpen()"
+          [attr.aria-expanded]="open()"
+          [attr.aria-haspopup]="true">
+    <span class="current-name">{{ palette().name }}</span>
+    <span class="current-mode">({{ mode() }})</span>
+    <span class="caret">▾</span>
+  </button>
+  <ul class="palette-menu" *ngIf="open()" role="menu">
+    <li *ngFor="let p of availablePalettes; trackBy: trackByPalette"
+        [class.active]="p.id === palette().id"
+        role="menuitemradio"
+        [attr.aria-checked]="p.id === palette().id"
+        [attr.data-palette-id]="p.id"
+        (click)="pick(p.id)">
+      <span class="swatches">
+        <span class="swatch swatch-accent"     [style.background]="p.dark.accent"></span>
+        <span class="swatch swatch-contrast"   [style.background]="p.dark.contrast"></span>
+        <span class="swatch swatch-bg"         [style.background]="p.dark.bgPrimary"></span>
+        <span class="swatch swatch-text"       [style.background]="p.dark.textPrimary"></span>
+      </span>
+      <span class="palette-name">{{ p.name }}</span>
+    </li>
+  </ul>
+</div>

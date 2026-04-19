@@ -49,6 +49,8 @@
           <a class="chip-logout" (click)="reloginTracker(t.name); $event.stopPropagation()">Re-login</a>
         </span>
       </span>
+
+      <app-theme-picker></app-theme-picker>
     </div>
   </header>
 
@@ -248,7 +250,7 @@
 
     <!-- Hooks Tab -->
     <div *ngIf="activeTab() === 'hooks'" style="display:block;">
-      <p class="empty-state" style="padding-bottom:10px">Hooks are managed via API. Use <code style="color:#e94560">POST /api/v1/hooks</code> to register scripts.</p>
+      <p class="empty-state" style="padding-bottom:10px">Hooks are managed via API. Use <code style="color:var(--color-accent)">POST /api/v1/hooks</code> to register scripts.</p>
       <table class="results-table">
         <thead><tr><th>Name</th><th>Event</th><th>Script</th><th>Enabled</th><th>Actions</th></tr></thead>
         <tbody>
