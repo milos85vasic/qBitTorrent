@@ -15,13 +15,22 @@ import pytest
 import requests
 
 
+@pytest.mark.stress
 class TestSearchStress:
-    """Search endpoint stress testing."""
+    """Search endpoint stress testing.
+
+    Every test in this class drives live multi-tracker fan-out many
+    times over. They are tagged :mod:`stress` so they can be skipped
+    from CI's default suite (``-m "not stress"``). When run, they need
+    a generous per-test timeout — see the ``@pytest.mark.timeout``
+    decorators on each method.
+    """
 
     @pytest.fixture(autouse=True)
     def _service_up(self, merge_service_live):
         self.base_url = merge_service_live
 
+    @pytest.mark.timeout(300)
     def test_rapid_fire_searches(self):
         """50 rapid searches should not crash the service."""
         success = 0
@@ -46,6 +55,7 @@ class TestSearchStress:
         health = requests.get(f"{self.base_url}/health", timeout=5)
         assert health.status_code == 200
 
+    @pytest.mark.timeout(300)
     def test_burst_concurrent_searches(self):
         """20 simultaneous searches should complete without deadlock."""
         results = []
@@ -72,6 +82,7 @@ class TestSearchStress:
         success_count = sum(1 for r in results if r == 200)
         assert success_count >= 10, f"Only {success_count}/20 burst searches succeeded"
 
+    @pytest.mark.timeout(120)
     def test_sustained_load(self):
         """Sustained load over 20 seconds should not crash service."""
         start = time.time()
@@ -97,6 +108,7 @@ class TestSearchStress:
         health = requests.get(f"{self.base_url}/health", timeout=5)
         assert health.status_code == 200
 
+    @pytest.mark.timeout(180)
     def test_search_with_abort_under_stress(self):
         """Aborting searches under stress should not cause issues."""
         # Start many searches that might be aborted
@@ -121,6 +133,7 @@ class TestSearchStress:
         health = requests.get(f"{self.base_url}/health", timeout=5)
         assert health.status_code == 200
 
+    @pytest.mark.timeout(180)
     def test_stats_endpoint_under_stress(self):
         """Stats endpoint should remain accurate under load."""
         # Run some searches
@@ -141,6 +154,7 @@ class TestSearchStress:
             for f in concurrent.futures.as_completed(futures):
                 f.result()
 
+    @pytest.mark.timeout(180)
     def test_file_descriptor_exhaustion_prevention(self):
         """Service should not exhaust file descriptors under load."""
         # Many concurrent connections
