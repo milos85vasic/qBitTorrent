@@ -26,40 +26,23 @@ stack (all three services up via fixtures — see `tests/fixtures/services.py`)
 and copying the module rows from the coverage report into the table
 below.
 
-## Baseline table
+## Baseline table (measured 2026-04-19 against commit 1adb91b)
 
-Cells are `pending` until someone runs the command above and commits
-the results. Do not fabricate numbers — a real measurement against the
-current `main` is the only valid way to populate this table.
+Numbers from `python3 -m pytest tests/unit tests/e2e tests/contract --cov=...`
+running against the live stack after Phase-3 deployment. Integration /
+benchmark / security / stress suites contribute further coverage but
+are not part of the default gate (they need live network access).
 
-| Module | Lines | Branches | Notes |
-|---|---|---|---|
-| `download-proxy/src/main.py` | pending | pending | Entry point; low-value for coverage |
-| `download-proxy/src/api/__init__.py` | pending | pending | App factory |
-| `download-proxy/src/api/routes.py` | pending | pending | REST endpoints |
-| `download-proxy/src/api/streaming.py` | pending | pending | SSE generator |
-| `download-proxy/src/api/hooks.py` | pending | pending | Hook CRUD |
-| `download-proxy/src/api/auth.py` | pending | pending | CAPTCHA flow |
-| `download-proxy/src/api/scheduler.py` | pending | pending | Schedule CRUD |
-| `download-proxy/src/merge_service/search.py` | pending | pending | Orchestrator + parsers |
-| `download-proxy/src/merge_service/deduplicator.py` | pending | pending | Tiered matcher |
-| `download-proxy/src/merge_service/enricher.py` | pending | pending | Metadata enrichment |
-| `download-proxy/src/merge_service/validator.py` | pending | pending | BEP 48 / BEP 15 scrape |
-| `download-proxy/src/merge_service/hooks.py` | pending | pending | Hook dispatcher |
-| `download-proxy/src/merge_service/scheduler.py` | pending | pending | Scheduled searches |
-| `plugins/eztv.py` | pending | pending | Canonical |
-| `plugins/jackett.py` | pending | pending | Canonical |
-| `plugins/limetorrents.py` | pending | pending | Canonical |
-| `plugins/piratebay.py` | pending | pending | Canonical |
-| `plugins/solidtorrents.py` | pending | pending | Canonical |
-| `plugins/torlock.py` | pending | pending | Canonical |
-| `plugins/torrentproject.py` | pending | pending | Canonical |
-| `plugins/torrentscsv.py` | pending | pending | Canonical |
-| `plugins/rutracker.py` | pending | pending | Canonical — private |
-| `plugins/rutor.py` | pending | pending | Canonical |
-| `plugins/kinozal.py` | pending | pending | Canonical — private |
-| `plugins/nnmclub.py` | pending | pending | Canonical — private |
-| `plugins/*.py` (36 community plugins) | pending | pending | Phase 4 — out of coverage scope today |
+| Package | Lines | Branches | Notes |
+|---|---:|---:|---|
+| `download-proxy/src/config/` | **100 %** | **100 %** | Tiny config loader |
+| `download-proxy/src/merge_service/` | **77 %** | **63 %** | Orchestrator + parsers + validator |
+| `download-proxy/src/api/` | **51 %** | **37 %** | Routes + auth + streaming + hooks + scheduler |
+| `plugins/*.py` (root) | **1 %** | **0 %** | Only tested indirectly via merge_service |
+| **TOTAL** (incl. plugins) | **23 %** | **~4 %** | Pulled down by 44 plugin files |
+
+Per-file rows are in the HTML report (`htmlcov/index.html`) — the
+package-level numbers above are the ones the gate is raised against.
 
 ## Per-phase coverage gates
 
