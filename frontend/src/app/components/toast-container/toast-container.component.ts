@@ -35,14 +35,14 @@ import { ToastService } from '../../services/toast.service';
       border-radius: 8px;
       color: #fff;
       font-size: 14px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 12px var(--color-shadow);
       animation: slideIn 0.3s ease;
       backdrop-filter: blur(4px);
     }
-    .toast-success { background: rgba(40, 167, 69, 0.95); border: 1px solid #28a745; }
-    .toast-error { background: rgba(220, 53, 69, 0.95); border: 1px solid #dc3545; }
-    .toast-warning { background: rgba(255, 193, 7, 0.95); color: #333; border: 1px solid #ffc107; }
-    .toast-info { background: rgba(23, 162, 184, 0.95); border: 1px solid #17a2b8; }
+    .toast-success { background: color-mix(in srgb, var(--color-success) 95%, transparent); border: 1px solid var(--color-success); }
+    .toast-error { background: color-mix(in srgb, var(--color-danger) 95%, transparent); border: 1px solid var(--color-danger); }
+    .toast-warning { background: color-mix(in srgb, var(--color-warning) 95%, transparent); color: #333; border: 1px solid var(--color-warning); }
+    .toast-info { background: color-mix(in srgb, var(--color-info) 95%, transparent); border: 1px solid var(--color-info); }
     .toast-message { flex: 1; margin-right: 12px; word-break: break-word; }
     .toast-dismiss {
       background: none;

@@ -33,18 +33,18 @@ import { ToastService } from '../../services/toast.service';
   styles: [`
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10001; justify-content: center; align-items: center; }
     .modal-overlay.show { display: flex; }
-    .modal { background: #1e2a4a; padding: 28px; border-radius: 12px; border: 1px solid #2a3f6a; max-width: 400px; width: 90%; color: #e0e0e0; }
-    .modal h3 { color: #e94560; margin-bottom: 6px; font-size: 20px; }
-    .hint { color: #888; font-size: 13px; margin-bottom: 16px; }
-    input[type="text"], input[type="password"] { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #2a3f6a; border-radius: 8px; background: #0f1a30; color: #e0e0e0; font-size: 15px; }
-    .save-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #888; margin-bottom: 14px; }
+    .modal { background: var(--color-bg-secondary); padding: 28px; border-radius: 12px; border: 1px solid var(--color-border); max-width: 400px; width: 90%; color: var(--color-text-primary); }
+    .modal h3 { color: var(--color-accent); margin-bottom: 6px; font-size: 20px; }
+    .hint { color: var(--color-text-secondary); font-size: 13px; margin-bottom: 16px; }
+    input[type="text"], input[type="password"] { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-primary); color: var(--color-text-primary); font-size: 15px; }
+    .save-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-secondary); margin-bottom: 14px; }
     .save-label input { width: auto; }
-    .error { color: #dc3545; font-size: 13px; margin-bottom: 12px; }
+    .error { color: var(--color-danger); font-size: 13px; margin-bottom: 12px; }
     .modal-actions { display: flex; gap: 10px; }
     .modal-actions button { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 15px; }
-    .cancel-btn { background: #333; color: #ccc; }
-    .submit-btn { background: #e94560; color: #fff; }
-    .submit-btn:disabled { background: #555; cursor: not-allowed; }
+    .cancel-btn { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
+    .submit-btn { background: var(--color-accent); color: #fff; }
+    .submit-btn:disabled { background: var(--color-text-secondary); cursor: not-allowed; }
   `]
 })
 export class QbitLoginDialogComponent {

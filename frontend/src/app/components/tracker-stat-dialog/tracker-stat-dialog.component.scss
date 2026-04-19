@@ -1,14 +1,4 @@
-$accent: #e94560;
-$bg-primary: #0f1a30;
-$bg-secondary: #1e2a4a;
-$bg-tertiary: #2a3f6a;
-$text-primary: #e0e0e0;
-$text-secondary: #888;
-$border: #2a3f6a;
-$success: #28a745;
-$danger: #dc3545;
-$warning: #ffc107;
-$info: #17a2b8;
+/* Tracker stat dialog — uses the global palette CSS variables. */
 
 .modal-overlay {
   display: none;
@@ -26,16 +16,16 @@ $info: #17a2b8;
 }
 
 .modal {
-  background: $bg-secondary;
+  background: var(--color-bg-secondary);
   padding: 22px;
   border-radius: 12px;
-  border: 1px solid $border;
+  border: 1px solid var(--color-border);
   max-width: 640px;
   width: 100%;
   max-height: 88vh;
   overflow-y: auto;
-  color: $text-primary;
-  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.5);
+  color: var(--color-text-primary);
+  box-shadow: 0 10px 35px var(--color-shadow);
 }
 
 .dialog-header {
@@ -43,7 +33,7 @@ $info: #17a2b8;
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
-  border-bottom: 1px solid $border;
+  border-bottom: 1px solid var(--color-border);
   padding-bottom: 12px;
   margin-bottom: 16px;
 
@@ -56,19 +46,19 @@ $info: #17a2b8;
 
   h3 {
     margin: 0;
-    color: $accent;
+    color: var(--color-accent);
     font-size: 18px;
   }
 
   .close-x {
     background: transparent;
     border: none;
-    color: $text-secondary;
+    color: var(--color-text-secondary);
     font-size: 22px;
     line-height: 1;
     cursor: pointer;
     padding: 0 6px;
-    &:hover { color: $accent; }
+    &:hover { color: var(--color-accent); }
   }
 }
 
@@ -76,14 +66,14 @@ $info: #17a2b8;
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: $text-secondary;
-  &.dot-success { background: $success; }
-  &.dot-empty { background: $warning; }
+  background: var(--color-text-secondary);
+  &.dot-success { background: var(--color-success); }
+  &.dot-empty { background: var(--color-warning); }
   &.dot-error,
-  &.dot-timeout { background: $danger; }
-  &.dot-running { background: $info; }
-  &.dot-pending { background: $text-secondary; }
-  &.dot-cancelled { background: $text-secondary; }
+  &.dot-timeout { background: var(--color-danger); }
+  &.dot-running { background: var(--color-info); }
+  &.dot-pending { background: var(--color-text-secondary); }
+  &.dot-cancelled { background: var(--color-text-secondary); }
 }
 
 .status-badge {
@@ -93,13 +83,13 @@ $info: #17a2b8;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  background: $bg-tertiary;
-  color: $text-primary;
-  &.status-success { background: rgba(40, 167, 69, 0.3); color: $success; }
-  &.status-empty { background: rgba(255, 193, 7, 0.22); color: $warning; }
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  &.status-success { background: color-mix(in srgb, var(--color-success) 30%, transparent); color: var(--color-success); }
+  &.status-empty { background: color-mix(in srgb, var(--color-warning) 22%, transparent); color: var(--color-warning); }
   &.status-error,
-  &.status-timeout { background: rgba(220, 53, 69, 0.3); color: $danger; }
-  &.status-running { background: rgba(23, 162, 184, 0.28); color: $info; }
+  &.status-timeout { background: color-mix(in srgb, var(--color-danger) 30%, transparent); color: var(--color-danger); }
+  &.status-running { background: color-mix(in srgb, var(--color-info) 28%, transparent); color: var(--color-info); }
 }
 
 .dialog-section {
@@ -107,7 +97,7 @@ $info: #17a2b8;
 
   h4 {
     margin: 0 0 8px;
-    color: $text-secondary;
+    color: var(--color-text-secondary);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -116,13 +106,13 @@ $info: #17a2b8;
 }
 
 .dialog-section.error-section {
-  background: rgba(220, 53, 69, 0.08);
-  border: 1px solid rgba(220, 53, 69, 0.35);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
   border-radius: 8px;
   padding: 10px 12px;
 
   h4 {
-    color: $danger;
+    color: var(--color-danger);
   }
 }
 
@@ -134,20 +124,20 @@ $info: #17a2b8;
   font-size: 13px;
 
   dt {
-    color: $text-secondary;
+    color: var(--color-text-secondary);
     font-weight: 500;
   }
 
   dd {
     margin: 0;
-    color: $text-primary;
+    color: var(--color-text-primary);
     word-break: break-word;
   }
 
   code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    background: $bg-primary;
-    border: 1px solid $border;
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 12px;
@@ -160,18 +150,18 @@ $info: #17a2b8;
   border-radius: 10px;
   font-size: 11px;
   font-weight: 600;
-  &.yes { background: rgba(40, 167, 69, 0.22); color: $success; }
-  &.no { background: rgba(136, 136, 136, 0.25); color: $text-secondary; }
+  &.yes { background: color-mix(in srgb, var(--color-success) 22%, transparent); color: var(--color-success); }
+  &.no { background: color-mix(in srgb, var(--color-text-secondary) 25%, transparent); color: var(--color-text-secondary); }
 }
 
 .raw-json {
-  background: $bg-primary;
-  border: 1px solid $border;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
-  color: $text-primary;
+  color: var(--color-text-primary);
   overflow: auto;
   max-height: 220px;
   margin: 0;
@@ -182,7 +172,7 @@ $info: #17a2b8;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  border-top: 1px solid $border;
+  border-top: 1px solid var(--color-border);
   padding-top: 14px;
   margin-top: 10px;
 }
@@ -193,8 +183,8 @@ $info: #17a2b8;
   border: none;
   cursor: pointer;
   font-size: 13px;
-  &.btn-primary { background: $accent; color: #fff; }
+  &.btn-primary { background: var(--color-accent); color: #fff; }
   &.btn-primary:hover { filter: brightness(1.1); }
-  &.btn-secondary { background: $bg-tertiary; color: $text-primary; }
-  &.btn-secondary:hover { background: $accent; color: #fff; }
+  &.btn-secondary { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
+  &.btn-secondary:hover { background: var(--color-accent); color: #fff; }
 }

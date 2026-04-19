@@ -1,29 +1,22 @@
-@use "sass:color";
-
-$accent: #e94560;
-$accent-hover: #c73652;
-$bg-primary: #0f1a30;
-$bg-secondary: #1e2a4a;
-$bg-tertiary: #2a3f6a;
-$text-primary: #e0e0e0;
-$text-secondary: #888;
-$border: #2a3f6a;
-$success: #28a745;
-$danger: #dc3545;
-$warning: #ffc107;
-$info: #17a2b8;
-$purple: #6f42c1;
+/* Dashboard stylesheet.
+ *
+ * Every colour reference is a CSS custom property so the dashboard
+ * picks up runtime palette changes from `ThemeService` without any
+ * Sass recompile. See `frontend/src/app/models/palette.model.ts` for
+ * the token catalogue and `frontend/src/styles.scss` for the fallback
+ * values applied before ThemeService runs.
+ */
 
 * { box-sizing: border-box; }
 
 .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
 header {
-  background: $bg-secondary;
+  background: var(--color-bg-secondary);
   padding: 24px;
   border-radius: 16px;
   margin-bottom: 24px;
-  border: 1px solid $border;
+  border: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -39,7 +32,7 @@ header {
     width: 48px;
     height: 48px;
     border-radius: 10px;
-    box-shadow: 0 1px 6px rgba(0,0,0,.35);
+    box-shadow: 0 1px 6px var(--color-shadow);
     flex-shrink: 0;
   }
   .brand-text {
@@ -49,13 +42,13 @@ header {
     .tagline {
       margin: 0;
       font-size: 12px;
-      color: $text-secondary;
+      color: var(--color-text-secondary);
       letter-spacing: 0.01em;
     }
   }
 }
 
-h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
+h1 { color: var(--color-accent); font-size: 24px; margin: 0; font-weight: 700; }
 
 .service-links {
   display: flex;
@@ -64,14 +57,14 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   flex-wrap: wrap;
   a {
     padding: 6px 14px;
-    background: $bg-tertiary;
-    color: $text-primary;
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
     border-radius: 8px;
     text-decoration: none;
     font-size: 13px;
-    border: 1px solid $border;
-    &:hover { background: $accent; color: #fff; border-color: $accent; }
-    &.current { background: $accent; color: #fff; border-color: $accent; cursor: default; }
+    border: 1px solid var(--color-border);
+    &:hover { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+    &.current { background: var(--color-accent); color: #fff; border-color: var(--color-accent); cursor: default; }
   }
 }
 
@@ -84,14 +77,14 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 13px;
-  background: $bg-primary;
-  border: 1px solid $border;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
-  &:hover { border-color: $accent; }
+  &:hover { border-color: var(--color-accent); }
   &.expanded {
-    background: $bg-tertiary;
-    border-color: $accent;
+    background: var(--color-bg-tertiary);
+    border-color: var(--color-accent);
   }
   .chip-label { white-space: nowrap; }
   .chip-actions {
@@ -100,30 +93,30 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
     gap: 6px;
     margin-left: 8px;
     padding-left: 8px;
-    border-left: 1px solid $border;
+    border-left: 1px solid var(--color-border);
   }
   .chip-logout {
-    color: $accent;
+    color: var(--color-accent);
     cursor: pointer;
     text-decoration: underline;
     font-size: 12px;
-    &:hover { color: $accent-hover; }
+    &:hover { color: var(--color-accent-hover); }
   }
 }
 
 .auth-indicator {
   width: 10px; height: 10px; border-radius: 50%;
-  background: $danger;
-  &.active { background: $success; }
+  background: var(--color-danger);
+  &.active { background: var(--color-success); }
 }
 
 .card {
-  background: $bg-secondary;
+  background: var(--color-bg-secondary);
   padding: 24px;
   border-radius: 16px;
   margin-bottom: 24px;
-  border: 1px solid $border;
-  h2 { color: $accent; font-size: 22px; margin-bottom: 16px; margin-top: 0; }
+  border: 1px solid var(--color-border);
+  h2 { color: var(--color-accent); font-size: 22px; margin-bottom: 16px; margin-top: 0; }
 }
 
 .stats-bar {
@@ -133,12 +126,12 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
 }
 
 .stat-item {
-  background: $bg-primary;
+  background: var(--color-bg-primary);
   padding: 14px 24px;
   border-radius: 12px;
-  border: 1px solid $border;
-  .stat-value { font-size: 28px; font-weight: 700; color: $accent; }
-  .stat-label { font-size: 14px; color: $text-secondary; }
+  border: 1px solid var(--color-border);
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--color-accent); }
+  .stat-label { font-size: 14px; color: var(--color-text-secondary); }
 }
 
 .search-form {
@@ -148,29 +141,29 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   input {
     flex: 1;
     padding: 14px;
-    border: 1px solid $border;
+    border: 1px solid var(--color-border);
     border-radius: 10px;
     font-size: 18px;
-    background: $bg-primary;
-    color: $text-primary;
-    &:focus { outline: none; border-color: $accent; }
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    &:focus { outline: none; border-color: var(--color-accent); }
   }
   button {
     padding: 14px 28px;
-    background: $accent;
+    background: var(--color-accent);
     color: #fff;
     border: none;
     border-radius: 10px;
     cursor: pointer;
     font-size: 18px;
-    &:hover { background: $accent-hover; }
-    &:disabled { background: $text-secondary; cursor: not-allowed; }
-    &.btn-abort { background: $danger; }
+    &:hover { background: var(--color-accent-hover); }
+    &:disabled { background: var(--color-text-secondary); cursor: not-allowed; }
+    &.btn-abort { background: var(--color-danger); }
   }
 }
 
 .search-status {
-  color: $text-secondary;
+  color: var(--color-text-secondary);
   font-size: 16px;
   margin-top: 8px;
   display: flex;
@@ -181,8 +174,8 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
 .spinner {
   display: inline-block;
   width: 16px; height: 16px;
-  border: 2px solid $text-secondary;
-  border-top-color: $accent;
+  border: 2px solid var(--color-text-secondary);
+  border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -191,7 +184,7 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
 
 .tabs {
   display: flex;
-  border-bottom: 2px solid $border;
+  border-bottom: 2px solid var(--color-border);
   margin-bottom: 24px;
   flex-wrap: wrap;
 }
@@ -202,17 +195,17 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   border: none;
   background: none;
   font-size: 16px;
-  color: $text-secondary;
-  &:hover { color: $text-primary; }
+  color: var(--color-text-secondary);
+  &:hover { color: var(--color-text-primary); }
   &.active {
-    border-bottom: 2px solid $accent;
-    color: $accent;
+    border-bottom: 2px solid var(--color-accent);
+    color: var(--color-accent);
     font-weight: 600;
   }
 }
 
 .empty-state {
-  color: $text-secondary;
+  color: var(--color-text-secondary);
   text-align: center;
   padding: 40px;
 }
@@ -223,17 +216,17 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   th, td {
     padding: 10px 14px;
     text-align: left;
-    border-bottom: 1px solid $border;
+    border-bottom: 1px solid var(--color-border);
     font-size: 14px;
   }
   td:first-child { max-width: 450px; word-break: break-word; }
   td:last-child { white-space: nowrap; }
   th {
-    color: $accent;
+    color: var(--color-accent);
     font-weight: 600;
     cursor: pointer;
     user-select: none;
-    &.sortable:hover { color: color.adjust($accent, $lightness: 10%); }
+    &.sortable:hover { color: color-mix(in srgb, var(--color-accent) 85%, white); }
     &.asc .sort-icon::after { content: ' ▲'; }
     &.desc .sort-icon::after { content: ' ▼'; }
   }
@@ -242,14 +235,14 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
 
 .download-btn {
   padding: 6px 14px;
-  background: $success;
+  background: var(--color-success);
   color: #fff;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
   &:hover { opacity: 0.9; }
-  &:disabled { background: $text-secondary; cursor: not-allowed; }
+  &:disabled { background: var(--color-text-secondary); cursor: not-allowed; }
 }
 
 .btn-group {
@@ -258,17 +251,17 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
 }
 
 .btn-magnet {
-  background: $purple;
+  background: var(--color-purple);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
 }
 
-.btn-schedule { background: $info; }
+.btn-schedule { background: var(--color-info); }
 
 .delete-btn {
   padding: 6px 14px;
-  background: $danger;
+  background: var(--color-danger);
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -293,16 +286,16 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   &.audiobook { background: #20c997; }
   &.game { background: #795548; }
   &.software { background: #009688; }
-  &.ebook { background: #6f42c1; }
-  &.unknown { background: $text-secondary; }
+  &.ebook { background: var(--color-purple); }
+  &.unknown { background: var(--color-text-secondary); }
 }
 
 .quality-badge {
   &.uhd_4k, &.uhd_8k { background: #ffd700; color: #111; }
-  &.full_hd { background: #28a745; }
-  &.hd { background: #17a2b8; }
+  &.full_hd { background: var(--color-success); }
+  &.hd { background: var(--color-info); }
   &.sd { background: #6c757d; }
-  &.unknown { background: $text-secondary; }
+  &.unknown { background: var(--color-text-secondary); }
 }
 
 .tracker-tag {
@@ -310,11 +303,14 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   padding: 2px 10px;
   border-radius: 6px;
   font-size: 12px;
-  background: $bg-tertiary;
-  color: $text-primary;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
   margin-right: 8px;
   margin-bottom: 4px;
-  &.freeleech { background: rgba(255, 193, 7, 0.25); color: $warning; }
+  &.freeleech {
+    background: color-mix(in srgb, var(--color-warning) 25%, transparent);
+    color: var(--color-warning);
+  }
 }
 
 .merged-indicator {
@@ -325,8 +321,8 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(233, 69, 96, 0.2);
-  color: $accent;
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  color: var(--color-accent);
   margin-right: 8px;
   margin-bottom: 4px;
 }
@@ -336,7 +332,7 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   cursor: not-allowed;
   .bridge-down-hint {
     font-size: 11px;
-    color: $danger;
+    color: var(--color-danger);
     margin-left: 4px;
   }
 }
@@ -344,12 +340,12 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
 .tracker-errors {
   margin-top: 8px;
   font-size: 13px;
-  color: $text-secondary;
+  color: var(--color-text-secondary);
   summary {
     cursor: pointer;
     padding: 6px 0;
-    color: $warning;
-    &:hover { color: color.adjust($warning, $lightness: 10%); }
+    color: var(--color-warning);
+    &:hover { color: color-mix(in srgb, var(--color-warning) 85%, white); }
   }
   ul {
     margin: 4px 0 0 0;
@@ -359,8 +355,8 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   }
   li { margin-bottom: 3px; }
   code {
-    color: $text-primary;
-    background: $bg-primary;
+    color: var(--color-text-primary);
+    background: var(--color-bg-primary);
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 12px;
@@ -369,7 +365,7 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
 
 .meta-line {
   font-size: 11px;
-  color: $text-secondary;
+  color: var(--color-text-secondary);
   margin-top: 4px;
   display: flex;
   align-items: center;
@@ -381,13 +377,13 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
 .progress-bar {
   width: 100%;
   height: 6px;
-  background: $bg-primary;
+  background: var(--color-bg-primary);
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 4px;
   .fill {
     height: 100%;
-    background: $accent;
+    background: var(--color-accent);
     border-radius: 4px;
     transition: width 0.5s ease;
   }
@@ -398,13 +394,13 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 12px;
-  &.running { background: $warning; color: #333; }
-  &.completed, &.active, &.healthy { background: $success; color: #fff; }
-  &.failed { background: $danger; color: #fff; }
-  &.unknown { background: $text-secondary; color: #ccc; }
-  &.downloading { background: $info; color: #fff; }
-  &.seeding { background: $success; color: #fff; }
-  &.paused { background: $warning; color: #333; }
+  &.running { background: var(--color-warning); color: #333; }
+  &.completed, &.active, &.healthy { background: var(--color-success); color: #fff; }
+  &.failed { background: var(--color-danger); color: #fff; }
+  &.unknown { background: var(--color-text-secondary); color: #ccc; }
+  &.downloading { background: var(--color-info); color: #fff; }
+  &.seeding { background: var(--color-success); color: #fff; }
+  &.paused { background: var(--color-warning); color: #333; }
 }
 
 .inline-form {
@@ -413,15 +409,15 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
   align-items: center;
   input, select {
     padding: 8px 12px;
-    border: 1px solid $border;
+    border: 1px solid var(--color-border);
     border-radius: 6px;
     font-size: 13px;
-    background: $bg-primary;
-    color: $text-primary;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
   }
   button {
     padding: 8px 16px;
-    background: $accent;
+    background: var(--color-accent);
     color: #fff;
     border: none;
     border-radius: 6px;
@@ -431,8 +427,8 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
 }
 
 .tracker-stats-bar {
-  background: $bg-primary;
-  border: 1px solid $border;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 14px;
@@ -445,7 +441,7 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
     margin: 0 0 10px;
     font-size: 14px;
     font-weight: 600;
-    color: $text-primary;
+    color: var(--color-text-primary);
   }
 
   .stats-pill {
@@ -453,10 +449,10 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
     border-radius: 10px;
     font-size: 11px;
     font-weight: 700;
-    &.success { background: rgba(40, 167, 69, .25); color: $success; }
-    &.empty   { background: rgba(255, 193, 7, .18); color: $warning; }
-    &.error   { background: rgba(220, 53, 69, .25); color: $danger; }
-    &.running { background: rgba(23, 162, 184, .25); color: $info; }
+    &.success { background: color-mix(in srgb, var(--color-success) 25%, transparent); color: var(--color-success); }
+    &.empty   { background: color-mix(in srgb, var(--color-warning) 18%, transparent); color: var(--color-warning); }
+    &.error   { background: color-mix(in srgb, var(--color-danger) 25%, transparent);  color: var(--color-danger); }
+    &.running { background: color-mix(in srgb, var(--color-info) 25%, transparent);    color: var(--color-info); }
   }
 
   .tracker-chips {
@@ -471,39 +467,39 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
     gap: 6px;
     padding: 4px 10px;
     border-radius: 999px;
-    background: $bg-tertiary;
-    border: 1px solid $border;
-    color: $text-primary;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
     font-size: 12px;
     cursor: pointer;
     transition: transform .08s ease, border-color .12s ease;
 
     &:hover {
       transform: translateY(-1px);
-      border-color: $accent;
+      border-color: var(--color-accent);
     }
 
     .status-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: $text-secondary;
-      &.dot-success { background: $success; }
-      &.dot-empty   { background: $warning; }
+      background: var(--color-text-secondary);
+      &.dot-success { background: var(--color-success); }
+      &.dot-empty   { background: var(--color-warning); }
       &.dot-error,
-      &.dot-timeout { background: $danger; }
-      &.dot-running { background: $info; animation: pulse .8s ease-in-out infinite alternate; }
-      &.dot-cancelled { background: $text-secondary; }
+      &.dot-timeout { background: var(--color-danger); }
+      &.dot-running { background: var(--color-info); animation: pulse .8s ease-in-out infinite alternate; }
+      &.dot-cancelled { background: var(--color-text-secondary); }
     }
 
-    .chip-count { color: $text-secondary; font-variant-numeric: tabular-nums; }
+    .chip-count { color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
 
     .chip-spinner {
       width: 10px;
       height: 10px;
       border: 2px solid transparent;
-      border-top-color: $accent;
-      border-right-color: $accent;
+      border-top-color: var(--color-accent);
+      border-right-color: var(--color-accent);
       border-radius: 50%;
       animation: spin .6s linear infinite;
     }
@@ -511,8 +507,8 @@ h1 { color: $accent; font-size: 24px; margin: 0; font-weight: 700; }
     .chip-badge { font-size: 10px; }
 
     &.status-error,
-    &.status-timeout { border-color: $danger; }
-    &.status-running { border-color: $info; }
+    &.status-timeout { border-color: var(--color-danger); }
+    &.status-running { border-color: var(--color-info); }
   }
 }
 

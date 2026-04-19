@@ -16,8 +16,8 @@ import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dial
     :host {
       display: block;
       min-height: 100vh;
-      background: #0f1a30;
-      color: #e0e0e0;
+      background: var(--color-bg-primary);
+      color: var(--color-text-primary);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     }
   `]
