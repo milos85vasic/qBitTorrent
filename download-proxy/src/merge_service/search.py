@@ -146,6 +146,76 @@ class MergedResult:
         }
 
 
+def _classify_plugin_stderr(
+    stderr: str, *, killed_by_deadline: bool, had_results: bool
+) -> Dict[str, Any]:
+    """Categorise a plugin subprocess's stderr into a structured diagnostic.
+
+    Public trackers run as isolated python subprocesses, and their
+    stderr is the only evidence we get about WHY a tracker returned
+    zero rows. Before this helper, `TrackerSearchStat.error` was always
+    ``None`` for the empty-but-broken trackers, leaving the dashboard
+    with no way to distinguish "no hits for this niche query" from
+    "upstream returned 403" or "plugin crashed".
+
+    Returns a dict with keys ``error_type`` (short enum-like string),
+    ``error`` (human summary), and ``stderr_tail`` (raw tail, truncated).
+    """
+    tail = (stderr or "").strip()
+    if not tail and killed_by_deadline and not had_results:
+        return {
+            "error_type": "deadline_timeout",
+            "error": "plugin exceeded 25s per-tracker deadline with no results",
+            "stderr_tail": "",
+        }
+    if not tail:
+        return {"error_type": None, "error": None, "stderr_tail": ""}
+
+    lower = tail.lower()
+    # Upstream HTTP failures
+    if "http error 403" in lower or "connection error: forbidden" in lower:
+        error_type = "upstream_http_403"
+        summary = "upstream returned HTTP 403 Forbidden"
+    elif "connection error: not found" in lower or "http error 404" in lower:
+        error_type = "upstream_http_404"
+        summary = "upstream returned HTTP 404 Not Found (domain moved?)"
+    elif "gateway timeout" in lower or "http error 504" in lower:
+        error_type = "upstream_timeout"
+        summary = "upstream gateway timed out"
+    elif "name does not resolve" in lower or "name has no usable address" in lower:
+        error_type = "dns_failure"
+        summary = "upstream domain does not resolve (DNS failure)"
+    elif "ssl:" in lower or "tlsv1_alert" in lower:
+        error_type = "tls_failure"
+        summary = "TLS handshake with upstream failed"
+    elif "filenotfounderror" in lower:
+        error_type = "plugin_env_missing"
+        summary = "plugin needs a directory/file that is not present in the container"
+    elif "indexerror" in lower or "list index out of range" in lower:
+        error_type = "plugin_parse_failure"
+        summary = "plugin parse failed (upstream HTML likely changed)"
+    elif "'nonetype' object is not iterable" in lower or "typeerror" in lower:
+        error_type = "plugin_crashed"
+        summary = "plugin crashed with a TypeError"
+    elif "jsondecodeerror" in lower:
+        error_type = "plugin_parse_failure"
+        summary = "plugin failed to decode upstream JSON"
+    elif "incompleteread" in lower:
+        error_type = "upstream_incomplete"
+        summary = "upstream closed the connection mid-response"
+    elif "traceback" in lower or "__error__" in lower:
+        error_type = "plugin_crashed"
+        summary = "plugin raised an unhandled exception"
+    else:
+        # Plugin ran cleanly but printed something to stderr (often just
+        # `{"__done__": 0}` from our probe wrapper or the plugin's own
+        # INFO-level logging). Treat as benign noise.
+        error_type = None
+        summary = None
+
+    return {"error_type": error_type, "error": summary, "stderr_tail": tail[-400:]}
+
+
 @dataclass
 class TrackerSearchStat:
     """Per-tracker run-time diagnostics for a single search.
@@ -298,6 +368,13 @@ class SearchOrchestrator:
             maxsize=_max_searches, ttl=_ttl
         )
         self._tracker_results: Dict[str, Dict[str, List[Any]]] = {}
+        # Side-channel: `_search_public_tracker` writes a diagnostic
+        # dict here keyed by tracker name so the orchestrator can thread
+        # error info into TrackerSearchStat without changing the return
+        # type of every _search_* helper. Overwritten on each call so
+        # stale entries can't leak into the next search. Keys live only
+        # for the duration of a single orchestrator fan-out.
+        self._last_public_tracker_diag: Dict[str, Dict[str, Any]] = {}
         # Bounded tracker fan-out.  Without this, asyncio.gather spawned one
         # task per tracker (~40+) with no backpressure, which let subprocess
         # spawns and aiohttp sessions starve the event loop under load.
@@ -452,6 +529,19 @@ class SearchOrchestrator:
                     metadata.total_results += len(results)
                     stat.results_count = len(results)
                     stat.status = "success" if results else "empty"
+                    # Pull subprocess diagnostic out of the side-channel
+                    # populated by `_search_public_tracker` so the empty
+                    # trackers show their real failure reason instead of
+                    # `error: None`.
+                    diag = self._last_public_tracker_diag.pop(tracker.name, None)
+                    if diag:
+                        if diag.get("error_type"):
+                            stat.error_type = diag["error_type"]
+                            stat.error = diag.get("error")
+                            if not results:
+                                stat.status = "error"
+                        if diag.get("stderr_tail"):
+                            stat.notes["stderr_tail"] = diag["stderr_tail"]
                     return tracker.name, results, None
                 except asyncio.TimeoutError as e:
                     stat.status = "timeout"
@@ -562,10 +652,19 @@ class SearchOrchestrator:
         return trackers
 
     async def _search_tracker(self, tracker: TrackerSource, query: str, category: str) -> List[SearchResult]:
+        """Dispatch to the right plugin and return its results.
+
+        Per-plugin diagnostic info (subprocess stderr, error classification)
+        is stashed on ``self._last_public_tracker_diag[name]`` when the
+        tracker is a public plugin so the orchestrator can surface it in
+        ``TrackerSearchStat`` after the call. This is deliberately a
+        side-channel rather than a tuple return so the private-tracker
+        helpers don't need to change shape.
+        """
         import logging
 
         logger = logging.getLogger(__name__)
-        results = []
+        results: List[SearchResult] = []
 
         try:
             self._load_env()
@@ -644,6 +743,8 @@ class SearchOrchestrator:
             except Exception as e:
                 logger.debug(f"Skipping malformed {tracker_name} result: {e}")
 
+        killed_by_deadline = False
+        stderr_tail = ""
         try:
             proc = await asyncio.create_subprocess_exec(
                 "python3",
@@ -655,12 +756,14 @@ class SearchOrchestrator:
             while True:
                 remaining = deadline - asyncio.get_event_loop().time()
                 if remaining <= 0:
+                    killed_by_deadline = True
                     break
                 try:
                     line = await asyncio.wait_for(
                         proc.stdout.readline(), timeout=remaining
                     )
                 except asyncio.TimeoutError:
+                    killed_by_deadline = True
                     break
                 if not line:  # EOF
                     break
@@ -678,9 +781,9 @@ class SearchOrchestrator:
                 except Exception:
                     pass
             try:
-                err = (await proc.stderr.read()).decode(errors="replace").strip()
-                if err:
-                    logger.debug(f"Plugin {tracker_name} stderr: {err[:300]}")
+                stderr_tail = (await proc.stderr.read()).decode(errors="replace").strip()
+                if stderr_tail:
+                    logger.debug(f"Plugin {tracker_name} stderr: {stderr_tail[:300]}")
             except Exception:
                 pass
             try:
@@ -697,6 +800,9 @@ class SearchOrchestrator:
                 except Exception:
                     pass
 
+        self._last_public_tracker_diag[tracker_name] = _classify_plugin_stderr(
+            stderr_tail, killed_by_deadline=killed_by_deadline, had_results=bool(results)
+        )
         return results
 
     async def _search_rutracker(self, query: str, category: str) -> List[SearchResult]:

@@ -98,3 +98,47 @@ def test_query_roundtrip_matches(linux_search: Dict) -> None:
             f"tracker {t.get('name')!r} recorded query={t.get('query')!r} "
             f"(expected {QUERY!r})"
         )
+
+
+def test_empty_trackers_surface_a_reason(linux_search: Dict) -> None:
+    """Every empty tracker should tell us WHY.
+
+    Before the diagnostic plumb-through, `error` and `error_type` were
+    always ``None`` on empty trackers and the dashboard had no way to
+    distinguish a niche-empty "no linux torrents on an anime tracker"
+    from an upstream outage or a plugin crash. The orchestrator now
+    pulls `_search_public_tracker`'s subprocess stderr classification
+    into `TrackerSearchStat`, so each empty tracker must either:
+
+    * be genuinely empty (``status == "empty"`` with no error — the
+      plugin ran cleanly but found nothing for this query), or
+    * name the failure (``error_type`` is one of the known classes).
+
+    We allow a small tolerance because transient TLS/CDN weather shifts
+    which trackers land in which bucket, but on "linux" at least a
+    handful MUST be classified — otherwise the plumb-through is broken.
+    """
+    stats = linux_search.get("tracker_stats", [])
+    empty = [t for t in stats if t.get("results_count", 0) == 0]
+    assert empty, "no empty trackers found — test assumes some exist"
+
+    classified = [t for t in empty if t.get("error_type") is not None]
+    genuinely_empty = [t for t in empty if t.get("error_type") is None]
+
+    # Every classified tracker should have a human-readable summary too.
+    for t in classified:
+        assert t.get("error"), (
+            f"tracker {t['name']!r} has error_type={t.get('error_type')!r} "
+            f"but no human-readable error summary"
+        )
+
+    # Floor: at least a few classifications should be present. When the
+    # stack is working, we typically see >15 classifications (403s from
+    # kickass/eztv/bt4g/etc., DNS failures, timeouts). If that drops to
+    # zero the plumb-through is broken.
+    assert len(classified) >= 5, (
+        f"Only {len(classified)} of {len(empty)} empty trackers had a "
+        "classified error_type — the subprocess-stderr plumb-through is "
+        "likely broken. Empty-without-reason list: "
+        f"{sorted(t['name'] for t in genuinely_empty)}"
+    )

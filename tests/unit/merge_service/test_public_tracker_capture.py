@@ -1,4 +1,6 @@
-"""Regression guards for the public-tracker subprocess capture.
+"""Regression guards for the public-tracker subprocess capture
+and the stderr classifier that surfaces failure reasons in
+TrackerSearchStat.
 
 Context
 -------
@@ -193,3 +195,68 @@ def test_subprocess_captures_from_fake_plugin(tmp_path: Path) -> None:
     assert len(rows) == 3, f"expected 3 rows, got {len(rows)}: {rows}"
     names = [r["name"] for r in rows]
     assert names == ["linux-0", "linux-1", "linux-2"], names
+
+
+# --- classifier tests -------------------------------------------------------
+# `_classify_plugin_stderr` takes raw subprocess stderr and maps it to the
+# structured `{error_type, error, stderr_tail}` triple that the orchestrator
+# writes into TrackerSearchStat. Before this helper, every empty tracker
+# showed `error: None`, hiding upstream 403s/404s/DNS failures/plugin
+# crashes behind a generic `[empty]` chip. These tests pin each class of
+# failure so a future refactor can't silently drop the signal.
+
+import importlib.util as _importlib_util
+
+_MS_PATH = str(REPO / "download-proxy" / "src" / "merge_service")
+sys.modules.setdefault("merge_service", type(sys)("merge_service"))
+sys.modules["merge_service"].__path__ = [_MS_PATH]  # type: ignore[attr-defined]
+_search_spec = _importlib_util.spec_from_file_location(
+    "merge_service.search", str(Path(_MS_PATH) / "search.py")
+)
+_search_mod = _importlib_util.module_from_spec(_search_spec)
+sys.modules["merge_service.search"] = _search_mod
+_search_spec.loader.exec_module(_search_mod)  # type: ignore[union-attr]
+_classify_plugin_stderr = _search_mod._classify_plugin_stderr
+
+
+@pytest.mark.parametrize(
+    "stderr,killed,had_results,expected_type",
+    [
+        ("", False, False, None),
+        ("", True, False, "deadline_timeout"),
+        ("", True, True, None),  # deadline fired but we already have rows
+        ("Connection error: Forbidden\n", False, False, "upstream_http_403"),
+        ("HTTP Error 403: Forbidden\n", False, False, "upstream_http_403"),
+        ("Connection error: Not Found\n", False, False, "upstream_http_404"),
+        ("Connection error: Gateway Timeout\n", False, False, "upstream_timeout"),
+        ("Connection error: [Errno -2] Name does not resolve\n", False, False, "dns_failure"),
+        ("Connection error: [Errno -5] Name has no usable address\n", False, False, "dns_failure"),
+        ("SSL: TLSV1_ALERT_INTERNAL_ERROR\n", False, False, "tls_failure"),
+        ("FileNotFoundError: [Errno 2]\n", False, False, "plugin_env_missing"),
+        ("IndexError: list index out of range\n", False, False, "plugin_parse_failure"),
+        ("'NoneType' object is not iterable\n", False, False, "plugin_crashed"),
+        ("json.decoder.JSONDecodeError: ...\n", False, False, "plugin_parse_failure"),
+        ("IncompleteRead(56503 bytes read)\n", False, False, "upstream_incomplete"),
+        ('{"__done__": 0}\n', False, False, None),
+    ],
+)
+def test_classifier_cases(stderr, killed, had_results, expected_type) -> None:
+    got = _classify_plugin_stderr(stderr, killed_by_deadline=killed, had_results=had_results)
+    assert got["error_type"] == expected_type, (
+        f"stderr={stderr!r} killed={killed} had_results={had_results} "
+        f"→ expected {expected_type!r}, got {got['error_type']!r}"
+    )
+    if expected_type is None:
+        assert got["error"] is None
+    else:
+        assert isinstance(got["error"], str) and got["error"]
+
+
+def test_classifier_truncates_long_stderr() -> None:
+    """Long stderr must be truncated so a misbehaving plugin can't
+    explode TrackerSearchStat.notes into the database/SSE feed."""
+    huge = "Connection error: Forbidden\n" + "x" * 5000
+    got = _classify_plugin_stderr(huge, killed_by_deadline=False, had_results=False)
+    assert len(got["stderr_tail"]) <= 400
+    # Still classified correctly despite the long tail.
+    assert got["error_type"] == "upstream_http_403"

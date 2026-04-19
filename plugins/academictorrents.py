@@ -45,8 +45,10 @@ class academictorrents(object):
 
     def _retrieve_database(self):
         folder_path = Path(f"{system_paths[sys.platform]}/qbit_plugins_data")
-        if not folder_path.exists():
-            folder_path.mkdir()
+        # Container image has no ~/.local/share — mkdir() without
+        # parents=True raises FileNotFoundError and the plugin silently
+        # fails with 0 results.
+        folder_path.mkdir(parents=True, exist_ok=True)
         self._update_database_cache()
         with open(cache_path, encoding="utf-8") as f:
             lines = f.readlines()[1:]
