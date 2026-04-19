@@ -306,6 +306,14 @@
             ],
             "title": "Completed At"
           },
+          "errors": {
+            "description": "Per-tracker error strings (e.g. 'rutracker: HTTP 503')",
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
           "merged_results": {
             "title": "Merged Results",
             "type": "integer"
@@ -699,8 +707,26 @@
         ]
       }
     },
+    "/api/v1/bridge/health": {
+      "get": {
+        "description": "Probe the host webui-bridge (default port 7188).\n\nThe dashboard's \"WebUI Bridge\" link becomes disabled when this\nreturns ``healthy: false`` so users don't land on a dead page.",
+        "operationId": "bridge_health_api_v1_bridge_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Bridge Health"
+      }
+    },
     "/api/v1/config": {
       "get": {
+        "description": "Return the dashboard's user-facing service URLs.\n\n``qbittorrent_url`` points to the authenticated download proxy\n(default port 7186) \u2014 the container-internal qBittorrent WebUI\n(port 7185) answers 401 Unauthorized without the proxy shim.\n``qbittorrent_internal_url`` is still exposed for tooling that\nneeds the direct container endpoint.",
         "operationId": "get_config_api_v1_config_get",
         "responses": {
           "200": {
@@ -1171,6 +1197,7 @@
     },
     "/api/v1/search": {
       "post": {
+        "description": "Kick off a search and return immediately.\n\nThe endpoint returns ``status: \"running\"`` as soon as the search\nmetadata is created \u2014 the actual tracker fan-out runs in a\nbackground ``asyncio.Task`` so the client can attach to\n``/api/v1/search/stream/{search_id}`` and see results arrive\nlive instead of waiting for the slowest tracker.",
         "operationId": "search_api_v1_search_post",
         "requestBody": {
           "content": {
@@ -1245,6 +1272,48 @@
           }
         },
         "summary": "Search Stream",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/api/v1/search/sync": {
+      "post": {
+        "description": "Blocking search (legacy behaviour).\n\nPreserved for tests and schedulers that need the full merged result\nset in a single response.  Real-time clients should use\n``POST /search`` + ``GET /search/stream/{search_id}``.",
+        "operationId": "search_sync_api_v1_search_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Sync",
         "tags": [
           "search"
         ]
