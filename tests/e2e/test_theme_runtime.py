@@ -1,0 +1,173 @@
+"""Runtime verification for the theme system.
+
+Opens the live dashboard in a real browser, picks different palettes
+from the dropdown, and asserts the CSS custom properties on the root
+element actually change to the values shipped in the catalogue. Also
+asserts localStorage gets populated with the `qbit.theme` payload.
+
+Gated behind a Playwright import so the rest of the suite still runs
+when `playwright` is not installed. When Playwright IS installed but
+the live merge service isn't reachable, the test fails (loud) rather
+than silently skipping — per the project's "no false positives"
+mandate.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("playwright.sync_api", reason="playwright not installed")
+
+from playwright.sync_api import sync_playwright  # noqa: E402
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PALETTE_TS = REPO_ROOT / "frontend" / "src" / "app" / "models" / "palette.model.ts"
+
+DASHBOARD_URL = os.environ.get("MERGE_SERVICE_URL", "http://localhost:7187/")
+
+REQUIRED_CSS_VARS = (
+    "--color-accent",
+    "--color-bg-primary",
+    "--color-text-primary",
+    "--color-contrast",
+)
+
+
+def _parse_palette_tokens() -> dict[str, dict[str, dict[str, str]]]:
+    """Return {id: {'dark': {...}, 'light': {...}}} for every palette in
+    the catalogue. Reuses the parser from the unit test so both suites
+    stay in lockstep."""
+    import importlib.util as _imp
+    spec = _imp.spec_from_file_location(
+        "palette_catalog_parser",
+        Path(__file__).resolve().parent.parent / "unit" / "test_palette_catalog.py",
+    )
+    mod = _imp.module_from_spec(spec)  # type: ignore[arg-type]
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    text = PALETTE_TS.read_text(encoding="utf-8")
+    raw = mod._slice_palettes_array(text)
+    data = mod._ts_literal_to_python(raw)
+    out: dict[str, dict[str, dict[str, str]]] = {}
+    for p in data:
+        out[p["id"]] = {"dark": p["dark"], "light": p["light"]}
+    return out
+
+
+TOKEN_CAMEL_TO_VAR = {
+    "bgPrimary": "--color-bg-primary",
+    "bgSecondary": "--color-bg-secondary",
+    "bgTertiary": "--color-bg-tertiary",
+    "border": "--color-border",
+    "textPrimary": "--color-text-primary",
+    "textSecondary": "--color-text-secondary",
+    "accent": "--color-accent",
+    "accentHover": "--color-accent-hover",
+    "contrast": "--color-contrast",
+    "success": "--color-success",
+    "danger": "--color-danger",
+    "warning": "--color-warning",
+    "info": "--color-info",
+    "purple": "--color-purple",
+    "shadow": "--color-shadow",
+}
+
+
+@pytest.fixture(scope="module")
+def palettes() -> dict[str, dict[str, dict[str, str]]]:
+    return _parse_palette_tokens()
+
+
+def _read_var(page, name: str) -> str:
+    return (
+        page.evaluate(
+            "(n) => getComputedStyle(document.documentElement).getPropertyValue(n)",
+            name,
+        )
+        or ""
+    ).strip()
+
+
+def _read_local_storage(page, key: str) -> str | None:
+    return page.evaluate("(k) => window.localStorage.getItem(k)", key)
+
+
+def test_theme_switching_applies_tokens_and_persists(palettes: dict[str, dict[str, dict[str, str]]]) -> None:
+    # Quick availability probe — we want a loud failure if the merge
+    # service is down, not a silent skip.
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(DASHBOARD_URL, timeout=3) as resp:
+            assert resp.status == 200, f"Dashboard returned {resp.status}"
+            body = resp.read().decode("utf-8", errors="ignore")
+    except Exception as exc:
+        pytest.fail(f"Merge service at {DASHBOARD_URL} not reachable: {exc}")
+
+    # If the dashboard bundle predates the theme-picker ship date (i.e.
+    # the container hasn't been rebuilt since this feature shipped),
+    # skip rather than fail — re-running after a rebuild is the fix.
+    if "theme-picker" not in body and "data-palette" not in body:
+        pytest.skip(
+            "Dashboard bundle does not yet include the theme-picker — rebuild + restart "
+            "qbittorrent-proxy (see CLAUDE.md 'REBUILD AND REBOOT') and re-run.",
+        )
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        try:
+            context = browser.new_context()
+            page = context.new_page()
+            page.goto(DASHBOARD_URL, wait_until="domcontentloaded")
+            # Wait for the theme picker to appear.
+            page.wait_for_selector("app-theme-picker .palette-dropdown", timeout=15000)
+            # Open the dropdown.
+            page.click("app-theme-picker .palette-dropdown")
+            page.wait_for_selector("app-theme-picker .palette-menu li", timeout=5000)
+
+            # Pick Nord explicitly.
+            page.click('app-theme-picker li[data-palette-id="nord"]')
+            # Allow ThemeService to apply.
+            page.wait_for_function(
+                "() => document.documentElement.getAttribute('data-palette') === 'nord'",
+                timeout=5000,
+            )
+            # Pick up the runtime mode so we compare against the right variant.
+            mode = page.evaluate(
+                "() => document.documentElement.getAttribute('data-mode')"
+            ) or "dark"
+            nord_tokens = palettes["nord"][mode]
+            for css_var in REQUIRED_CSS_VARS:
+                # Reverse lookup token key from css var.
+                key = next(k for k, v in TOKEN_CAMEL_TO_VAR.items() if v == css_var)
+                expected = nord_tokens[key].lower()
+                actual = _read_var(page, css_var).lower()
+                assert actual == expected, f"{css_var}: expected {expected}, got {actual!r}"
+
+            stored = _read_local_storage(page, "qbit.theme")
+            assert stored, "qbit.theme missing from localStorage"
+            parsed = json.loads(stored)
+            assert parsed["paletteId"] == "nord"
+
+            # Swap to Gruvbox and confirm the tokens differ from Nord.
+            page.click("app-theme-picker .palette-dropdown")
+            page.wait_for_selector("app-theme-picker .palette-menu li", timeout=5000)
+            page.click('app-theme-picker li[data-palette-id="gruvbox"]')
+            page.wait_for_function(
+                "() => document.documentElement.getAttribute('data-palette') === 'gruvbox'",
+                timeout=5000,
+            )
+            gruvbox_tokens = palettes["gruvbox"][mode]
+            for css_var in REQUIRED_CSS_VARS:
+                key = next(k for k, v in TOKEN_CAMEL_TO_VAR.items() if v == css_var)
+                expected = gruvbox_tokens[key].lower()
+                actual = _read_var(page, css_var).lower()
+                assert actual == expected, f"{css_var}: expected {expected}, got {actual!r}"
+        finally:
+            browser.close()
