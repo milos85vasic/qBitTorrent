@@ -1,249 +1,243 @@
-# qBitTorrent-Fixed
+<h1 align="center">
+  <img src="docs/assets/logo.png" alt="qBittorrent-Fixed" width="160" />
+  <br>
+  qBittorrent-Fixed
+</h1>
 
-[![Tests](https://img.shields.io/badge/tests-331%20passing-success)](tests/)
-[![Plugins](https://img.shields.io/badge/plugins-42-blue)](plugins/)
-[![Merge Service](https://img.shields.io/badge/merge_service-FastAPI%20%3A7187-orange)](download-proxy/src/)
-[![CI](https://img.shields.io/badge/ci-manual%20%28ci.sh%29-blueviolet)](ci.sh)
-[![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
+<p align="center">
+  <strong>Multi-tracker meta-search for qBittorrent — self-hosted, containerised, private-tracker-aware.</strong>
+</p>
 
-> **qBittorrent with unified multi-tracker search, 42 plugins, and a download proxy with authenticated tracker support.**
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#tokens--api-keys">Tokens & keys</a> ·
+  <a href="#documentation">Documentation</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#testing">Testing</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
+
+<p align="center">
+  <img alt="tests"   src="https://img.shields.io/badge/python%20tests-585%20passing-success">
+  <img alt="vitest"  src="https://img.shields.io/badge/frontend%20tests-182%20passing-success">
+  <img alt="plugins" src="https://img.shields.io/badge/plugins-48-blue">
+  <img alt="merge"   src="https://img.shields.io/badge/merge_service-FastAPI%20%3A7187-orange">
+  <img alt="ci"      src="https://img.shields.io/badge/ci-auto%20%28syntax%20%2F%20unit%20%2F%20integration%20%2F%20nightly%20%2F%20security%29-blueviolet">
+  <img alt="scan"    src="https://img.shields.io/badge/scanners-snyk%20%7C%20sonar%20%7C%20bandit%20%7C%20ruff%20%7C%20semgrep%20%7C%20trivy%20%7C%20gitleaks%20%7C%20pip--audit-red">
+  <img alt="license" src="https://img.shields.io/badge/license-Apache%202.0-green">
+</p>
+
+---
 
 ## Features
 
-- **Merge Search Service** — FastAPI service (port 7187) that searches multiple trackers simultaneously, deduplicates results, and proxies authenticated downloads
-- **42 Search Plugins** — Public, private, and specialized tracker plugins
-- **Freeleech Protection** — IPTorrents freeleech results tagged `[free]`; non-freeleech never merges with other trackers
-- **WebUI Download Fix** — Private tracker downloads work through the proxy bridge (auto-starts via systemd)
-- **Dark Theme Dashboard** — Search UI at `http://localhost:7187/`
-- **SSE Streaming** — Real-time search results as they arrive from each tracker
-- **Hook System** — Configure webhooks triggered on search/download events
-- **Manual CI Pipeline** — Secret leak detection, syntax checks, full test suite, container health (`./ci.sh`)
-- **331 Tests Passing** — HTML parsers, API endpoints, quality detection, deduplication, hooks, validator, enricher, freeleech, CI infra
+- **Merge Search Service** — FastAPI service (`:7187`) that fans out across 40+ trackers, deduplicates results, streams via SSE.
+- **Real-time results** — `result_found` events arrive as each tracker completes, no blocking.
+- **Private-tracker bridge** — Authenticated downloads via `webui-bridge.py` for RuTracker, Kinozal, NNM-Club, IPTorrents.
+- **Freeleech-only IPTorrents** — Automation never costs ratio (see [constitution VIII](.specify/memory/constitution.md)).
+- **Opt-in quality stack** — SonarQube + Snyk + Semgrep + Trivy + Gitleaks + bandit + pip-audit behind `docker-compose.quality.yml`.
+- **Opt-in observability** — Prometheus + Grafana dashboards behind the same profile system.
+- **Hook system** — Register scripts via `POST /api/v1/hooks` for search / download events.
+- **Angular 21 SPA dashboard** — dark-themed, signals-based, per-tracker status chips with CAPTCHA re-login, virtual-scroll-ready sort.
+- **PWA-ready** — favicon + launcher icons + web manifest ship from `frontend/public/`.
+- **Container-first** — rootless Podman or Docker, single `./start.sh` boot.
 
-## Quick Start
+---
+
+## Quick start
 
 ```bash
 git clone https://github.com/milos85vasic/qBitTorrent.git
 cd qBitTorrent
+
+# Optional: configure tracker credentials + tokens
 cp .env.example .env
-# Edit .env with tracker credentials
-./setup.sh
-./start.sh -p
-./setup-webui-bridge-service.sh   # One-time: auto-start webui-bridge on boot
-# Access:
-#   qBittorrent WebUI:   http://localhost:7185
-#   Download proxy:      http://localhost:7186
-#   Merge Search + UI:   http://localhost:7187/
-#   webui-bridge:        auto-started via systemd (port 7188)
-# Login: admin / admin
+$EDITOR .env            # see "Tokens & API keys" below
+
+./setup.sh              # one-time
+./start.sh              # Angular build + containers + plugin sync
 ```
+
+Then visit:
+
+| URL | Purpose | Auth |
+|---|---|---|
+| [http://localhost:7187/](http://localhost:7187/) | Merge-search dashboard (SPA) | — |
+| [http://localhost:7187/docs](http://localhost:7187/docs) | FastAPI Swagger UI | — |
+| [http://localhost:7187/openapi.json](http://localhost:7187/openapi.json) | OpenAPI schema | — |
+| [http://localhost:7186/](http://localhost:7186/) | qBittorrent WebUI proxy | `admin` / `admin` |
+| [http://localhost:7185/](http://localhost:7185/) | qBittorrent internal (container) | — |
+| [http://localhost:7188/](http://localhost:7188/) | WebUI bridge (private-tracker downloads) | — |
+
+---
+
+## Tokens & API keys
+
+**⚠ Configure any credentials you need in `.env` before running `./start.sh`.** The single source of truth is **[`docs/TOKENS_AND_KEYS.md`](docs/TOKENS_AND_KEYS.md)** — which variable is mandatory, which is optional, and **where to register** for each one.
+
+### At a glance
+
+| Category | Mandatory | Optional | Documentation |
+|---|---|---|---|
+| qBittorrent WebUI | — | `WEBUI_USERNAME`, `WEBUI_PASSWORD` | [§1](docs/TOKENS_AND_KEYS.md#1-qbittorrent-webui-built-in) |
+| Private trackers | per-tracker | — | [§2](docs/TOKENS_AND_KEYS.md#2-private-tracker-credentials) |
+| Public tracker uplift | — | `JACKETT_API_KEY`, … | [§3](docs/TOKENS_AND_KEYS.md#3-public-tracker-api-keys-optional) |
+| Metadata enrichment | — | `TMDB_API_KEY`, `TVDB_API_KEY`, … | [§4](docs/TOKENS_AND_KEYS.md#4-metadata-enrichment-apis-optional) |
+| Security scanning | — | `SNYK_TOKEN`, `SONAR_TOKEN`, … | [§5](docs/TOKENS_AND_KEYS.md#5-security-scanner-tokens-opt-in-ci--local-scans) |
+| Observability | — | `GRAFANA_USER`, `GRAFANA_PASSWORD` | [§6](docs/TOKENS_AND_KEYS.md#6-observability-endpoints-opt-in-compose-profile) |
+| Orchestrator tuning | — | `ALLOWED_ORIGINS`, `MAX_CONCURRENT_TRACKERS`, … | [§7](docs/TOKENS_AND_KEYS.md#7-orchestrator-tuning-optional--phase-3) |
+
+### Where to register (fast links)
+
+| Provider | Signup | Notes |
+|---|---|---|
+| RuTracker | <https://rutracker.org/forum/register.php> | Username + password |
+| Kinozal | <https://kinozal.tv/signup.php> | May require invite |
+| NNM-Club | <https://nnmclub.to/forum/ucp.php?mode=register> | Cookie-based auth |
+| IPTorrents | <https://iptorrents.com/> | Invite-only; freeleech enforced |
+| Jackett | <https://github.com/Jackett/Jackett> | Self-hosted indexer |
+| TMDb | <https://www.themoviedb.org/signup> | v3 auth API key |
+| TVDb | <https://thetvdb.com/api-information> | Subscription API |
+| MusicBrainz | <https://musicbrainz.org/doc/MusicBrainz_API> | Free — needs UA only |
+| Snyk | <https://app.snyk.io/> | Account → Auth Token |
+| SonarCloud | <https://sonarcloud.io/account/security/> | Or run the compose SonarQube |
+| Gitleaks | <https://gitleaks.io/> | Optional commercial license |
+
+---
+
+## Documentation
+
+Everything the platform offers, indexed:
+
+### Getting started & operation
+
+- [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md) — end-user walkthrough
+- [`docs/TOKENS_AND_KEYS.md`](docs/TOKENS_AND_KEYS.md) — **⭐ credentials / tokens / env vars (mandatory vs optional + registration links)**
+- [`docs/PLUGINS.md`](docs/PLUGINS.md) — the 48 plugin engines
+- [`docs/PLUGIN_TROUBLESHOOTING.md`](docs/PLUGIN_TROUBLESHOOTING.md) — what to check when a plugin breaks
+
+### Architecture & subsystems
+
+- [`docs/architecture/`](docs/architecture/) — 5 Mermaid diagrams (topology, search lifecycle, plugin execution, bridge, shutdown)
+- [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — Pydantic schemas & lifecycle (no relational DB)
+- [`docs/CONCURRENCY.md`](docs/CONCURRENCY.md) — asyncio semaphore + TTL caches + retry/backoff
+- [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) — Prometheus + Grafana + OpenTelemetry
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — benchmark + load + stress test layout
+- [`docs/api/openapi.json`](docs/api/openapi.json) — frozen OpenAPI spec (diffed in CI)
+
+### Quality & security
+
+- [`docs/SECURITY.md`](docs/SECURITY.md) — threat model + credential storage
+- [`docs/SCANNING.md`](docs/SCANNING.md) — Snyk + Sonar + Semgrep + Trivy + Gitleaks + bandit + pip-audit
+- [`docs/QUALITY_STACK.md`](docs/QUALITY_STACK.md) — the opt-in `docker-compose.quality.yml` stack
+
+### Testing
+
+- [`docs/TESTING.md`](docs/TESTING.md) — catalogue of every test type (30 rows)
+- [`docs/COVERAGE_BASELINE.md`](docs/COVERAGE_BASELINE.md) — per-module coverage gates
+- [`tests/README.md`](tests/README.md) — layout of the `tests/` tree
+
+### Development
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow
+- [`CLAUDE.md`](CLAUDE.md) — Claude Code agent protocol (TDD + rebuild-reboot)
+- [`AGENTS.md`](AGENTS.md) — runtime development guidance
+- [`.specify/memory/constitution.md`](.specify/memory/constitution.md) — **binding architectural contract (v1.1.0)**
+
+### Courses (self-paced, Asciinema)
+
+- [`courses/01-operator/`](courses/01-operator/) — Your first search
+- [`courses/02-plugin-author/`](courses/02-plugin-author/) — Authoring a nova3 plugin
+- [`courses/03-contributor/`](courses/03-contributor/) — TDD + rebuild-reboot deep dive
+- [`courses/04-security-ops/`](courses/04-security-ops/) — Threat model + scanner bundle
+
+### Release / CI
+
+- [`CHANGELOG.md`](CHANGELOG.md)
+- [`releases/README.md`](releases/README.md) — release artefacts layout
+- [`docs/OUT_OF_SANDBOX.md`](docs/OUT_OF_SANDBOX.md) — items requiring external credentials (HelixQA / OpenCode / submodule orgs)
+
+---
 
 ## Architecture
 
 ```
-                         ┌─────────────────────────┐
-                         │      qbittorrent-proxy   │
-                         │    (python:3.12-alpine)   │
-  http://localhost:7186  │                           │
-   ──────────────────────►│  Download Proxy (:7186)   │────► qBittorrent (:7185)
-                          │                           │
-   http://localhost:7187  │  Merge Search Service     │
-   ──────────────────────►│  (FastAPI :7187)          │────► RuTracker / Kinozal / NNMClub / IPTorrents
-                          │                           │
-                          │  ┌─ download-proxy/src/ ─┐│
-                          │  │  api/    merge_service/ ││
-                          │  │  ui/     config/        ││
-                          │  └────────────────────────┘│
-                          └─────────────────────────┘
+                       ┌───────────────────────────────┐
+                       │       qbittorrent-proxy        │
+                       │      (python:3.12-alpine)      │
+  http://:7186 ────────┤                                 │
+   Download proxy      │  Download proxy (:7186) ────────┼──► qBittorrent (:7185)
+                       │                                 │
+  http://:7187 ────────┤  Merge search service (:7187)   │
+   Angular SPA +       │  ├── /api/v1/search + SSE       │
+   FastAPI             │  ├── /api/v1/bridge/health      │
+                       │  └── /api/v1/auth/...           │
+                       └───────────────────────────────┘
+                                     ▲
+  http://:7188 ── webui-bridge.py (host process) — private-tracker bridge
 
-   systemd user service:
-   webui-bridge  (:7188)  — auto-started, private tracker WebUI download support
+Opt-in (docker-compose.quality.yml):
+   http://:9000   SonarQube              profile: quality
+   http://:9090   Prometheus             profile: observability
+   http://:3000   Grafana                profile: observability
+   (run-once)     Snyk / Semgrep /
+                  Trivy / Gitleaks       profile: run-once
 ```
 
-Two containers via `docker-compose.yml` (both use `network_mode: host`):
+Full Mermaid renders in [`docs/architecture/`](docs/architecture/).
 
-| Service | Image | Ports | Purpose |
-|---------|-------|-------|---------|
-| **qbittorrent** | `lscr.io/linuxserver/qbittorrent:latest` | 7185 | The qBittorrent app |
-| **download-proxy** | `python:3.12-alpine` | 7186, 7187 | Download proxy + Merge Search API |
-
-Container runtime is auto-detected (podman preferred over docker).
-
-## Merge Search API
-
-The merge service runs inside `qbittorrent-proxy` on port **7187**.
-
-### Key Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/search` | Search across multiple trackers |
-| `GET` | `/api/v1/search/stream/{id}` | SSE stream of search results |
-| `POST` | `/api/v1/download` | Download via authenticated proxy |
-| `GET` | `/api/v1/downloads/active` | List active downloads |
-| `GET` | `/api/v1/hooks` | List configured hooks |
-| `POST` | `/api/v1/hooks` | Create a hook |
-| `DELETE` | `/api/v1/hooks` | Delete a hook |
-| `GET` | `/health` | Health check |
-| `GET` | `/api/v1/stats` | Service statistics |
-| `GET` | `/` | Dashboard UI (dark theme) |
-
-### How It Works
-
-1. **Search** — `POST /api/v1/search` dispatches queries to enabled trackers (RuTracker, Kinozal, NNMClub, etc.)
-2. **Deduplicate** — Tiered deduplication: exact hash → name+size → fuzzy similarity
-3. **Enrich** — Metadata from OMDb, TMDB, TVMaze, AniList, MusicBrainz, OpenLibrary
-4. **Quality Detect** — Automatically tags UHD 4K, Full HD, HD, SD
-5. **Stream** — Results delivered via SSE as each tracker responds
-6. **Download** — Authenticated tracker URLs intercepted, fetched with session cookies, uploaded as .torrent to qBittorrent
-
-## Plugin System
-
-### 35+ Plugins
-
-**Public Trackers (19):** The Pirate Bay, EZTV, Rutor, LimeTorrents, Solid Torrents, TorrentProject, torrents-csv, TorLock, Jackett, 1337x, YTS, TorrentGalaxy, RARBG Alt, ExtraTorrent, TorrentFunk, BTSOW, TorrentKitty, GamesTorrents, RockBox
-
-**Russian Trackers (6):** RuTracker (auth), Kinozal (auth), NNMClub (auth), MegaPeer, BitRu, PC-Torrents
-
-**Anime Trackers (4):** Nyaa, Tokyo Toshokan, AniLibra, Xfsub
-
-**Specialized (3):** AudioBook Bay, AcademicTorrents, LinuxTracker
-
-**Private (1):** IPTorrents (auth)
-
-### Managed Plugins (12)
-
-`install-plugin.sh` manages: `eztv jackett limetorrents piratebay solidtorrents torlock torrentproject torrentscsv rutracker rutor kinozal nnmclub`
-
-### Plugin Contract
-
-Each plugin is a Python class with:
-- Class attributes: `url`, `name`, `supported_categories`
-- `search(self, what, cat='all')` — outputs via `novaprinter.print()`
-- `download_torrent(self, url)` — returns magnet link or file path
+---
 
 ## Testing
 
 ```bash
-./run-all-tests.sh
-./test.sh --all
-python3 -m py_compile plugins/*.py
-python3 -m pytest tests/unit/merge_service/ tests/integration/test_merge_api.py -v --import-mode=importlib
+# Non-live-HTTP suites — run anywhere, ~10s
+python3 -m pytest tests/unit/ tests/e2e/ tests/contract/ --no-cov -q
+
+# Benchmarks — dedupe perf + live-HTTP fan-out benchmarks, ~4min
+python3 -m pytest tests/benchmark/ --no-cov -q
+
+# Security — hits the live merge service, needs stack up
+python3 -m pytest tests/security/ --no-cov -q
+
+# Integration — same
+python3 -m pytest tests/integration/ --no-cov -q -m "not requires_credentials"
+
+# Frontend
+npx --prefix frontend ng test --watch=false
+
+# Full scanner sweep (non-interactive; skips scanners with missing tokens)
+./scripts/scan.sh --all
 ```
 
-**119 tests passing** covering: HTML parsers, API endpoints, quality detection, deduplicator, hooks, validator, enricher.
-
-## What's Included
-
-```
-plugins/                          # 35+ tracker plugins
-├── eztv.py, piratebay.py, ...   # Individual tracker plugins
-├── helpers.py                    # Shared utilities (build_magnet_link, etc.)
-├── nova2.py                      # Search engine core
-├── novaprinter.py                # Output formatting
-├── socks.py                      # Proxy support
-├── download_proxy.py             # Download proxy server
-└── webui_compatible/             # WebUI variants for private trackers
-
-download-proxy/src/               # Merge Search Service source
-├── api/                          # FastAPI application
-│   ├── __init__.py               # App factory, lifespan, health, stats
-│   ├── routes.py                 # Search, download, streaming endpoints
-│   ├── hooks.py                  # Webhook CRUD with JSON persistence
-│   └── streaming.py              # SSE streaming support
-├── merge_service/                # Core business logic
-│   ├── search.py                 # SearchOrchestrator, data models
-│   ├── deduplicator.py           # Tiered dedup (hash, name+size, fuzzy)
-│   ├── enricher.py               # Metadata enrichment (OMDb, TMDB, etc.)
-│   ├── validator.py              # Tracker HTTP/UDP scrape validation
-│   ├── hooks.py                  # Hook execution engine
-│   └── scheduler.py              # Scheduled search with persistence
-├── config/                       # Configuration module
-└── ui/templates/dashboard.html   # Dark theme dashboard
-
-tests/
-├── unit/merge_service/           # Unit tests for merge service
-│   ├── test_html_parsers.py
-│   ├── test_quality_detection.py
-│   ├── test_deduplicator.py
-│   ├── test_hooks.py
-│   ├── test_validator.py
-│   └── test_enricher.py
-├── integration/
-│   └── test_merge_api.py
-└── ...                           # Plugin tests, e2e, UI automation
-```
-
-## Configuration
-
-### Environment Variables
-
-Edit `.env` (see `.env.example`):
-
-```bash
-RUTRACKER_USERNAME=your_username
-RUTRACKER_PASSWORD=your_password
-KINOZAL_USERNAME=your_username
-KINOZAL_PASSWORD=your_password
-NNMCLUB_COOKIES="uid=123456; pass=abc..."
-IPTORRENTS_USERNAME=your_username
-IPTORRENTS_PASSWORD=your_password
-QBITTORRENT_DATA_DIR=/mnt/DATA
-PUID=1000
-PGID=1000
-```
-
-## Scripts
-
-```bash
-./setup.sh                    # One-time setup
-./start.sh [-p] [-s] [-v]    # Start containers (-p pull images)
-./stop.sh [-r] [--purge]      # Stop (-r remove, --purge clean images)
-./install-plugin.sh --all     # Install 12 managed plugins
-./run-all-tests.sh            # Full test suite
-```
-
-## Troubleshooting
-
-```bash
-# Plugin not showing in WebUI
-./stop.sh -r && ./start.sh
-
-# Private tracker download fails
-python3 webui-bridge.py
-
-# Merge service not responding
-podman logs qbittorrent-proxy
-
-# Sync updated source to container
-podman cp download-proxy/src/. qbittorrent-proxy:/config/download-proxy/src/
-podman restart qbittorrent-proxy
-```
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [User Manual](docs/USER_MANUAL.md) | Complete usage guide |
-| [Plugin Status](PLUGIN_STATUS.md) | Compatibility matrix |
-| [Troubleshooting](docs/PLUGIN_TROUBLESHOOTING.md) | Debug guide |
-| [Fork Summary](FORK_SUMMARY.md) | Architecture & fixes |
-| [Changelog](CHANGELOG.md) | Version history |
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature-name`
-3. Make changes
-4. Run tests: `./run-all-tests.sh`
-5. Commit and push: `git push origin feature-name`
-6. Submit Pull Request
-
-## License
-
-Apache 2.0 — See [LICENSE](LICENSE)
+See [`docs/TESTING.md`](docs/TESTING.md) for the 30-row test-type catalogue.
 
 ---
 
-**Version**: 3.0.0
-**Last Updated**: April 2026
+## Releases
+
+Non-interactive builder at [`scripts/build-releases.sh`](scripts/build-releases.sh) produces artefacts under [`releases/<version>/`](releases/README.md):
+
+```bash
+./scripts/build-releases.sh              # all targets, all channels
+./scripts/build-releases.sh frontend     # one target
+./scripts/build-releases.sh --channel release
+```
+
+Each artefact ships with `SHA256SUMS` + `BUILD_INFO.json`.
+
+---
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the TDD protocol in [`CLAUDE.md`](CLAUDE.md). PRs must keep the following green:
+
+- Python unit + e2e + contract (`pytest` — 585+ tests)
+- Frontend Vitest (`ng test` — 182+ tests)
+- Ruff + bandit + shellcheck (via `scripts/scan.sh`)
+
+---
+
+## License
+
+Apache 2.0 — see [`LICENSE`](LICENSE).
