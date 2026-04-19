@@ -67,6 +67,13 @@ class SearchResponse(BaseModel):
         default_factory=list,
         description="Per-tracker error strings (e.g. 'rutracker: HTTP 503')",
     )
+    tracker_stats: List[dict] = Field(
+        default_factory=list,
+        description=(
+            "Per-tracker run-time diagnostics (status, result count, "
+            "timings, error details, authentication flag)."
+        ),
+    )
     started_at: str
     completed_at: Optional[str] = None
 
@@ -201,6 +208,7 @@ async def search(request: SearchRequest, req: Request):
         total_results=0,
         merged_results=0,
         trackers_searched=metadata.trackers_searched,
+        tracker_stats=metadata.to_dict()["tracker_stats"],
         started_at=metadata.started_at.isoformat(),
         completed_at=None,
     )
@@ -306,6 +314,7 @@ async def search_sync(request: SearchRequest, req: Request):
                 "merged_results": 0,
                 "trackers_searched": metadata.trackers_searched,
                 "errors": metadata.errors,
+                "tracker_stats": metadata.to_dict()["tracker_stats"],
                 "message": "RuTracker requires CAPTCHA. Use /api/v1/auth/rutracker/captcha to solve it.",
                 "started_at": metadata.started_at.isoformat(),
                 "completed_at": metadata.completed_at.isoformat() if metadata.completed_at else None,
@@ -321,6 +330,7 @@ async def search_sync(request: SearchRequest, req: Request):
         merged_results=len(merged),
         trackers_searched=metadata.trackers_searched,
         errors=metadata.errors,
+        tracker_stats=metadata.to_dict()["tracker_stats"],
         started_at=metadata.started_at.isoformat(),
         completed_at=metadata.completed_at.isoformat() if metadata.completed_at else None,
     )
@@ -381,6 +391,7 @@ async def get_search(search_id: str, req: Request):
         merged_results=metadata.merged_results,
         trackers_searched=metadata.trackers_searched,
         errors=metadata.errors,
+        tracker_stats=metadata.to_dict()["tracker_stats"],
         started_at=metadata.started_at.isoformat(),
         completed_at=metadata.completed_at.isoformat() if metadata.completed_at else None,
     )

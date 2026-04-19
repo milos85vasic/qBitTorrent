@@ -147,6 +147,52 @@ class MergedResult:
 
 
 @dataclass
+class TrackerSearchStat:
+    """Per-tracker run-time diagnostics for a single search.
+
+    Exposed over the HTTP API (``SearchResponse.tracker_stats``) and
+    streamed via SSE events (``tracker_started`` / ``tracker_completed``)
+    so the dashboard can render a live chip bar above the results table.
+    """
+
+    name: str
+    tracker_url: str = ""
+    status: str = "pending"  # pending | running | success | empty | error | timeout | cancelled
+    results_count: int = 0
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    duration_ms: Optional[int] = None
+    error: Optional[str] = None
+    error_type: Optional[str] = None
+    authenticated: bool = False
+    attempt: int = 1
+    http_status: Optional[int] = None  # when available from the plugin
+    category: str = "all"
+    query: str = ""
+    # Free-form notes for future diagnostics the plugin wants to surface.
+    notes: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "tracker_url": self.tracker_url,
+            "status": self.status,
+            "results_count": self.results_count,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "duration_ms": self.duration_ms,
+            "error": self.error,
+            "error_type": self.error_type,
+            "authenticated": self.authenticated,
+            "attempt": self.attempt,
+            "http_status": self.http_status,
+            "category": self.category,
+            "query": self.query,
+            "notes": self.notes,
+        }
+
+
+@dataclass
 class SearchMetadata:
     search_id: str
     query: str
@@ -158,6 +204,7 @@ class SearchMetadata:
     trackers_searched: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
     status: str = "running"
+    tracker_stats: Dict[str, "TrackerSearchStat"] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -171,6 +218,10 @@ class SearchMetadata:
             "trackers_searched": self.trackers_searched,
             "errors": self.errors,
             "status": self.status,
+            "tracker_stats": [
+                s.to_dict()
+                for s in sorted(self.tracker_stats.values(), key=lambda s: s.name)
+            ],
         }
 
 
@@ -309,6 +360,24 @@ class SearchOrchestrator:
         search_id = str(uuid.uuid4())
         metadata = SearchMetadata(search_id=search_id, query=query, category=category)
         metadata.status = "running"
+        # Seed tracker_stats synchronously so the POST /search response
+        # — which returns before the fan-out starts — can already tell
+        # the dashboard which trackers will be hit.
+        try:
+            trackers = self._get_enabled_trackers()
+            metadata.trackers_searched = [t.name for t in trackers]
+            for t in trackers:
+                metadata.tracker_stats[t.name] = TrackerSearchStat(
+                    name=t.name,
+                    tracker_url=t.url,
+                    status="pending",
+                    query=query,
+                    category=category,
+                    authenticated=self._is_tracker_authenticated(t.name),
+                )
+        except Exception:
+            # Never let a tracker-enumeration failure block search start.
+            pass
         self._active_searches[search_id] = metadata
         self._tracker_results[search_id] = {}
         # Seed a mutable placeholder so SSE clients can read partial
@@ -332,6 +401,7 @@ class SearchOrchestrator:
         """
         import asyncio
         import logging
+        import time as _time
 
         logger = logging.getLogger(__name__)
         metadata = self._active_searches.get(search_id)
@@ -341,8 +411,38 @@ class SearchOrchestrator:
         try:
             trackers = self._get_enabled_trackers()
             metadata.trackers_searched = [t.name for t in trackers]
+            # ``start_search`` may have already seeded tracker_stats so
+            # the POST /search response is accurate before the fan-out
+            # begins.  Only backfill any that are missing — never
+            # overwrite, so the pending→running transition the SSE
+            # streamer watches for remains observable.
+            for t in trackers:
+                if t.name not in metadata.tracker_stats:
+                    metadata.tracker_stats[t.name] = TrackerSearchStat(
+                        name=t.name,
+                        tracker_url=t.url,
+                        status="pending",
+                        query=query,
+                        category=category,
+                        authenticated=self._is_tracker_authenticated(t.name),
+                    )
 
             async def _search_one(tracker):
+                stat = metadata.tracker_stats.get(tracker.name)
+                if stat is None:
+                    # Defensive: always have a stat to mutate.
+                    stat = TrackerSearchStat(
+                        name=tracker.name,
+                        tracker_url=tracker.url,
+                        status="pending",
+                        query=query,
+                        category=category,
+                        authenticated=self._is_tracker_authenticated(tracker.name),
+                    )
+                    metadata.tracker_stats[tracker.name] = stat
+                stat.status = "running"
+                stat.started_at = datetime.now(timezone.utc)
+                t0 = _time.perf_counter()
                 try:
                     results = await self._search_tracker(tracker, query, category)
                     logger.info(f"Tracker {tracker.name}: {len(results)} results for '{query}'")
@@ -350,10 +450,24 @@ class SearchOrchestrator:
                     self._tracker_results[search_id][tracker.name] = results
                     # Bump running totals for SSE results_update event.
                     metadata.total_results += len(results)
+                    stat.results_count = len(results)
+                    stat.status = "success" if results else "empty"
                     return tracker.name, results, None
+                except asyncio.TimeoutError as e:
+                    stat.status = "timeout"
+                    stat.error = str(e) or "timeout"
+                    stat.error_type = "TimeoutError"
+                    logger.error(f"Tracker {tracker.name} timeout: {e}")
+                    return tracker.name, [], "timeout"
                 except Exception as e:
+                    stat.status = "error"
+                    stat.error = str(e)
+                    stat.error_type = e.__class__.__name__
                     logger.error(f"Tracker {tracker.name} error: {e}")
                     return tracker.name, [], str(e)
+                finally:
+                    stat.completed_at = datetime.now(timezone.utc)
+                    stat.duration_ms = int((_time.perf_counter() - t0) * 1000)
 
             semaphore = asyncio.Semaphore(self._max_concurrent_trackers)
 
@@ -405,6 +519,29 @@ class SearchOrchestrator:
         metadata.total_results = 0
         await self._run_search(metadata.search_id, query, category)
         return metadata
+
+    def _is_tracker_authenticated(self, name: str) -> bool:
+        """Return True when the tracker has credentials/session available.
+
+        Public trackers always report False.  For the four private
+        trackers we first consult ``_tracker_sessions`` (populated after
+        a successful login during a search) and fall back to env-var
+        presence so the first search still reports an accurate chip
+        state before any login round-trip has completed.
+        """
+        import os
+
+        if name in self._tracker_sessions:
+            return True
+        if name == "rutracker":
+            return bool(os.getenv("RUTRACKER_USERNAME") and os.getenv("RUTRACKER_PASSWORD"))
+        if name == "kinozal":
+            return bool(os.getenv("KINOZAL_USERNAME") and os.getenv("KINOZAL_PASSWORD"))
+        if name == "nnmclub":
+            return bool(os.getenv("NNMCLUB_COOKIES"))
+        if name == "iptorrents":
+            return bool(os.getenv("IPTORRENTS_USERNAME") and os.getenv("IPTORRENTS_PASSWORD"))
+        return False
 
     def _get_enabled_trackers(self) -> List[TrackerSource]:
         import os
