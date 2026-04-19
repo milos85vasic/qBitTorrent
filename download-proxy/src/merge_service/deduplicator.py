@@ -61,8 +61,13 @@ class Deduplicator:
         self._merged_groups = []
         unmatched = list(results)
 
-        # Sort by seed count (higher seeds = more likely to be canonical)
-        unmatched.sort(key=lambda r: r.seeds, reverse=True)
+        # Sort by seed count (higher seeds = more likely to be canonical),
+        # with deterministic tie-breakers on (link, name) so the grouping
+        # is order-independent — Python's sort is stable, so without a
+        # tie-breaker, items with equal seed counts preserve their input
+        # order and drive different merge-group seeds depending on caller
+        # order. Property test `test_merge_is_order_invariant` guards this.
+        unmatched.sort(key=lambda r: (-r.seeds, r.link or "", r.name or ""))
 
         while unmatched:
             # Take the first unmatched result as the seed for a new group
