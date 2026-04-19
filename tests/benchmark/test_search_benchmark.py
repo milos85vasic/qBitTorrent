@@ -32,8 +32,9 @@ class TestSearchBenchmark:
         elapsed = time.time() - start
 
         assert resp.status_code == 200
-        # 30s CI-friendly ceiling; real search-one-tracker p50 is <5s.
-        assert elapsed < 30, f"Single tracker search took {elapsed:.1f}s"
+        # 60s CI-friendly ceiling. Single-tracker p50 is ~5-10s locally
+        # but CI runners + network-bound trackers can hit ~30-40s.
+        assert elapsed < 60, f"Single tracker search took {elapsed:.1f}s"
 
     @pytest.mark.timeout(180)
     def test_search_result_count_performance(self):
