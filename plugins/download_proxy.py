@@ -14,6 +14,8 @@ docs/CROSS_APP_THEME_PLAN.md.
 import sys
 import os
 import json
+import gzip
+import zlib
 import urllib.request
 import urllib.parse
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -537,8 +539,92 @@ _THEME_HEAD_TAGS = (
 _HEAD_CLOSE_RE = re.compile(rb"</head\s*>", re.IGNORECASE)
 
 
+def _merge_service_origin() -> str:
+    """Return the origin of the merge service for CSP whitelisting.
+
+    qBittorrent ships a strict CSP header (``default-src 'self'; ...``)
+    that, without the ``connect-src`` directive, blocks the bridge's
+    ``fetch('/api/v1/theme')`` + ``EventSource(...)`` calls cross-origin.
+    We whitelist the merge-service origin in the CSP the browser sees.
+    """
+    from urllib.parse import urlparse
+
+    parsed = urlparse(MERGE_SERVICE_URL)
+    scheme = parsed.scheme or "http"
+    host = parsed.hostname or "localhost"
+    port = parsed.port or (443 if scheme == "https" else 7187)
+    return f"{scheme}://{host}:{port}"
+
+
+MERGE_SERVICE_ORIGIN = _merge_service_origin()
+
+
+_CSP_DIRECTIVE_RE = re.compile(r"\s*([^;\s]+)(?:\s+([^;]*))?\s*;?", re.I)
+
+
+def rewrite_csp(header_value: str) -> str:
+    """Relax qBittorrent's Content-Security-Policy so the theme bridge
+    can talk to the merge service.
+
+    Adds the merge-service origin to ``connect-src`` (creating the
+    directive if qBittorrent didn't set one). Idempotent. If the input
+    is blank, returns it unchanged.
+    """
+    if not header_value or _theme_injection_disabled():
+        return header_value
+    origin = MERGE_SERVICE_ORIGIN
+    directives: list[tuple[str, str]] = []
+    for part in header_value.split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        name, _, rest = part.partition(" ")
+        directives.append((name.lower(), rest.strip()))
+
+    seen_connect = False
+    new_directives: list[tuple[str, str]] = []
+    for name, value in directives:
+        if name == "connect-src":
+            seen_connect = True
+            if origin not in value.split():
+                value = (value + " " + origin).strip()
+        new_directives.append((name, value))
+    if not seen_connect:
+        # Fall back to default-src if present, extended with our origin.
+        default_src = next((v for n, v in directives if n == "default-src"), "'self'")
+        if origin not in default_src.split():
+            default_src = (default_src + " " + origin).strip()
+        new_directives.append(("connect-src", default_src))
+    return "; ".join(f"{n} {v}".strip() for n, v in new_directives)
+
+
 def _theme_injection_disabled() -> bool:
     return os.environ.get("DISABLE_THEME_INJECTION") == "1"
+
+
+def _maybe_decode_body(body: bytes, content_encoding: str) -> tuple[bytes, bool]:
+    """Return (decoded_bytes, decoded_flag).
+
+    ``decoded_flag`` is True only when we successfully turned a gzip /
+    deflate payload back into plain text so the injector can mutate
+    it. Anything we can't decode (br, zstd, unknown) is returned as
+    the original bytes with the flag False — the caller should then
+    skip the rewrite and pass the response through untouched.
+    """
+    if not content_encoding:
+        return body, True
+    enc = content_encoding.lower().strip()
+    try:
+        if enc == "gzip":
+            return gzip.decompress(body), True
+        if enc == "deflate":
+            try:
+                return zlib.decompress(body), True
+            except zlib.error:
+                return zlib.decompress(body, -zlib.MAX_WBITS), True
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.debug(f"could not decompress {enc}: {exc}")
+    return body, False
 
 
 def inject_theme_assets(body: bytes, content_type: str) -> bytes:
@@ -705,18 +791,38 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
             with urllib.request.urlopen(req, timeout=30) as response:
                 content_type = response.headers.get("Content-Type", "") or ""
+                content_encoding = (response.headers.get("Content-Encoding") or "").lower().strip()
                 content = response.read()
 
                 # Inject the theme bridge into HTML responses so the
                 # qBittorrent WebUI picks up the dashboard's palette.
-                if content_type.lower().startswith("text/html"):
-                    content = inject_theme_assets(content, content_type)
+                is_html = content_type.lower().startswith("text/html")
+                decoded_for_injection = False
+                if is_html:
+                    decoded, decoded_for_injection = _maybe_decode_body(content, content_encoding)
+                    if decoded_for_injection:
+                        new_decoded = inject_theme_assets(decoded, content_type)
+                        if new_decoded is not decoded:
+                            # Serve the response un-encoded so the browser
+                            # doesn't misinterpret our plain-text insertion.
+                            content = new_decoded
+                            content_encoding = ""
+                    else:
+                        content = inject_theme_assets(content, content_type)
 
                 self.send_response(response.status)
                 for header, value in response.headers.items():
                     h = header.lower()
                     if h in ("transfer-encoding", "content-length"):
                         continue
+                    # Drop Content-Encoding if we rewrote the body in place.
+                    if h == "content-encoding" and is_html and decoded_for_injection and not content_encoding:
+                        continue
+                    # Relax qBittorrent's CSP so the injected bridge
+                    # can fetch + stream from the merge service on
+                    # :7187 without being blocked by connect-src.
+                    if is_html and h == "content-security-policy":
+                        value = rewrite_csp(value)
                     self.send_header(header, value)
                 self.send_header("Content-Length", str(len(content)))
                 self.end_headers()

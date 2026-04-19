@@ -176,3 +176,86 @@ def test_routes_return_css_and_js_no_cache(dp, tmp_path):
 
 def test_serve_theme_asset_returns_404_for_unknown(dp):
     assert dp.serve_theme_asset("/__qbit_theme__/something-else.png")[0] == 404
+
+
+def test_csp_rewrite_adds_merge_origin_to_connect_src(dp):
+    """qBittorrent's CSP has no connect-src directive, so the browser
+    falls back to default-src 'self' and blocks cross-origin fetch +
+    EventSource. The proxy layer must inject connect-src with the
+    merge-service origin."""
+    original = (
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; script-src 'self' 'unsafe-inline'; "
+        "object-src 'none'; form-action 'self'; "
+        "frame-src 'self' blob:; frame-ancestors 'self';"
+    )
+    rewritten = dp.rewrite_csp(original)
+    assert "connect-src" in rewritten
+    assert dp.MERGE_SERVICE_ORIGIN in rewritten
+    # Other directives preserved.
+    assert "default-src" in rewritten
+    assert "script-src" in rewritten
+    assert "frame-ancestors" in rewritten
+
+
+def test_csp_rewrite_is_idempotent(dp):
+    original = (
+        "default-src 'self'; connect-src 'self' " + dp.MERGE_SERVICE_ORIGIN + ";"
+    )
+    assert dp.rewrite_csp(original).count(dp.MERGE_SERVICE_ORIGIN) == 1
+
+
+def test_csp_rewrite_extends_existing_connect_src(dp):
+    original = "default-src 'self'; connect-src 'self' https://other.example;"
+    rewritten = dp.rewrite_csp(original)
+    assert "https://other.example" in rewritten
+    assert dp.MERGE_SERVICE_ORIGIN in rewritten
+
+
+def test_csp_rewrite_honours_disable_flag(dp, monkeypatch):
+    monkeypatch.setenv("DISABLE_THEME_INJECTION", "1")
+    header = "default-src 'self'; connect-src 'self';"
+    assert dp.rewrite_csp(header) == header
+
+
+def test_csp_rewrite_passes_empty_through(dp):
+    assert dp.rewrite_csp("") == ""
+    assert dp.rewrite_csp(None) is None
+
+
+def test_body_gzip_is_decompressed_for_injection(dp):
+    """qBittorrent returns gzip-encoded HTML when the browser sends
+    Accept-Encoding: gzip. The injector needs to see plain text, so
+    the proxy must decompress first. We test the helper directly."""
+    import gzip as _gzip
+    decoded, flag = dp._maybe_decode_body(_gzip.compress(SAMPLE_HTML), "gzip")
+    assert flag is True
+    assert decoded == SAMPLE_HTML
+
+
+def test_body_deflate_is_decompressed(dp):
+    import zlib as _zlib
+    decoded, flag = dp._maybe_decode_body(_zlib.compress(SAMPLE_HTML), "deflate")
+    assert flag is True
+    assert decoded == SAMPLE_HTML
+
+
+def test_body_raw_deflate_is_decompressed(dp):
+    import zlib as _zlib
+    # Raw deflate (no zlib header).
+    compressor = _zlib.compressobj(wbits=-_zlib.MAX_WBITS)
+    raw = compressor.compress(SAMPLE_HTML) + compressor.flush()
+    decoded, flag = dp._maybe_decode_body(raw, "deflate")
+    assert flag is True
+    assert decoded == SAMPLE_HTML
+
+
+def test_body_unknown_encoding_flags_false(dp):
+    decoded, flag = dp._maybe_decode_body(b"\x00\x01\x02", "br")
+    assert flag is False
+
+
+def test_body_no_encoding_flags_true(dp):
+    decoded, flag = dp._maybe_decode_body(SAMPLE_HTML, "")
+    assert flag is True
+    assert decoded == SAMPLE_HTML
