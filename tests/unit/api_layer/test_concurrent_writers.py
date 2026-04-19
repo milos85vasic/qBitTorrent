@@ -32,10 +32,43 @@ if _SRC_PATH not in sys.path:
     sys.path.insert(0, _SRC_PATH)
 
 
-def _reimport_hooks(env=None):
+@pytest.fixture(autouse=True)
+def _restore_api_modules():
+    """Restore the `api.*` module graph after every test.
+
+    Each ``_reimport_*`` helper below stubs the ``api`` package so that
+    importing ``api.hooks`` / ``api.streaming`` does NOT trigger the real
+    ``api/__init__.py`` (which spins up FastAPI). Without this fixture
+    that stub would leak into later tests, replacing the real ``api``
+    package with a bare module and breaking every ``from api.X import Y``
+    that comes after — hence the cross-suite pollution we used to see.
+    """
+    saved = {k: v for k, v in sys.modules.items() if k == "api" or k.startswith("api.")}
+    try:
+        yield
+    finally:
+        for k in [k for k in list(sys.modules) if k == "api" or k.startswith("api.")]:
+            del sys.modules[k]
+        sys.modules.update(saved)
+
+
+def _install_fake_api_package() -> None:
+    """Install a namespace-package-shaped ``api`` module.
+
+    Giving the stub a ``__path__`` means Python's import machinery still
+    treats ``api`` as a *package* (so ``from api.routes import X`` works
+    if something later needs it), while ``api/__init__.py`` is never
+    executed — avoiding FastAPI startup during unit tests.
+    """
     for k in [k for k in list(sys.modules) if k == "api" or k.startswith("api.")]:
         del sys.modules[k]
-    sys.modules.setdefault("api", type(sys)("api"))
+    fake_api = type(sys)("api")
+    fake_api.__path__ = [os.path.join(_SRC_PATH, "api")]  # type: ignore[attr-defined]
+    sys.modules["api"] = fake_api
+
+
+def _reimport_hooks(env=None):
+    _install_fake_api_package()
     spec = importlib.util.spec_from_file_location(
         "api.hooks", os.path.join(_SRC_PATH, "api", "hooks.py")
     )
@@ -46,9 +79,7 @@ def _reimport_hooks(env=None):
 
 
 def _reimport_streaming():
-    for k in [k for k in list(sys.modules) if k == "api" or k.startswith("api.")]:
-        del sys.modules[k]
-    sys.modules.setdefault("api", type(sys)("api"))
+    _install_fake_api_package()
     spec = importlib.util.spec_from_file_location(
         "api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py")
     )

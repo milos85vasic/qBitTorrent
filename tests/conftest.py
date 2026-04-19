@@ -14,9 +14,38 @@ docs/superpowers/plans/2026-04-19-completion-initiative.md Phase 0.3.
 from __future__ import annotations
 
 import os
+import sys
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+
+
+_POLLUTING_ROOTS = ("api", "merge_service", "config")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_download_proxy_modules():
+    """Keep each test's ``sys.modules`` scribbles from leaking into the next.
+
+    Several pre-existing test files install throw-away stub packages for
+    ``api`` and ``merge_service`` (so they can import leaf modules without
+    executing ``api/__init__.py``, which boots FastAPI). If those stubs
+    leak into the next test, any subsequent ``from api.routes import X``
+    fails with ``'api' is not a package``. This autouse fixture snapshots
+    the relevant entries before the test runs and restores them after.
+    """
+    saved = {
+        k: v
+        for k, v in sys.modules.items()
+        if k in _POLLUTING_ROOTS or any(k.startswith(root + ".") for root in _POLLUTING_ROOTS)
+    }
+    try:
+        yield
+    finally:
+        for k in list(sys.modules):
+            if k in _POLLUTING_ROOTS or any(k.startswith(root + ".") for root in _POLLUTING_ROOTS):
+                del sys.modules[k]
+        sys.modules.update(saved)
 
 # Re-export live-service fixtures so that tests can request them by name
 # from any conftest without an explicit import.

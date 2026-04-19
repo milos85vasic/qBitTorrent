@@ -30,10 +30,28 @@ if _SRC_PATH not in sys.path:
     sys.path.insert(0, _SRC_PATH)
 
 
+@pytest.fixture(autouse=True)
+def _restore_api_modules():
+    """Restore the real ``api.*`` module graph after every test.
+
+    See test_concurrent_writers.py for the rationale — the same
+    sys.modules isolation applies here.
+    """
+    saved = {k: v for k, v in sys.modules.items() if k == "api" or k.startswith("api.")}
+    try:
+        yield
+    finally:
+        for k in [k for k in list(sys.modules) if k == "api" or k.startswith("api.")]:
+            del sys.modules[k]
+        sys.modules.update(saved)
+
+
 def _reimport_streaming():
     for k in [k for k in list(sys.modules) if k == "api" or k.startswith("api.")]:
         del sys.modules[k]
-    sys.modules.setdefault("api", type(sys)("api"))
+    fake_api = type(sys)("api")
+    fake_api.__path__ = [os.path.join(_SRC_PATH, "api")]  # type: ignore[attr-defined]
+    sys.modules["api"] = fake_api
     spec = importlib.util.spec_from_file_location(
         "api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py")
     )
