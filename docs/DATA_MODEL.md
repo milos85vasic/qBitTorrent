@@ -125,6 +125,38 @@ is `completed` or `failed`.
 | `trackers_searched` | `List[str]` | Tracker names that were attempted |
 | `errors` | `List[str]` | `"<tracker>: <message>"` strings |
 | `status` | `str` | `"running"`, `"completed"`, `"failed"` |
+| `tracker_stats` | `Dict[str, TrackerSearchStat]` | Per-tracker run-time diagnostics; serialised as a sorted list in `to_dict()` |
+
+### `TrackerSearchStat`
+
+File: `search.py:~150`
+
+Lifecycle: one instance per enabled tracker, created synchronously in
+`SearchOrchestrator.start_search()` (so the first HTTP response already
+lists every tracker that will be hit) and mutated in place by
+`_run_search()` as the tracker transitions
+`pending → running → success | empty | error | timeout | cancelled`.
+Exposed through `SearchResponse.tracker_stats` on all three search
+endpoints and streamed via SSE as `tracker_started` (pending→running)
+and `tracker_completed` (any terminal flip) events.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | `str` | Tracker identifier (e.g. `"rutracker"`) |
+| `tracker_url` | `str` | Base URL of the tracker |
+| `status` | `str` | `"pending"`, `"running"`, `"success"`, `"empty"`, `"error"`, `"timeout"`, `"cancelled"` |
+| `results_count` | `int` | Raw row count for this tracker's run |
+| `started_at` | `Optional[datetime]` | UTC; set on pending→running |
+| `completed_at` | `Optional[datetime]` | UTC; set on terminal flip |
+| `duration_ms` | `Optional[int]` | Wall-clock milliseconds |
+| `error` | `Optional[str]` | Exception message, when `status == "error" \| "timeout"` |
+| `error_type` | `Optional[str]` | Exception class name (`"RuntimeError"`, `"TimeoutError"`, …) |
+| `authenticated` | `bool` | `True` when a cached session exists or credentials env-vars are set |
+| `attempt` | `int` | Retry counter (currently always 1; reserved for future retries) |
+| `http_status` | `Optional[int]` | HTTP status from the plugin when surfaced |
+| `category` | `str` | The `category` filter value used for this run |
+| `query` | `str` | The user query |
+| `notes` | `Dict[str, Any]` | Free-form diagnostics a plugin can stash for the dashboard dialog |
 
 ### `SearchResult`
 

@@ -110,6 +110,27 @@ The CLAUDE.md critical constraint is non-negotiable:
 - **Single-file** — `./test.sh --plugin <name>` or
   `./test.sh --full`
 
+## Per-tracker search stats
+
+Tests that cover `TrackerSearchStat` and the `tracker_started` /
+`tracker_completed` SSE events live across four suites:
+
+| Test file | Type | What it pins |
+|---|---|---|
+| `tests/unit/merge_service/test_tracker_stats.py` | Unit | `TrackerSearchStat` defaults, status transitions (pending → running → success / empty / error / timeout), `duration_ms` bookkeeping, auth-flag provenance, and sorted `to_dict()` serialisation. |
+| `tests/unit/api_layer/test_tracker_stats_sse.py` | Unit (streaming) | The SSE poll loop emits `tracker_started` exactly once on pending→running and `tracker_completed` exactly once per terminal flip; gracefully degrades when metadata predates `tracker_stats`. |
+| `tests/property/test_tracker_stats_properties.py` | Property (Hypothesis) | sum of `results_count` == `total_results`, every completed stat has `duration_ms >= 0`, `set(tracker_stats keys) == set(trackers_searched)`, failed trackers retain `error_type` + `error`. |
+| `tests/contract/test_tracker_stats_contract.py` | Contract | `POST /api/v1/search`, `POST /api/v1/search/sync`, and `GET /api/v1/search/{id}` all expose the 15-field `tracker_stats` payload on `SearchResponse`. |
+
+The frontend dialog + chip bar are covered by
+`frontend/src/app/components/tracker-stat-dialog/tracker-stat-dialog.component.spec.ts`
+and the `tracker stats bar` describe block in
+`frontend/src/app/components/dashboard/dashboard.component.spec.ts`.
+
+Whenever the `TrackerSearchStat` shape changes, run
+`./scripts/freeze-openapi.sh` to refresh `docs/api/openapi.json` so
+the contract test `test_frozen_and_live_have_same_schemas` stays green.
+
 ## Gotchas
 
 - `pytest` needs `--import-mode=importlib` for the merge service —
