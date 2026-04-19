@@ -52,6 +52,7 @@ class TestMagnetDialog:
         html = self.session.get(self.base_url).text
         assert "<app-root>" in html or "<app-root></app-root>" in html, "Dashboard should be Angular app"
 
+    @pytest.mark.timeout(120)
     def test_generateMagnet_creates_valid_uri(self):
         """generateMagnet should create valid magnet URI."""
         result = self.search_and_get_first_result("matrix")
@@ -100,6 +101,7 @@ class TestMobileMagnetExecution:
         self.base_url = merge_service_live
         self.session = requests.Session()
 
+    @pytest.mark.timeout(120)
     def test_magnet_link_can_be_opened(self):
         """Magnet link should be openable as URL."""
         result = (

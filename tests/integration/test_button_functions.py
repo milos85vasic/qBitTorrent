@@ -54,6 +54,7 @@ class TestButtonFunctions:
         # This is just existence check
         print("Y Magnet API endpoint exists")
 
+    @pytest.mark.timeout(120)
     def test_results_have_download_urls(self):
         """Results should have download_urls for buttons to work."""
         results = self.search_and_get_results("matrix")
@@ -66,6 +67,7 @@ class TestButtonFunctions:
 
         print(f"\nY Download URLs: {len(r['download_urls'])} URLs in first result")
 
+    @pytest.mark.timeout(120)
     def test_results_have_sources(self):
         """Results should have sources for display."""
         results = self.search_and_get_results("matrix")

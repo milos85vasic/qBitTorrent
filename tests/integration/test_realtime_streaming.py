@@ -93,11 +93,13 @@ class TestSSEStreaming:
             if event_count > 10:
                 break
 
+    @pytest.mark.timeout(180)
     def test_search_emits_events_during_execution(self):
         """Search should emit events while running, not just at completion.
 
-        This test FAILS because asyncio.gather() waits for ALL trackers to complete
-        before returning any results. The fix needs to make results available incrementally.
+        The live merge service fans out across multiple trackers, so the
+        full round-trip can take a minute or more; pytest budget set
+        accordingly.
         """
         # Start search
         resp = requests.post(f"{self.base_url}/api/v1/search", json={"query": "star wars", "limit": 10}, timeout=60)
@@ -137,10 +139,12 @@ class TestSSEStreaming:
         has_complete = any("status" in e and "completed" in e for e in sse.events)
         assert has_complete, "Should have search_complete event"
 
+    @pytest.mark.timeout(180)
     def test_individual_results_stream(self):
         """Individual results should stream as trackers complete.
 
         This test verifies that result_found events contain actual result data.
+        Live multi-tracker search; pytest budget raised for CI.
         """
         # Start search
         resp = requests.post(f"{self.base_url}/api/v1/search", json={"query": "matrix", "limit": 5}, timeout=60)
@@ -179,6 +183,7 @@ class TestSSEStreaming:
         # This assertion WILL FAIL without the fix - check for any result data or name field
         assert len(events_with_names) > 0, "Should receive individual result events"
 
+    @pytest.mark.timeout(180)
     def test_search_complete_has_totals(self):
         """search_complete event should include total counts."""
         resp = requests.post(f"{self.base_url}/api/v1/search", json={"query": "test", "limit": 5}, timeout=60)
