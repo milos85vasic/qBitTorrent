@@ -78,6 +78,12 @@ class SSEHandler:
 
         last_count = 0
         seen_hashes = set()
+        # Per-tracker status diff — lets us emit ``tracker_started`` /
+        # ``tracker_completed`` events whenever a stat flips between
+        # poll iterations.  Keyed by tracker name; value is the last
+        # observed status string.
+        last_tracker_status: Dict[str, str] = {}
+        _TERMINAL_STATUSES = {"success", "empty", "error", "timeout", "cancelled"}
 
         async def _client_gone() -> bool:
             if request is None:
@@ -106,6 +112,36 @@ class SSEHandler:
                     event_id=search_id,
                 )
                 break
+
+            # Emit per-tracker stat transition events.  We diff against
+            # the last observed status per tracker so each flip fires
+            # exactly once.  tracker_started covers pending → running;
+            # tracker_completed covers any flip to a terminal status.
+            try:
+                tracker_stats = getattr(metadata, "tracker_stats", {}) or {}
+                for tname, stat in tracker_stats.items():
+                    prev = last_tracker_status.get(tname)
+                    cur = getattr(stat, "status", None)
+                    if cur is None or cur == prev:
+                        continue
+                    to_dict = getattr(stat, "to_dict", None)
+                    payload = to_dict() if callable(to_dict) else {"name": tname, "status": cur}
+                    if cur == "running":
+                        yield SSEHandler.format_event(
+                            event="tracker_started",
+                            data=payload,
+                            event_id=search_id,
+                        )
+                    elif cur in _TERMINAL_STATUSES:
+                        yield SSEHandler.format_event(
+                            event="tracker_completed",
+                            data=payload,
+                            event_id=search_id,
+                        )
+                    last_tracker_status[tname] = cur
+            except Exception as _e:  # noqa: BLE001
+                # Never let a diagnostics-emit failure kill the stream.
+                pass
 
             # Check if search completed
             if metadata.status in ("completed", "failed"):
