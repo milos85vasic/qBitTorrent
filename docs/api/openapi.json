@@ -345,6 +345,15 @@
             "title": "Total Results",
             "type": "integer"
           },
+          "tracker_stats": {
+            "description": "Per-tracker run-time diagnostics (status, result count, timings, error details, authentication flag).",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Tracker Stats",
+            "type": "array"
+          },
           "trackers_searched": {
             "items": {
               "type": "string"
