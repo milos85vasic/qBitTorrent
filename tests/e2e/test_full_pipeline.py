@@ -89,11 +89,16 @@ class TestFullPipeline:
     @pytest.mark.asyncio
     async def test_search_orchestrator_initializes(self):
         """Test that search orchestrator initializes correctly."""
+        from collections.abc import MutableMapping
+
         orch = SearchOrchestrator()
 
         assert orch.deduplicator is not None
         assert orch.validator is not None
-        assert isinstance(orch._active_searches, dict)
+        # Phase 3 replaced the unbounded dict with a cachetools.TTLCache
+        # (bounded + self-expiring). It still satisfies the mapping
+        # contract and supports the same [] / in / __setitem__ usage.
+        assert isinstance(orch._active_searches, MutableMapping)
 
     @pytest.mark.asyncio
     async def test_search_metadata_creation(self):
