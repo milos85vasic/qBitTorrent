@@ -127,6 +127,22 @@ The frontend dialog + chip bar are covered by
 and the `tracker stats bar` describe block in
 `frontend/src/app/components/dashboard/dashboard.component.spec.ts`.
 
+## Runtime theme (palette system)
+
+The runtime-switchable palette system (see
+[`docs/DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)) is guarded by a four-tier
+test bundle — every tier asserts *observable* state (DOM, CSS
+variables, localStorage, Playwright computed style) per the
+"no false positives" mandate:
+
+| Test file | Type | What it pins |
+|---|---|---|
+| `tests/unit/test_palette_catalog.py` | Unit (parametric) | Every palette has both variants, every one of the 15 tokens is a valid CSS colour, ids are unique, `DEFAULT_PALETTE_ID` resolves, Darcula accent is `#9d001e`. Per-palette parametrisation names the offender. |
+| `tests/unit/test_theme_wiring.py` | Unit (integration) | `:root` fallback block covers every token; dashboard SCSS uses `var(--color-*)` instead of `$accent`/`$bg-*` Sass variables; dashboard template includes `<app-theme-picker>`; `TOKEN_CSS_VAR` map covers every var. |
+| `frontend/src/app/services/theme.service.spec.ts` | Unit (Vitest) | System-dark detection, stored-state hydration, unknown-id fallback, `setPalette` writes all 15 tokens with exact values to `documentElement.style`, `toggleMode` flips signal + `data-mode` + `color-scheme`, `prefers-color-scheme` change listener respects `modeIsUserChosen` flag. |
+| `frontend/src/app/components/theme-picker/theme-picker.component.spec.ts` | Unit (Vitest) | One menu item per palette, swatches render with accent/contrast/bg/text colours, clicking an item calls `setPalette`, clicking outside closes the menu, active palette has `.active` + `aria-checked="true"`. |
+| `tests/e2e/test_theme_runtime.py` | End-to-end (Playwright) | Live dashboard at `:7187`: picking a new palette changes `--color-accent` (+3 others) on `<html>` to the catalogue value AND writes `qbit.theme` into localStorage. Skips with a loud message when the served bundle predates the theme-picker. |
+
 Whenever the `TrackerSearchStat` shape changes, run
 `./scripts/freeze-openapi.sh` to refresh `docs/api/openapi.json` so
 the contract test `test_frozen_and_live_have_same_schemas` stays green.

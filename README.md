@@ -113,6 +113,7 @@ Everything the platform offers, indexed:
 
 - [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md) — end-user walkthrough
 - [`docs/TOKENS_AND_KEYS.md`](docs/TOKENS_AND_KEYS.md) — **⭐ credentials / tokens / env vars (mandatory vs optional + registration links)**
+- [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) — runtime-switchable palette catalogue (8 palettes, dark + light, Darcula default)
 - [`docs/PLUGINS.md`](docs/PLUGINS.md) — the 48 plugin engines
 - [`docs/PLUGIN_TROUBLESHOOTING.md`](docs/PLUGIN_TROUBLESHOOTING.md) — what to check when a plugin breaks
 
