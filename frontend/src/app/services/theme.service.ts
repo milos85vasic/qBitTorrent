@@ -26,6 +26,19 @@ export interface StoredTheme {
 
 const STORAGE_KEY = 'qbit.theme';
 
+/** Shared-state REST endpoints (Phase A of CROSS_APP_THEME_PLAN.md). */
+const THEME_ENDPOINT = '/api/v1/theme';
+const THEME_STREAM_ENDPOINT = '/api/v1/theme/stream';
+
+/** PUTs are debounced so rapid toggles collapse into the last value. */
+const PUT_DEBOUNCE_MS = 200;
+
+interface ThemeApiPayload {
+  paletteId: string;
+  mode: PaletteMode;
+  updatedAt?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   /** Full palette catalogue — exposed for the picker. */
@@ -52,6 +65,17 @@ export class ThemeService {
   private readonly mediaQuery: MediaQueryList | null;
   private readonly mediaListener: ((e: MediaQueryListEvent) => void) | null;
 
+  // Cross-app sync plumbing (Phase B).
+  private _eventSource: EventSource | null = null;
+  private _putTimer: ReturnType<typeof setTimeout> | null = null;
+  private _lastUpdatedAt: string | null = null;
+  /**
+   * Set to true while we are adopting a server-originated update, so
+   * the helper `persist()` inside setPalette/setMode doesn't kick off
+   * another PUT and cause a loop.
+   */
+  private _suppressPut = false;
+
   constructor() {
     this.availablePalettes = PALETTES;
     this.paletteIds = PALETTES.map((p) => p.id);
@@ -74,6 +98,7 @@ export class ThemeService {
         this._mode.set(event.matches ? 'dark' : 'light');
         this.persist();
         this.apply();
+        this.scheduleServerSync();
       };
       // Prefer modern API; fall back to deprecated addListener for jsdom.
       if (typeof this.mediaQuery.addEventListener === 'function') {
@@ -84,6 +109,12 @@ export class ThemeService {
     } else {
       this.mediaListener = null;
     }
+
+    // Pull shared state from the backend if localStorage was empty.
+    this.bootstrapFromServer(initial.hadStoredState);
+    // Subscribe to live updates so palette swaps in other tabs /
+    // apps propagate here without a manual refresh.
+    this.openEventStream();
   }
 
   /** Swap to a different palette by id. No-op if id is unknown. */
@@ -94,6 +125,7 @@ export class ThemeService {
     this._palette.set(next);
     this.persist();
     this.apply();
+    this.scheduleServerSync();
   }
 
   /** Set explicit light/dark mode (marks the user choice as sticky). */
@@ -103,6 +135,7 @@ export class ThemeService {
     this._modeIsUserChosen = true;
     this.persist();
     this.apply();
+    this.scheduleServerSync();
   }
 
   /** Flip between light and dark. */
@@ -123,6 +156,14 @@ export class ThemeService {
       } else if (typeof (this.mediaQuery as MediaQueryList).removeListener === 'function') {
         (this.mediaQuery as MediaQueryList).removeListener(this.mediaListener);
       }
+    }
+    if (this._eventSource) {
+      try { this._eventSource.close(); } catch { /* swallow */ }
+      this._eventSource = null;
+    }
+    if (this._putTimer) {
+      clearTimeout(this._putTimer);
+      this._putTimer = null;
     }
   }
 
@@ -150,7 +191,12 @@ export class ThemeService {
     }
   }
 
-  private resolveInitialState(): { palette: Palette; mode: PaletteMode; modeIsUserChosen: boolean } {
+  private resolveInitialState(): {
+    palette: Palette;
+    mode: PaletteMode;
+    modeIsUserChosen: boolean;
+    hadStoredState: boolean;
+  } {
     const stored = this.readStored();
     if (stored) {
       const palette = findPalette(stored.paletteId) ?? findPalette(DEFAULT_PALETTE_ID)!;
@@ -159,6 +205,7 @@ export class ThemeService {
         palette,
         mode,
         modeIsUserChosen: !!stored.modeIsUserChosen,
+        hadStoredState: true,
       };
     }
     // No persisted theme — respect system preference.
@@ -167,6 +214,7 @@ export class ThemeService {
       palette: findPalette(DEFAULT_PALETTE_ID)!,
       mode: systemDark ? 'dark' : 'light',
       modeIsUserChosen: false,
+      hadStoredState: false,
     };
   }
 
@@ -215,5 +263,109 @@ export class ThemeService {
     root.style.setProperty('color-scheme', this._mode());
     root.setAttribute('data-palette', this._palette().id);
     root.setAttribute('data-mode', this._mode());
+  }
+
+  // ----------------------------------------------------- Phase B: sync
+
+  /**
+   * Pull the server-side theme when we have no persisted choice yet.
+   * When the browser already has a local state we keep ours and let
+   * setPalette/setMode push it to the server.
+   */
+  private bootstrapFromServer(hadStoredState: boolean): void {
+    if (hadStoredState) return;
+    if (typeof fetch !== 'function') return;
+    try {
+      fetch(THEME_ENDPOINT, { credentials: 'omit' })
+        .then((r) => (r && r.ok ? r.json() : null))
+        .then((payload: ThemeApiPayload | null) => this.adoptServerState(payload))
+        .catch(() => { /* offline — keep defaults */ });
+    } catch {
+      /* fetch threw synchronously on this environment */
+    }
+  }
+
+  /**
+   * Open a persistent EventSource to the theme-stream endpoint so we
+   * react to palette changes from other tabs / the qBittorrent WebUI.
+   */
+  private openEventStream(): void {
+    if (typeof EventSource !== 'function') return;
+    try {
+      const es = new EventSource(THEME_STREAM_ENDPOINT);
+      this._eventSource = es;
+      es.addEventListener('theme', (ev) => {
+        try {
+          const payload = JSON.parse((ev as MessageEvent).data) as ThemeApiPayload;
+          this.adoptServerState(payload);
+        } catch {
+          /* ignore malformed event */
+        }
+      });
+    } catch {
+      this._eventSource = null;
+    }
+  }
+
+  private adoptServerState(state: ThemeApiPayload | null): void {
+    if (!state || typeof state.paletteId !== 'string') return;
+    if (state.mode !== 'light' && state.mode !== 'dark') return;
+    const palette = findPalette(state.paletteId);
+    if (!palette) return;
+
+    // De-dupe by updatedAt to avoid re-applying the echo of our own PUT.
+    if (state.updatedAt && this._lastUpdatedAt && state.updatedAt === this._lastUpdatedAt) {
+      return;
+    }
+    this._lastUpdatedAt = state.updatedAt ?? this._lastUpdatedAt;
+
+    const changed = palette.id !== this._palette().id || state.mode !== this._mode();
+    if (!changed) return;
+
+    this._suppressPut = true;
+    try {
+      this._palette.set(palette);
+      this._mode.set(state.mode);
+      this.persist();
+      this.apply();
+    } finally {
+      this._suppressPut = false;
+    }
+  }
+
+  private scheduleServerSync(): void {
+    if (this._suppressPut) return;
+    if (typeof fetch !== 'function') return;
+    if (this._putTimer) {
+      clearTimeout(this._putTimer);
+    }
+    this._putTimer = setTimeout(() => {
+      this._putTimer = null;
+      this.putSharedState();
+    }, PUT_DEBOUNCE_MS);
+  }
+
+  private putSharedState(): void {
+    const body = JSON.stringify({
+      paletteId: this._palette().id,
+      mode: this._mode(),
+    });
+    try {
+      fetch(THEME_ENDPOINT, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body,
+        credentials: 'omit',
+      })
+        .then((r) => (r && r.ok ? r.json() : null))
+        .then((payload: ThemeApiPayload | null) => {
+          if (payload && payload.updatedAt) {
+            this._lastUpdatedAt = payload.updatedAt;
+          }
+        })
+        .catch(() => { /* offline — local state still applied */ });
+    } catch {
+      /* fetch threw synchronously — nothing to do */
+    }
   }
 }
