@@ -1,4 +1,8 @@
-# Session Report — 2026-04-19
+# Session Report — 2026-04-19 (rolling)
+
+> Continuously updated as the session progresses.
+> Latest totals reflect post-rebuild + post-test-fix state.
+
 
 Summary of what was accomplished against the completion-initiative
 plan in this working session. This is an honest status report, not a
