@@ -110,10 +110,23 @@ def test_theme_switching_applies_tokens_and_persists(palettes: dict[str, dict[st
     except Exception as exc:
         pytest.fail(f"Merge service at {DASHBOARD_URL} not reachable: {exc}")
 
-    # If the dashboard bundle predates the theme-picker ship date (i.e.
-    # the container hasn't been rebuilt since this feature shipped),
-    # skip rather than fail — re-running after a rebuild is the fix.
-    if "theme-picker" not in body and "data-palette" not in body:
+    # Angular SPAs serve a near-empty index.html; the theme-picker
+    # component is defined inside the compiled main-*.js bundle. To
+    # check whether the served bundle actually has the feature we
+    # must grep the bundle, not the shell.
+    import re
+    m = re.search(r'main-[A-Z0-9]+\.js', body)
+    if not m:
+        pytest.skip("Could not locate main-*.js in the index HTML.")
+    try:
+        with urllib.request.urlopen(
+            f"{DASHBOARD_URL.rstrip('/')}/{m.group(0)}", timeout=5
+        ) as r:
+            bundle = r.read().decode("utf-8", errors="ignore")
+    except Exception as exc:
+        pytest.fail(f"Dashboard bundle {m.group(0)} not reachable: {exc}")
+
+    if "theme-picker" not in bundle and "palette-dropdown" not in bundle:
         pytest.skip(
             "Dashboard bundle does not yet include the theme-picker — rebuild + restart "
             "qbittorrent-proxy (see CLAUDE.md 'REBUILD AND REBOOT') and re-run.",
