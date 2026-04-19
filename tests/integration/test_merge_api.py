@@ -320,7 +320,8 @@ class TestMagnetEndpoint:
         assert data["hashes"] == []
 
     def test_generate_magnet_invalid_request(self, client):
-        resp = client.post("/api/v1/magnet", data="not-json")
+        # httpx 0.27+ deprecated `data=<str>` for raw body — use `content=`.
+        resp = client.post("/api/v1/magnet", content="not-json")
         assert resp.status_code == 400
 
 
