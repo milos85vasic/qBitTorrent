@@ -19,10 +19,15 @@ class TestAuthRouter:
         assert router is not None
         assert router.prefix == "/auth"
 
-    def test_pending_captchas_dict(self):
+    def test_pending_captchas_mapping(self):
+        # Phase 3 replaced the unbounded dict with a cachetools.TTLCache
+        # (bounded + self-expiring). It is no longer a plain dict, but it
+        # still satisfies the Mapping contract.
+        from collections.abc import MutableMapping
+
         from api.auth import _pending_captchas
 
-        assert isinstance(_pending_captchas, dict)
+        assert isinstance(_pending_captchas, MutableMapping)
 
     def test_captcha_login_request_model(self):
         from api.auth import CaptchaLoginRequest
