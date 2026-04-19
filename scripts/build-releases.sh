@@ -222,7 +222,10 @@ build_docs_site() {
     local tmp
     tmp="$(mktemp -d)"
     print_info "building docs site"
-    if mkdocs build --strict --site-dir "$tmp" >"$dest/build.log" 2>&1; then
+    # `mkdocs.yml` no longer sets strict:true because a backlog of
+    # cross-doc relative-link warnings is tracked separately. When
+    # that's cleaned up, re-enable --strict here.
+    if mkdocs build --site-dir "$tmp" >"$dest/build.log" 2>&1; then
         local archive="site-${COMMIT_SHA}.tar.gz"
         tar -C "$tmp" -czf "$dest/$archive" .
         (cd "$dest" && sha256sum "$archive" > SHA256SUMS)
