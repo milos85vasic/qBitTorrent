@@ -75,6 +75,59 @@ def test_bridge_strips_transfer_encoding_header(src: str) -> None:
     ), "proxy_to_qbittorrent must skip the Transfer-Encoding upstream header"
 
 
+def test_bridge_uses_threaded_http_server(src: str) -> None:
+    """Single-threaded HTTPServer means one slow request (e.g. a
+    client long-poll to qBit) blocks the liveness probe, which
+    flipped the dashboard chip to 'down' every time a real user was
+    mid-request. ThreadingHTTPServer handles every connection on its
+    own thread.
+    """
+    assert "ThreadingHTTPServer" in src, (
+        "webui-bridge.py must import ThreadingHTTPServer (not HTTPServer) "
+        "so slow requests do not block the liveness probe"
+    )
+    # Import site must use the threaded class.
+    import_matches = re.findall(
+        r"from http\.server import[^\n]+",
+        src,
+    )
+    assert any("ThreadingHTTPServer" in m for m in import_matches), (
+        "import site must name ThreadingHTTPServer"
+    )
+    # Construction site must use the threaded class too.
+    assert re.search(r"ThreadingHTTPServer\s*\(", src), (
+        "server construction must use ThreadingHTTPServer(...)"
+    )
+    # And the non-threaded class must not be used.
+    assert not re.search(r"\bHTTPServer\s*\(", src.replace("ThreadingHTTPServer", "")), (
+        "no remaining HTTPServer(...) construction sites — must be ThreadingHTTPServer"
+    )
+
+
+@pytest.mark.timeout(20)
+def test_bridge_serves_concurrent_requests_without_blocking() -> None:
+    """Live smoke: fire 5 concurrent GETs at the bridge and ensure
+    none time out (regression for the 'WebUI Bridge (down)' report).
+    """
+    import concurrent.futures
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen("http://localhost:7188/", timeout=2) as r:
+            if r.status != 200:
+                pytest.skip(f"bridge returned {r.status}")
+    except Exception:
+        pytest.skip("webui-bridge not up on :7188")
+
+    def _hit() -> int:
+        with urllib.request.urlopen("http://localhost:7188/", timeout=3) as r:
+            return r.status
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+        results = list(pool.map(lambda _: _hit(), range(5)))
+    assert all(s == 200 for s in results), f"not all concurrent probes returned 200: {results}"
+
+
 def test_bridge_live_login_round_trip() -> None:
     """Live-stack smoke: POST /api/v2/auth/login through :7188 must
     return 200 with body starting with 'Ok.', and a subsequent

@@ -17,7 +17,7 @@ import json
 import time
 import threading
 import subprocess
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import urllib.request
 import urllib.parse
 
@@ -233,7 +233,11 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
 
 def run_bridge():
     """Start the WebUI bridge server."""
-    server = HTTPServer(("", BRIDGE_PORT), WebUIBridgeHandler)
+    # ThreadingHTTPServer so one slow request (e.g. a long poll to qBit)
+    # does not block the liveness probe from /api/v1/bridge/health.
+    # Without this, the dashboard chip flipped to "down" any time a
+    # real client happened to be mid-request.
+    server = ThreadingHTTPServer(("", BRIDGE_PORT), WebUIBridgeHandler)
 
     print("=" * 70)
     print("qBittorrent WebUI Bridge Server")
