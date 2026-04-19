@@ -111,7 +111,12 @@ export interface Hook {
 }
 
 export interface AuthStatus {
-  trackers: Record<string, { authenticated?: boolean; has_session?: boolean; username?: string }>;
+  trackers: Record<string, {
+    authenticated?: boolean;
+    has_session?: boolean;
+    username?: string;
+    base_url?: string;
+  }>;
 }
 
 export interface QbitCredentials {

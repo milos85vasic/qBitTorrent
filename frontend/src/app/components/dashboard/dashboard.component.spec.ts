@@ -62,14 +62,15 @@ describe('DashboardComponent', () => {
     try { http.verify(); } catch { /* some tests deliberately leave requests open */ }
   });
 
-  /** Create the component and drain the three requests kicked off by ngOnInit. */
+  /** Create the component and drain the requests kicked off by ngOnInit. */
   function bootstrap(): ReturnType<typeof TestBed.createComponent<DashboardComponent>> {
     const fx = TestBed.createComponent(DashboardComponent);
     fx.detectChanges();
-    // ngOnInit fires: getStats, getAuthStatus, getConfig
+    // ngOnInit fires: getStats, getAuthStatus, getBridgeHealth, getConfig
     http.expectOne('/api/v1/stats').flush({ active_searches: 0, completed_searches: 0, trackers_count: 0, trackers: [] });
     http.expectOne('/api/v1/auth/status').flush({ trackers: {} });
-    http.expectOne('/api/v1/config').flush({ qbittorrent_url: 'http://localhost:7185' });
+    http.expectOne('/api/v1/bridge/health').flush({ healthy: true });
+    http.expectOne('/api/v1/config').flush({ qbittorrent_url: 'http://localhost:7186' });
     fx.detectChanges();
     return fx;
   }
@@ -104,11 +105,53 @@ describe('DashboardComponent', () => {
       const fx = TestBed.createComponent(DashboardComponent);
       fx.detectChanges();
       http.expectOne('/api/v1/stats').flush({ active_searches: 0, completed_searches: 0, trackers_count: 0, trackers: [] });
-      http.expectOne('/api/v1/auth/status').flush({ trackers: { qbittorrent: { has_session: true } } });
+      http.expectOne('/api/v1/auth/status').flush({ trackers: { qbittorrent: { has_session: true, username: 'admin' } } });
+      http.expectOne('/api/v1/bridge/health').flush({ healthy: true });
       http.expectOne('/api/v1/config').flush({ qbittorrent_url: '' });
       fx.detectChanges();
-      const chip = (fx.nativeElement as HTMLElement).querySelector('.auth-chip');
+      const chip = (fx.nativeElement as HTMLElement).querySelector('.auth-chip.qbit-chip');
       expect(chip?.textContent).toContain('qBit Connected');
+      // Username must be displayed in the chip now.
+      expect(chip?.textContent).toContain('admin');
+    });
+
+    it('renders a chip per tracker returned by auth-status', () => {
+      const fx = TestBed.createComponent(DashboardComponent);
+      fx.detectChanges();
+      http.expectOne('/api/v1/stats').flush({ active_searches: 0, completed_searches: 0, trackers_count: 0, trackers: [] });
+      http.expectOne('/api/v1/auth/status').flush({
+        trackers: {
+          qbittorrent: { has_session: true, username: 'admin' },
+          rutracker: { has_session: true, base_url: 'https://rutracker.org', username: 'ruuser' },
+          kinozal: { has_session: false, base_url: '' },
+          nnmclub: { has_session: false, base_url: '' },
+          iptorrents: { has_session: true, base_url: 'https://iptorrents.com' },
+        },
+      });
+      http.expectOne('/api/v1/bridge/health').flush({ healthy: true });
+      http.expectOne('/api/v1/config').flush({ qbittorrent_url: '' });
+      fx.detectChanges();
+      const trackerChipEls = (fx.nativeElement as HTMLElement).querySelectorAll('.auth-chip.tracker-chip');
+      // One per non-qbittorrent tracker.
+      expect(trackerChipEls.length).toBe(4);
+      // Chip for rutracker should include username.
+      const chips = fx.componentInstance.trackerChips();
+      const ruchip = chips.find(c => c.name === 'rutracker');
+      expect(ruchip?.has_session).toBe(true);
+      expect(ruchip?.username).toBe('ruuser');
+    });
+
+    it('marks WebUI Bridge link disabled when bridge is down', () => {
+      const fx = TestBed.createComponent(DashboardComponent);
+      fx.detectChanges();
+      http.expectOne('/api/v1/stats').flush({ active_searches: 0, completed_searches: 0, trackers_count: 0, trackers: [] });
+      http.expectOne('/api/v1/auth/status').flush({ trackers: {} });
+      http.expectOne('/api/v1/bridge/health').flush({ healthy: false });
+      http.expectOne('/api/v1/config').flush({ qbittorrent_url: '' });
+      fx.detectChanges();
+      const bridgeLink = (fx.nativeElement as HTMLElement).querySelector('a[href="http://localhost:7188"]');
+      expect(bridgeLink?.classList.contains('disabled-link')).toBe(true);
+      expect(bridgeLink?.textContent).toContain('down');
     });
   });
 
@@ -596,6 +639,170 @@ describe('DashboardComponent', () => {
       const fx = bootstrap();
       fx.componentInstance.ngOnDestroy();
       expect(disconnectSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('tracker chips + qBit username + logout', () => {
+    it('loadAuthStatus updates qbitUsername and trackerChips', () => {
+      const fx = bootstrap();
+      fx.componentInstance.loadAuthStatus();
+      http.expectOne('/api/v1/auth/status').flush({
+        trackers: {
+          qbittorrent: { has_session: true, username: 'milos' },
+          rutracker: { has_session: true, username: 'r', base_url: 'https://rutracker.org' },
+          kinozal: { has_session: false, base_url: '' },
+        },
+      });
+      expect(fx.componentInstance.qbitUsername()).toBe('milos');
+      expect(fx.componentInstance.trackerChips()).toHaveLength(2);
+      expect(fx.componentInstance.trackerChips()[0].name).toBe('rutracker');
+    });
+
+    it('toggleChip flips expandedChip state', () => {
+      const fx = bootstrap();
+      fx.componentInstance.toggleChip('rutracker');
+      expect(fx.componentInstance.expandedChip()).toBe('rutracker');
+      fx.componentInstance.toggleChip('rutracker');
+      expect(fx.componentInstance.expandedChip()).toBeNull();
+      fx.componentInstance.toggleChip('kinozal');
+      expect(fx.componentInstance.expandedChip()).toBe('kinozal');
+    });
+
+    it('logoutQbit POSTs /auth/qbittorrent/logout and refreshes auth', () => {
+      const fx = bootstrap();
+      fx.componentInstance.qbitAuthenticated.set(true);
+      fx.componentInstance.qbitUsername.set('admin');
+      const event = new Event('click');
+      fx.componentInstance.logoutQbit(event);
+      http.expectOne('/api/v1/auth/qbittorrent/logout').flush({ status: 'logged_out' });
+      expect(fx.componentInstance.qbitAuthenticated()).toBe(false);
+      expect(fx.componentInstance.qbitUsername()).toBeNull();
+      // Then a follow-up auth status refresh.
+      http.expectOne('/api/v1/auth/status').flush({ trackers: {} });
+    });
+
+    it('openQbitLogin wires up a success callback that refreshes auth', () => {
+      const fx = bootstrap();
+      const openSpy = vi.fn();
+      (fx.componentInstance as any).qbitDialog = { open: openSpy };
+      fx.componentInstance.openQbitLogin();
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      // The handler is a function — invoke it to simulate dialog success
+      // and assert the component refreshes auth status.
+      const onSuccess = openSpy.mock.calls[0][0];
+      expect(typeof onSuccess).toBe('function');
+      onSuccess();
+      http.expectOne('/api/v1/auth/status').flush({ trackers: { qbittorrent: { has_session: true, username: 'z' } } });
+      expect(fx.componentInstance.qbitAuthenticated()).toBe(true);
+      expect(fx.componentInstance.qbitUsername()).toBe('z');
+    });
+  });
+
+  describe('bridge health', () => {
+    it('loadBridgeHealth sets bridgeHealthy based on response', () => {
+      const fx = bootstrap();
+      fx.componentInstance.loadBridgeHealth();
+      http.expectOne('/api/v1/bridge/health').flush({ healthy: false });
+      expect(fx.componentInstance.bridgeHealthy()).toBe(false);
+    });
+
+    it('loadBridgeHealth treats HTTP error as bridge down', () => {
+      const fx = bootstrap();
+      fx.componentInstance.loadBridgeHealth();
+      http.expectOne('/api/v1/bridge/health').flush(null, { status: 500, statusText: 'err' });
+      expect(fx.componentInstance.bridgeHealthy()).toBe(false);
+    });
+  });
+
+  describe('sourceStats', () => {
+    it('returns an empty list when sources is missing', () => {
+      const fx = bootstrap();
+      expect(fx.componentInstance.sourceStats([])).toEqual({ isMerged: false, trackers: [] });
+      expect(fx.componentInstance.sourceStats(undefined as any)).toEqual({ isMerged: false, trackers: [] });
+    });
+
+    it('flags merged=true when 2+ sources are present', () => {
+      const fx = bootstrap();
+      const s = fx.componentInstance.sourceStats([
+        { tracker: 'rutracker', seeds: 1, leechers: 0 },
+        { tracker: 'kinozal', seeds: 2, leechers: 0 },
+      ]);
+      expect(s.isMerged).toBe(true);
+      expect(s.trackers.map(t => t.name)).toEqual(['rutracker', 'kinozal']);
+    });
+
+    it('counts duplicate trackers and detects freeleech', () => {
+      const fx = bootstrap();
+      const s = fx.componentInstance.sourceStats([
+        { tracker: 'IPTorrents [free]', seeds: 1, leechers: 0 },
+        { tracker: 'IPTorrents [free]', seeds: 2, leechers: 0 },
+      ]);
+      expect(s.trackers[0].name).toBe('IPTorrents [free]');
+      expect(s.trackers[0].count).toBe(2);
+      expect(s.trackers[0].isFree).toBe(true);
+      expect(s.isMerged).toBe(true);
+    });
+  });
+
+  describe('sortedResults computed signal', () => {
+    it('is reactively derived from results() + sort column + direction', () => {
+      const fx = bootstrap();
+      fx.componentInstance.results.set([
+        makeResult({ name: 'a', seeds: 10 }),
+        makeResult({ name: 'b', seeds: 50 }),
+      ]);
+      fx.componentInstance.sortColumn.set('seeds');
+      fx.componentInstance.sortDirection.set('desc');
+      expect(fx.componentInstance.sortedResults().map(r => r.name)).toEqual(['b', 'a']);
+      // Flip direction without mutating the underlying array.
+      fx.componentInstance.sortDirection.set('asc');
+      expect(fx.componentInstance.sortedResults().map(r => r.name)).toEqual(['a', 'b']);
+    });
+  });
+
+  describe('searchErrors surface tracker failures', () => {
+    it('stores errors from /search response', () => {
+      const fx = bootstrap();
+      fx.componentInstance.query.set('ubuntu');
+      fx.componentInstance.doSearch();
+      http.expectOne('/api/v1/search').flush({
+        search_id: 's1',
+        query: 'ubuntu',
+        status: 'completed',
+        results: [makeResult()],
+        total_results: 1,
+        merged_results: 0,
+        trackers_searched: ['rutracker', 'kinozal'],
+        errors: ['kinozal: HTTP 503'],
+        started_at: 'now',
+      });
+      expect(fx.componentInstance.searchErrors()).toEqual(['kinozal: HTTP 503']);
+    });
+
+    it('populates errors from the follow-up get after SSE completes', () => {
+      const fx = bootstrap();
+      fx.componentInstance.searchId.set('s2');
+      fx.componentInstance.loadSearchResults('s2');
+      http.expectOne('/api/v1/search/s2').flush({
+        search_id: 's2',
+        query: 'x',
+        status: 'completed',
+        results: [],
+        total_results: 0,
+        merged_results: 0,
+        trackers_searched: [],
+        errors: ['rutracker: captcha_required'],
+        started_at: 'now',
+      });
+      expect(fx.componentInstance.searchErrors()).toEqual(['rutracker: captcha_required']);
+    });
+  });
+
+  describe('virtual-scroll trackBy', () => {
+    it('produces a stable id from name|size|url', () => {
+      const fx = bootstrap();
+      const row = makeResult({ name: 'x', size: '1 GB', download_urls: ['u1'] });
+      expect(fx.componentInstance.trackResult(0, row)).toBe('x|1 GB|u1');
     });
   });
 

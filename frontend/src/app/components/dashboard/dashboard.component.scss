@@ -51,7 +51,7 @@ h1 { color: $accent; font-size: 28px; margin: 0; }
   }
 }
 
-.auth-section { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.auth-section { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .auth-chip {
   display: inline-flex;
@@ -59,11 +59,32 @@ h1 { color: $accent; font-size: 28px; margin: 0; }
   gap: 6px;
   padding: 6px 12px;
   border-radius: 20px;
-  font-size: 14px;
+  font-size: 13px;
   background: $bg-primary;
   border: 1px solid $border;
   cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
   &:hover { border-color: $accent; }
+  &.expanded {
+    background: $bg-tertiary;
+    border-color: $accent;
+  }
+  .chip-label { white-space: nowrap; }
+  .chip-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left: 1px solid $border;
+  }
+  .chip-logout {
+    color: $accent;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 12px;
+    &:hover { color: $accent-hover; }
+  }
 }
 
 .auth-indicator {
@@ -267,8 +288,8 @@ h1 { color: $accent; font-size: 28px; margin: 0; }
   font-size: 12px;
   background: $bg-tertiary;
   color: $text-primary;
-  margin-right: 6px;
-  margin-bottom: 3px;
+  margin-right: 8px;
+  margin-bottom: 4px;
   &.freeleech { background: rgba(255, 193, 7, 0.25); color: $warning; }
 }
 
@@ -282,7 +303,44 @@ h1 { color: $accent; font-size: 28px; margin: 0; }
   font-weight: 600;
   background: rgba(233, 69, 96, 0.2);
   color: $accent;
-  margin-right: 6px;
+  margin-right: 8px;
+  margin-bottom: 4px;
+}
+
+.disabled-link {
+  opacity: 0.5;
+  cursor: not-allowed;
+  .bridge-down-hint {
+    font-size: 11px;
+    color: $danger;
+    margin-left: 4px;
+  }
+}
+
+.tracker-errors {
+  margin-top: 8px;
+  font-size: 13px;
+  color: $text-secondary;
+  summary {
+    cursor: pointer;
+    padding: 6px 0;
+    color: $warning;
+    &:hover { color: color.adjust($warning, $lightness: 10%); }
+  }
+  ul {
+    margin: 4px 0 0 0;
+    padding-left: 20px;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  li { margin-bottom: 3px; }
+  code {
+    color: $text-primary;
+    background: $bg-primary;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
 }
 
 .meta-line {

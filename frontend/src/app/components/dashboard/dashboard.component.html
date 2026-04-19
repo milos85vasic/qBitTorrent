@@ -3,16 +3,46 @@
     <div>
       <h1>Merge Search Dashboard</h1>
       <div class="service-links">
-        <a href="http://localhost:7185" target="_blank">qBittorrent WebUI</a>
+        <a [attr.href]="config().qbittorrent_url" target="_blank">qBittorrent WebUI</a>
         <a href="http://localhost:7186" target="_blank">Download Proxy</a>
         <a href="http://localhost:7187" class="current">Merge Search</a>
-        <a href="http://localhost:7188" target="_blank">WebUI Bridge</a>
+        <a href="http://localhost:7188" target="_blank"
+           [class.disabled-link]="!bridgeHealthy()"
+           [title]="bridgeHealthy() ? 'WebUI Bridge' : 'Bridge not running — see docs/OUT_OF_SANDBOX.md'"
+           (click)="!bridgeHealthy() && $event.preventDefault()">
+          WebUI Bridge
+          <span *ngIf="!bridgeHealthy()" class="bridge-down-hint">(down)</span>
+        </a>
       </div>
     </div>
     <div class="auth-section">
-      <span class="auth-chip" [class.active]="qbitAuthenticated()" (click)="qbitAuthenticated() ? null : qbitDialog.open()">
+      <!-- qBit chip -->
+      <span class="auth-chip qbit-chip"
+            [class.active]="qbitAuthenticated()"
+            [class.expanded]="expandedChip() === 'qbittorrent'"
+            (click)="qbitAuthenticated() ? toggleChip('qbittorrent') : openQbitLogin()">
         <span class="auth-indicator" [class.active]="qbitAuthenticated()"></span>
-        {{ qbitAuthenticated() ? 'qBit Connected' : 'qBit Login' }}
+        <span class="chip-label">
+          {{ qbitAuthenticated() ? ('qBit Connected' + (qbitUsername() ? ' — ' + qbitUsername() : '')) : 'qBit Login' }}
+        </span>
+        <span class="chip-actions" *ngIf="qbitAuthenticated() && expandedChip() === 'qbittorrent'">
+          <a class="chip-logout" (click)="logoutQbit($event)">Logout</a>
+        </span>
+      </span>
+
+      <!-- Per-tracker chips -->
+      <span class="auth-chip tracker-chip"
+            *ngFor="let t of trackerChips()"
+            [class.active]="t.has_session"
+            [class.expanded]="expandedChip() === t.name"
+            (click)="toggleChip(t.name)">
+        <span class="auth-indicator" [class.active]="t.has_session"></span>
+        <span class="chip-label">
+          {{ t.name }}{{ t.has_session && t.username ? ' — ' + t.username : '' }}
+        </span>
+        <span class="chip-actions" *ngIf="expandedChip() === t.name">
+          <a class="chip-logout" (click)="reloginTracker(t.name); $event.stopPropagation()">Re-login</a>
+        </span>
       </span>
     </div>
   </header>
@@ -45,6 +75,12 @@
     <div class="search-status" *ngIf="searchStatus()">
       <span class="spinner" *ngIf="isSearching()"></span>{{ searchStatus() }}
     </div>
+    <details class="tracker-errors" *ngIf="searchErrors().length > 0">
+      <summary>{{ searchErrors().length }} tracker error(s)</summary>
+      <ul>
+        <li *ngFor="let e of searchErrors()"><code>{{ e }}</code></li>
+      </ul>
+    </details>
   </div>
 
   <div class="card">
@@ -58,11 +94,11 @@
 
     <!-- Results Tab -->
     <div *ngIf="activeTab() === 'results'">
-      <div *ngIf="results().length === 0 && liveResults().length === 0" class="empty-state">
+      <div *ngIf="sortedResults().length === 0 && liveResults().length === 0" class="empty-state">
         No search results yet. Enter a query above.
       </div>
 
-      <table class="results-table" *ngIf="results().length > 0 || liveResults().length > 0">
+      <table class="results-table" *ngIf="sortedResults().length > 0 || liveResults().length > 0">
         <thead>
           <tr>
             <th [class]="getSortClass('name')" (click)="sortResults('name')">Name<span class="sort-icon"></span></th>
@@ -76,7 +112,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of results(); let i = index">
+          <tr *ngFor="let r of sortedResults(); let i = index; trackBy: trackResult">
             <td>
               <div>{{ r.name }}</div>
               <div class="meta-line" *ngIf="r.metadata?.poster_url">
@@ -91,7 +127,18 @@
             <td>{{ r.seeds || 0 }}</td>
             <td>{{ r.leechers || 0 }}</td>
             <td><span class="quality-badge" [class]="r.quality || 'unknown'">{{ r.quality || 'unknown' }}</span></td>
-            <td [innerHTML]="trackerHtml(r.sources)"></td>
+            <td>
+              <ng-container *ngIf="sourceStats(r.sources) as s">
+                <span *ngIf="s.isMerged" class="merged-indicator">
+                  <span class="merge-icon">&#x2697;</span>Merged
+                </span>
+                <span *ngFor="let t of s.trackers"
+                      class="tracker-tag"
+                      [class.freeleech]="t.isFree">
+                  {{ t.name }}<span *ngIf="t.count > 1"> (x{{ t.count }})</span>
+                </span>
+              </ng-container>
+            </td>
             <td>
               <div class="btn-group">
                 <a class="download-btn btn-magnet" (click)="doMagnet(i); $event.preventDefault()" title="Get Magnet Link">Magnet</a>

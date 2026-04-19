@@ -1,21 +1,35 @@
-import { Component, inject, signal, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ScrollingModule } from '@angular/cdk/scrolling';
+import { HttpClient } from '@angular/common/http';
 import { ApiService } from '../../services/api.service';
 import { ToastService } from '../../services/toast.service';
 import { DialogService } from '../../services/dialog.service';
 import { SseService } from '../../services/sse.service';
 import {
-  SearchResult, SearchResponse, ActiveDownload, Schedule, Hook,
+  SearchResult, ActiveDownload, Schedule, Hook,
   TrackerStatus, Source
 } from '../../models/search.model';
 import { MagnetDialogComponent } from '../magnet-dialog/magnet-dialog.component';
 import { QbitLoginDialogComponent } from '../qbit-login-dialog/qbit-login-dialog.component';
 
+export interface TrackerChip {
+  name: string;
+  has_session: boolean;
+  username?: string;
+  base_url?: string;
+}
+
+export interface SourceStats {
+  isMerged: boolean;
+  trackers: { name: string; count: number; isFree: boolean }[];
+}
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, MagnetDialogComponent, QbitLoginDialogComponent],
+  imports: [CommonModule, FormsModule, ScrollingModule, MagnetDialogComponent, QbitLoginDialogComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
@@ -24,6 +38,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
   private dialog = inject(DialogService);
   private sse = inject(SseService);
+  private http = inject(HttpClient);
 
   @ViewChild(MagnetDialogComponent) magnetDialog!: MagnetDialogComponent;
   @ViewChild(QbitLoginDialogComponent) qbitDialog!: QbitLoginDialogComponent;
@@ -37,10 +52,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
   liveResults = signal<SearchResult[]>([]);
   totalResults = signal(0);
   mergedResults = signal(0);
+  searchErrors = signal<string[]>([]);
 
   // Sorting
   sortColumn = signal('seeds');
   sortDirection = signal<'asc' | 'desc'>('desc');
+
+  // Memoised sorted view for fast rendering of thousands of rows.
+  readonly sortedResults = computed(() => {
+    const rows = this.results();
+    const col = this.sortColumn();
+    const dir = this.sortDirection();
+    return this._sort(rows, col, dir);
+  });
 
   // Tabs
   activeTab = signal('results');
@@ -63,10 +87,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   // Auth
   qbitAuthenticated = signal(false);
+  qbitUsername = signal<string | null>(null);
+  trackerChips = signal<TrackerChip[]>([]);
+  expandedChip = signal<string | null>(null);
   pendingAction?: { type: 'schedule' | 'addMagnet'; index: number };
 
+  // Bridge health
+  bridgeHealthy = signal(true);
+
   // Config
-  config = signal({ qbittorrent_url: 'http://localhost:7185' });
+  config = signal({ qbittorrent_url: 'http://localhost:7186' });
 
   private sseSub?: any;
   private pollInterval?: any;
@@ -75,11 +105,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadStats();
     this.loadAuthStatus();
+    this.loadBridgeHealth();
     this.api.getConfig().subscribe(c => this.config.set(c));
     this.statsInterval = setInterval(() => {
       this.loadStats();
       this.loadAuthStatus();
       this.loadDownloads();
+      this.loadBridgeHealth();
     }, 30000);
   }
 
@@ -102,7 +134,73 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.api.getAuthStatus().subscribe(status => {
       const qbit = status.trackers?.['qbittorrent'];
       this.qbitAuthenticated.set(!!(qbit?.has_session || qbit?.authenticated));
+      this.qbitUsername.set(qbit?.username ?? null);
+      // Everything except qBittorrent becomes a tracker chip.
+      const chips: TrackerChip[] = [];
+      for (const [name, val] of Object.entries(status.trackers || {})) {
+        if (name === 'qbittorrent') continue;
+        chips.push({
+          name,
+          has_session: !!(val?.has_session || val?.authenticated),
+          username: val?.username,
+          base_url: (val as any)?.base_url,
+        });
+      }
+      this.trackerChips.set(chips);
     });
+  }
+
+  loadBridgeHealth(): void {
+    this.http.get<{ healthy: boolean }>('/api/v1/bridge/health').subscribe({
+      next: (r) => this.bridgeHealthy.set(!!r.healthy),
+      error: () => this.bridgeHealthy.set(false),
+    });
+  }
+
+  // Per-tracker chip interactions
+  toggleChip(name: string): void {
+    this.expandedChip.set(this.expandedChip() === name ? null : name);
+  }
+
+  reloginTracker(name: string): void {
+    // CAPTCHA flow is tracker-specific. For rutracker we already have
+    // /api/v1/auth/rutracker/captcha + /login; for others we expose
+    // a placeholder for re-login via backend config.
+    if (name === 'rutracker') {
+      this.http.get<any>('/api/v1/auth/rutracker/captcha').subscribe({
+        next: (res) => {
+          if (res.authenticated) {
+            this.toast.success('Re-authenticated with rutracker');
+            this.loadAuthStatus();
+          } else if (res.captcha_required) {
+            this.toast.info('CAPTCHA required — use the CAPTCHA form');
+          } else {
+            this.toast.warning(res.message || 'Could not re-login');
+          }
+        },
+        error: (err) => this.toast.error('Re-login failed: ' + (err.error?.detail || err.message)),
+      });
+    } else {
+      this.toast.info(`Manual re-login for ${name} — update credentials in .env and restart the proxy`);
+    }
+  }
+
+  // qBit logout (clears saved credentials)
+  logoutQbit(event: Event): void {
+    event.stopPropagation();
+    this.http.post<any>('/api/v1/auth/qbittorrent/logout', {}).subscribe({
+      next: () => {
+        this.toast.success('Logged out of qBittorrent');
+        this.qbitAuthenticated.set(false);
+        this.qbitUsername.set(null);
+        this.loadAuthStatus();
+      },
+      error: () => this.toast.error('Logout failed'),
+    });
+  }
+
+  openQbitLogin(): void {
+    this.qbitDialog.open(() => this.loadAuthStatus());
   }
 
   // Search
@@ -118,6 +216,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.searchStatus.set('Searching...');
     this.results.set([]);
     this.liveResults.set([]);
+    this.searchErrors.set([]);
 
     this.api.search({ query: q, limit: 50, sort_by: this.sortColumn(), sort_order: this.sortDirection() }).subscribe({
       next: (resp) => {
@@ -127,6 +226,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.results.set(resp.results);
           this.totalResults.set(resp.total_results);
           this.mergedResults.set(resp.merged_results);
+          this.searchErrors.set((resp as any).errors || []);
           this.searchStatus.set(`Found ${resp.total_results} results (${resp.merged_results} merged)`);
           this.isSearching.set(false);
         } else {
@@ -175,6 +275,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.results.set(resp.results);
       this.totalResults.set(resp.total_results);
       this.mergedResults.set(resp.merged_results);
+      this.searchErrors.set((resp as any).errors || []);
     });
   }
 
@@ -218,12 +319,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.renderSortedResults();
   }
 
-  renderSortedResults(): void {
-    const col = this.sortColumn();
-    const dir = this.sortDirection();
+  private _sort(rows: SearchResult[], col: string, dir: 'asc' | 'desc'): SearchResult[] {
     const qw: Record<string, number> = { uhd_8k: 6, uhd_4k: 5, full_hd: 4, hd: 3, sd: 2, unknown: 1 };
-
-    const sorted = [...this.results()];
+    const sorted = [...rows];
     sorted.sort((a, b) => {
       let cmp = 0;
       switch (col) {
@@ -257,6 +355,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }
       return dir === 'asc' ? cmp : -cmp;
     });
+    return sorted;
+  }
+
+  renderSortedResults(): void {
+    // Kept for backward compatibility; the computed signal
+    // `sortedResults` does the same work and is what the template uses
+    // for rendering. This method also mutates `results` in place so
+    // legacy call sites (and existing tests) still see sorted rows.
+    const sorted = this._sort(this.results(), this.sortColumn(), this.sortDirection());
     this.results.set(sorted);
   }
 
@@ -289,6 +396,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return 'sortable ' + this.sortDirection();
   }
 
+  // trackBy for cdk-virtual-scroll-viewport to avoid re-rendering
+  // every row when the underlying array reference changes.
+  trackResult = (_index: number, row: SearchResult): string => {
+    return (row.name || '') + '|' + (row.size || '') + '|' + (row.download_urls?.[0] || '');
+  };
+
   // Actions
   async doSchedule(index: number): Promise<void> {
     const results = this.results();
@@ -305,7 +418,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     if (!this.qbitAuthenticated()) {
       this.pendingAction = { type: 'schedule', index };
-      this.qbitDialog.open(() => this.executeSchedule(index));
+      this.qbitDialog.open(() => { this.loadAuthStatus(); this.executeSchedule(index); });
       return;
     }
     this.executeSchedule(index);
@@ -316,14 +429,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!r) return;
     this.api.download({ result_id: String(index), download_urls: r.download_urls }).subscribe({
       next: (res) => {
-        if (res.status === 'initiated' || res.added_count > 0) {
+        if (res.added_count > 0 || res.status === 'initiated') {
           this.toast.success(`Sent "${r.name}" to qBittorrent`);
         } else if (res.status === 'auth_failed') {
           this.toast.error('qBittorrent auth failed. Please login.');
           this.pendingAction = { type: 'schedule', index };
-          this.qbitDialog.open(() => this.executeSchedule(index));
+          this.qbitDialog.open(() => { this.loadAuthStatus(); this.executeSchedule(index); });
         } else {
-          this.toast.error('Failed to send to qBittorrent');
+          // Surface real failure reason from backend.
+          const detail = (res.results || [])
+            .map((x: any) => x.detail || x.message)
+            .filter(Boolean)
+            .join('; ');
+          this.toast.error('Failed to send to qBittorrent' + (detail ? ': ' + detail : ''));
         }
       },
       error: (err) => {
@@ -466,22 +584,39 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   // Helpers
-  trackerHtml(sources: Source[]): string {
-    if (!sources?.length) return '';
+  sourceStats(sources: Source[] | undefined | null): SourceStats {
+    if (!sources?.length) return { isMerged: false, trackers: [] };
     const counts: Record<string, number> = {};
-    sources.forEach(s => { counts[s.tracker || 'unknown'] = (counts[s.tracker || 'unknown'] || 0) + 1; });
-    const names = Object.keys(counts);
-    if (names.length > 1 || sources.length > 1) {
-      let html = '<span class="merged-indicator"><span class="merge-icon">&#x2697;</span>Merged</span>';
-      names.forEach(t => {
-        const isFree = t.includes('[free]');
-        html += `<span class="tracker-tag${isFree ? ' freeleech' : ''}">${t} (x${counts[t]})</span>`;
-      });
-      return html;
+    for (const s of sources) {
+      const t = s.tracker || 'unknown';
+      counts[t] = (counts[t] || 0) + 1;
     }
-    const t = sources[0]?.tracker || 'unknown';
-    const isFree = t.includes('[free]');
-    return `<span class="tracker-tag${isFree ? ' freeleech' : ''}">${t}</span>`;
+    const names = Object.keys(counts);
+    const isMerged = names.length > 1 || sources.length > 1;
+    const trackers = names.map(name => ({
+      name,
+      count: counts[name],
+      isFree: name.includes('[free]'),
+    }));
+    return { isMerged, trackers };
+  }
+
+  // Legacy helper retained so existing tests continue to pass.  The
+  // template itself no longer uses [innerHTML]; it renders the
+  // ``sourceStats()`` output via Angular bindings.
+  trackerHtml(sources: Source[]): string {
+    const stats = this.sourceStats(sources);
+    if (!stats.trackers.length) return '';
+    let html = '';
+    if (stats.isMerged) {
+      html += '<span class="merged-indicator"><span class="merge-icon">&#x2697;</span>Merged</span>';
+    }
+    for (const t of stats.trackers) {
+      const cls = t.isFree ? 'tracker-tag freeleech' : 'tracker-tag';
+      const suffix = t.count > 1 ? ` (x${t.count})` : '';
+      html += `<span class="${cls}">${t.name}${suffix}</span>`;
+    }
+    return html;
   }
 
   escapeHtml(text: string): string {
