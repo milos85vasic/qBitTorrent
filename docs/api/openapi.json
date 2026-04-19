@@ -478,6 +478,27 @@
         "title": "SearchResultResponse",
         "type": "object"
       },
+      "ThemeUpdate": {
+        "description": "Body for ``PUT /api/v1/theme``.\n\n``paletteId`` must be one of\n:data:`api.theme_state.ALLOWED_PALETTE_IDS`; ``mode`` must be one\nof :data:`api.theme_state.ALLOWED_MODES`. Validation happens in\n:meth:`api.theme_state.ThemeStore.put` and is surfaced as ``422``\nby the route handler.",
+        "properties": {
+          "mode": {
+            "description": "'light' or 'dark'",
+            "title": "Mode",
+            "type": "string"
+          },
+          "paletteId": {
+            "description": "One of the catalogued palette ids",
+            "title": "Paletteid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "paletteId",
+          "mode"
+        ],
+        "title": "ThemeUpdate",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1425,6 +1446,84 @@
           }
         },
         "summary": "Stats"
+      }
+    },
+    "/api/v1/theme": {
+      "get": {
+        "description": "Return the current shared theme state (persisted).",
+        "operationId": "get_theme_api_v1_theme_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Theme",
+        "tags": [
+          "search"
+        ]
+      },
+      "put": {
+        "description": "Persist the user's palette + mode choice and fan out to subscribers.",
+        "operationId": "put_theme_api_v1_theme_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Theme",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/api/v1/theme/stream": {
+      "get": {
+        "description": "SSE feed of theme updates.\n\nEmits the current state immediately (so late subscribers catch up),\nthen one ``event: theme`` line per PUT. A ``: keepalive`` comment\nis sent every 15s when idle so proxies don't hang up the\nconnection.",
+        "operationId": "stream_theme_api_v1_theme_stream_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stream Theme",
+        "tags": [
+          "search"
+        ]
       }
     },
     "/dashboard": {

@@ -2,6 +2,7 @@
 API routes for the merge service.
 """
 
+import asyncio
 import uuid
 import logging
 import sys
@@ -11,9 +12,16 @@ import json
 import urllib.parse
 import aiohttp
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional
+
+try:
+    from . import theme_state
+except ImportError:  # loaded via importlib.util.spec_from_file_location in tests
+    import importlib
+
+    theme_state = importlib.import_module("api.theme_state")
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +36,71 @@ def _get_orchestrator(request: Request):
     from merge_service.search import SearchOrchestrator
 
     return SearchOrchestrator()
+
+
+class ThemeUpdate(BaseModel):
+    """Body for ``PUT /api/v1/theme``.
+
+    ``paletteId`` must be one of
+    :data:`api.theme_state.ALLOWED_PALETTE_IDS`; ``mode`` must be one
+    of :data:`api.theme_state.ALLOWED_MODES`. Validation happens in
+    :meth:`api.theme_state.ThemeStore.put` and is surfaced as ``422``
+    by the route handler.
+    """
+
+    paletteId: str = Field(..., description="One of the catalogued palette ids")
+    mode: str = Field(..., description="'light' or 'dark'")
+
+
+@router.get("/theme")
+def get_theme():
+    """Return the current shared theme state (persisted)."""
+    return theme_state.get_store().get().to_dict()
+
+
+@router.put("/theme")
+def put_theme(body: ThemeUpdate):
+    """Persist the user's palette + mode choice and fan out to subscribers."""
+    try:
+        return theme_state.get_store().put(body.paletteId, body.mode).to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/theme/stream")
+async def stream_theme(request: Request):
+    """SSE feed of theme updates.
+
+    Emits the current state immediately (so late subscribers catch up),
+    then one ``event: theme`` line per PUT. A ``: keepalive`` comment
+    is sent every 15s when idle so proxies don't hang up the
+    connection.
+    """
+    async def gen():
+        store = theme_state.get_store()
+        queue = store.subscribe()
+        try:
+            current = store.get()
+            yield f"event: theme\ndata: {json.dumps(current.to_dict())}\n\n".encode("utf-8")
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    state = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield f"event: theme\ndata: {json.dumps(state.to_dict())}\n\n".encode("utf-8")
+                except asyncio.TimeoutError:
+                    yield b": keepalive\n\n"
+        finally:
+            store.unsubscribe(queue)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 class SearchRequest(BaseModel):
