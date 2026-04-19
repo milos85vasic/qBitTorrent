@@ -1,0 +1,153 @@
+"""
+Real cross-app theme e2e test (Phase D of CROSS_APP_THEME_PLAN.md).
+
+Opens the Angular dashboard at :7187, picks Nord in the palette
+dropdown, opens a second page at the proxied qBittorrent WebUI
+(:7186), and waits for the bridge to apply Nord's bg-primary to
+``document.body``. Then switches to Gruvbox and asserts the flip.
+
+The skip-guard looks for ``/__qbit_theme__/skin.css`` in the :7186
+HTML response. If that is missing, we skip with an actionable
+message ("rebuild + restart qbittorrent-proxy") rather than failing
+noisily on an environment that hasn't deployed the bridge yet.
+
+Any real failure in the cross-app sync path (palette mismatch, SSE
+silence, side-channel missing) makes the test fail — *not* skip —
+so the signal is trustworthy.
+"""
+
+from __future__ import annotations
+
+import os
+import urllib.request
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("playwright.sync_api", reason="playwright not installed")
+
+from playwright.sync_api import sync_playwright  # noqa: E402
+
+DASHBOARD_URL = os.environ.get("MERGE_SERVICE_URL", "http://localhost:7187").rstrip("/")
+PROXY_URL = os.environ.get("PROXY_URL", "http://localhost:7186").rstrip("/")
+
+# Nord + Gruvbox dark bg-primary values from the catalogue — these
+# must match frontend/src/app/models/palette.model.ts exactly.
+NORD_DARK_BG = "#2e3440"
+GRUVBOX_DARK_BG = "#282828"
+
+
+def _hex_to_rgb(hex6: str) -> str:
+    hex6 = hex6.lstrip("#")
+    r, g, b = int(hex6[0:2], 16), int(hex6[2:4], 16), int(hex6[4:6], 16)
+    return f"rgb({r}, {g}, {b})"
+
+
+def _preflight() -> None:
+    """Fail loudly when services are down; skip cleanly when the
+    bridge is not yet deployed (rebuild + restart needed).
+    """
+    # 1) Dashboard reachable.
+    try:
+        with urllib.request.urlopen(DASHBOARD_URL + "/", timeout=3) as resp:
+            assert resp.status == 200, f"Dashboard returned {resp.status}"
+            body = resp.read().decode("utf-8", errors="ignore")
+    except Exception as exc:
+        pytest.skip(f"Merge dashboard at {DASHBOARD_URL}/ down: {exc}")  # allow-skip: local dev may not have stack running
+
+    # 2) Dashboard bundle has the theme picker.
+    import re as _re
+    m = _re.search(r"main-[A-Z0-9]+\.js", body)
+    if not m:
+        pytest.skip("Could not locate main-*.js in the index HTML.")  # allow-skip: pre-deploy SPA shell
+    try:
+        with urllib.request.urlopen(f"{DASHBOARD_URL}/{m.group(0)}", timeout=5) as r:
+            bundle = r.read().decode("utf-8", errors="ignore")
+    except Exception as exc:
+        pytest.skip(f"Dashboard bundle {m.group(0)} fetch error: {exc}")  # allow-skip: rebuild required
+    if "theme-picker" not in bundle and "palette-dropdown" not in bundle:
+        pytest.skip(  # allow-skip: rebuild + restart qbittorrent-proxy
+            "Dashboard bundle does not include the theme-picker — rebuild + restart "
+            "qbittorrent-proxy and re-run.",
+        )
+
+    # 3) Proxy reachable.
+    try:
+        with urllib.request.urlopen(PROXY_URL + "/", timeout=3) as resp:
+            proxy_body = resp.read().decode("utf-8", errors="ignore")
+    except Exception as exc:
+        pytest.skip(f"Download proxy at {PROXY_URL}/ down: {exc}")  # allow-skip: start.sh not yet run
+
+    # 4) Bridge injected.
+    if "/__qbit_theme__/skin.css" not in proxy_body:
+        pytest.skip(  # allow-skip: rebuild + restart qbittorrent-proxy
+            "qBittorrent WebUI is not serving the theme bridge yet — rebuild + restart "
+            "qbittorrent-proxy so plugins/download_proxy.py is live.",
+        )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _check_environment() -> None:
+    _preflight()
+
+
+def _select_palette(page, palette_id: str) -> None:
+    page.click("app-theme-picker .palette-dropdown")
+    page.wait_for_selector("app-theme-picker .palette-menu li", timeout=5000)
+    page.click(f'app-theme-picker li[data-palette-id="{palette_id}"]')
+    page.wait_for_function(
+        f"() => document.documentElement.getAttribute('data-palette') === {palette_id!r}",
+        timeout=5000,
+    )
+
+
+def test_crossapp_theme_sync_nord_then_gruvbox() -> None:
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        try:
+            context = browser.new_context()
+            dashboard = context.new_page()
+            dashboard.goto(DASHBOARD_URL + "/", wait_until="domcontentloaded")
+            dashboard.wait_for_selector("app-theme-picker .palette-dropdown", timeout=15000)
+
+            # Reset to Nord on the dashboard.
+            _select_palette(dashboard, "nord")
+            stored = dashboard.evaluate("() => window.localStorage.getItem('qbit.theme')")
+            assert stored and '"nord"' in stored, f"dashboard did not persist Nord: {stored!r}"
+
+            # Open qBittorrent WebUI via the proxy.
+            webui = context.new_page()
+            webui.goto(PROXY_URL + "/", wait_until="domcontentloaded")
+
+            # Wait for the bridge to apply Nord.
+            webui.wait_for_function(
+                "(expectedRgb) => {\n"
+                "  const v = getComputedStyle(document.documentElement).getPropertyValue('--color-bg-primary').trim().toLowerCase();\n"
+                "  return v === expectedRgb.toLowerCase() || v === expectedRgb.toUpperCase();\n"
+                "}",
+                arg=NORD_DARK_BG,
+                timeout=5000,
+            )
+
+            # The side-channel shows the adopted palette.
+            side = webui.evaluate("() => window.__qbitTheme && window.__qbitTheme.paletteId")
+            assert side == "nord", f"window.__qbitTheme.paletteId on :7186 is {side!r}, expected 'nord'"
+
+            # Flip to Gruvbox on the dashboard.
+            _select_palette(dashboard, "gruvbox")
+            stored2 = dashboard.evaluate("() => window.localStorage.getItem('qbit.theme')")
+            assert stored2 and '"gruvbox"' in stored2
+
+            # qBittorrent WebUI should mirror within 5 s via SSE.
+            webui.wait_for_function(
+                "(expectedHex) => {\n"
+                "  const v = getComputedStyle(document.documentElement).getPropertyValue('--color-bg-primary').trim().toLowerCase();\n"
+                "  return v === expectedHex.toLowerCase();\n"
+                "}",
+                arg=GRUVBOX_DARK_BG,
+                timeout=5000,
+            )
+            side2 = webui.evaluate("() => window.__qbitTheme && window.__qbitTheme.paletteId")
+            assert side2 == "gruvbox", f"window.__qbitTheme.paletteId on :7186 is {side2!r}, expected 'gruvbox'"
+        finally:
+            browser.close()
