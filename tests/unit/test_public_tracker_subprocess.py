@@ -130,17 +130,27 @@ class TestSearchOrchestratorTrackerCount:
     """Search must use all enabled trackers, not just private ones."""
 
     def test_get_enabled_trackers_includes_public_trackers(self):
-        """Enabled trackers must include public trackers."""
+        """Enabled trackers must include the known-live public set.
+
+        The dead-tracker filter (``DEAD_PUBLIC_TRACKERS``) removes
+        permanently-broken plugins like eztv/nyaa/yts from the default
+        fan-out — the canary list here only contains trackers that are
+        empirically live as of 2026-04-20.
+        """
         orch = SearchOrchestrator()
         trackers = orch._get_enabled_trackers()
         names = [t.name for t in trackers]
-        # Should have many public trackers
-        public_names = ["yts", "piratebay", "nyaa", "rutor", "1337x", "eztv"]
-        found = [n for n in public_names if n in names]
-        assert len(found) >= 5, f"Too few public trackers enabled: {found}"
+        live_canaries = ["piratebay", "rutor", "linuxtracker",
+                         "torrentscsv", "academictorrents", "limetorrents"]
+        found = [n for n in live_canaries if n in names]
+        assert len(found) >= 5, f"Too few live public trackers enabled: {found}"
 
     def test_get_enabled_trackers_count(self):
-        """Should have 30+ trackers total."""
+        """Public-tracker count after dead-bucket filter is ~14 plugins
+        (37 public minus 23 dead). Keep the floor loose so the test
+        doesn't break if we add a new tracker or move one in/out of
+        the dead bucket.
+        """
         orch = SearchOrchestrator()
         trackers = orch._get_enabled_trackers()
-        assert len(trackers) >= 30, f"Only {len(trackers)} trackers enabled"
+        assert len(trackers) >= 10, f"Only {len(trackers)} trackers enabled"

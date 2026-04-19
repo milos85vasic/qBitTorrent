@@ -8,12 +8,20 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 
 from merge_service.search import (
+    DEAD_PUBLIC_TRACKERS,
     PRIVATE_TRACKERS,
     PUBLIC_TRACKERS,
     SearchOrchestrator,
     SearchResult,
     TrackerSource,
 )
+
+# Public trackers that aren't bucketed as dead. Most of the fan-out
+# math now uses this rather than `PUBLIC_TRACKERS` directly because
+# dead trackers are filtered out of `_get_enabled_trackers`.
+LIVE_PUBLIC_TRACKERS = {
+    name: url for name, url in PUBLIC_TRACKERS.items() if name not in DEAD_PUBLIC_TRACKERS
+}
 
 
 class TestPublicTrackersRegistry:
@@ -70,11 +78,28 @@ class TestGetEnabledTrackers:
         self.orch = SearchOrchestrator()
 
     def test_public_trackers_always_enabled(self):
+        """Every LIVE public tracker (not in DEAD_PUBLIC_TRACKERS) must
+        be enabled by default. Dead trackers are filtered out unless
+        ``ENABLE_DEAD_TRACKERS=1`` is set.
+        """
         with patch.dict(os.environ, {}, clear=True):
             trackers = self.orch._get_enabled_trackers()
             names = [t.name for t in trackers]
+            for name in LIVE_PUBLIC_TRACKERS:
+                assert name in names, f"Live public tracker {name} missing from enabled list"
+            for dead in DEAD_PUBLIC_TRACKERS:
+                assert dead not in names, (
+                    f"Dead tracker {dead} leaked into default fan-out"
+                )
+
+    def test_public_trackers_all_enabled_when_env_flag_set(self):
+        with patch.dict(os.environ, {"ENABLE_DEAD_TRACKERS": "1"}, clear=True):
+            trackers = self.orch._get_enabled_trackers()
+            names = [t.name for t in trackers]
             for name in PUBLIC_TRACKERS:
-                assert name in names, f"Public tracker {name} missing from enabled list"
+                assert name in names, (
+                    f"ENABLE_DEAD_TRACKERS=1 should force {name} back in"
+                )
 
     def test_private_trackers_without_credentials(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -121,7 +146,9 @@ class TestGetEnabledTrackers:
         }
         with patch.dict(os.environ, env, clear=True):
             trackers = self.orch._get_enabled_trackers()
-            assert len(trackers) == 4 + len(PUBLIC_TRACKERS)
+            # 4 private + every LIVE public (dead ones are filtered out
+            # by default unless `ENABLE_DEAD_TRACKERS=1`).
+            assert len(trackers) == 4 + len(LIVE_PUBLIC_TRACKERS)
 
     def test_tracker_sources_have_urls(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -383,7 +410,7 @@ class TestConcurrentSearch:
                 metadata = await self.orch.search("ubuntu", "all", enable_metadata=False, validate_trackers=False)
                 assert metadata.total_results == 1
                 assert "rutracker" in metadata.trackers_searched
-                total_trackers = 1 + len(PUBLIC_TRACKERS)
+                total_trackers = 1 + len(LIVE_PUBLIC_TRACKERS)
                 assert len(metadata.trackers_searched) == total_trackers
 
     @pytest.mark.asyncio
@@ -448,6 +475,15 @@ class TestConcurrentSearch:
 
     @pytest.mark.asyncio
     async def test_search_handles_partial_failures(self):
+        """One working + one crashing tracker: total still completes,
+        error surfaces in metadata.errors.
+
+        We use `rutor` as the raising tracker (a live public tracker
+        that's always in the fan-out). Previously this test used
+        `eztv`, but eztv now lives in `DEAD_PUBLIC_TRACKERS` and never
+        runs — so a raise inside the mock never reached the error
+        pipe.
+        """
         async def mock_search(tracker, query, category):
             if tracker.name == "piratebay":
                 return [
@@ -462,7 +498,7 @@ class TestConcurrentSearch:
                         engine_url="https://thepiratebay.org",
                     )
                 ]
-            if tracker.name == "eztv":
+            if tracker.name == "rutor":
                 raise Exception("Connection refused")
             return []
 

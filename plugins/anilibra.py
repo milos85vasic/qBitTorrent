@@ -38,8 +38,17 @@ class anilibra:
         
         try:
             data = json.loads(html)
-            if 'data' in data:
-                for item in data['data']:
+            # Upstream occasionally returns {"data": null} on empty
+            # search → `for item in None` would crash. Guard so the
+            # plugin exits cleanly with 0 results instead of propagating
+            # a NoneType iteration error up to our subprocess wrapper.
+            if not isinstance(data, dict):
+                return
+            items = data.get('data') or []
+            if not isinstance(items, list):
+                return
+            if items:
+                for item in items:
                     try:
                         name = item.get('names', {}).get('ru', item.get('names', {}).get('en', 'Unknown'))
                         series_id = item.get('id', '')

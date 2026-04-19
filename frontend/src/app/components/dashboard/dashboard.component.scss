@@ -612,6 +612,7 @@ h1 {
     }
 
     .chip-badge { font-size: 10px; }
+    .chip-badge.deadline { color: var(--color-warning, #d9a441); font-size: 11px; }
 
     &.status-error,
     &.status-timeout { border-color: var(--color-danger); }

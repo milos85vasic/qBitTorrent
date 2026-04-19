@@ -1077,6 +1077,47 @@ describe('DashboardComponent', () => {
       expect(chips[1].textContent).toContain('beta');
     });
 
+    it('renders a deadline-hit badge when notes.deadline_hit is true', () => {
+      // When the backend's per-tracker subprocess deadline fires, the
+      // captured NDJSON rows are still surfaced — but the result set
+      // is truncated. The badge tells the operator "there's more where
+      // that came from; raise PUBLIC_TRACKER_DEADLINE_SECONDS".
+      const fx = bootstrap();
+      fx.componentInstance.trackerStats.set([
+        makeStat({
+          name: 'linuxtracker',
+          status: 'success',
+          results_count: 285,
+          notes: { deadline_hit: true, deadline_seconds: 25 },
+        }),
+        makeStat({
+          name: 'piratebay',
+          status: 'success',
+          results_count: 100,
+          notes: {},
+        }),
+      ]);
+      fx.detectChanges();
+
+      const truncatedChip = (fx.nativeElement as HTMLElement).querySelector(
+        '[data-tracker="linuxtracker"]'
+      );
+      const cleanChip = (fx.nativeElement as HTMLElement).querySelector(
+        '[data-tracker="piratebay"]'
+      );
+      expect(truncatedChip).toBeTruthy();
+      expect(cleanChip).toBeTruthy();
+
+      expect(
+        truncatedChip!.querySelector('[data-testid="deadline-hit-badge"]'),
+      ).toBeTruthy();
+      // Clean chip must NOT show the stopwatch — otherwise every chip
+      // would look truncated and the signal is useless.
+      expect(
+        cleanChip!.querySelector('[data-testid="deadline-hit-badge"]'),
+      ).toBeNull();
+    });
+
     it('loadSearchResults populates tracker_stats when present on the response', () => {
       const fx = bootstrap();
       fx.componentInstance.loadSearchResults('sX');

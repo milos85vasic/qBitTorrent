@@ -100,6 +100,57 @@ def test_query_roundtrip_matches(linux_search: Dict) -> None:
         )
 
 
+def test_deadline_hit_is_surfaced_on_slow_trackers(linux_search: Dict) -> None:
+    """Slow plugins (limetorrents, linuxtracker, torrentdownload…) get
+    truncated at the per-tracker deadline. When that happens the API
+    must carry ``notes["deadline_hit"] == True`` so the dashboard can
+    show the stopwatch badge and the operator knows the result set is
+    capped. Without this, a 25-row result from a working tracker and
+    a 25-row truncation look identical.
+    """
+    stats = linux_search.get("tracker_stats", [])
+    truncated = [t for t in stats if t.get("notes", {}).get("deadline_hit")]
+    # At least one plugin in the wild typically hits the 25 s wall on
+    # the "linux" query — linuxtracker, limetorrents, and
+    # torrentdownload routinely do. A floor of 1 keeps the test stable
+    # even when network weather speeds the usual suspects up.
+    assert len(truncated) >= 1, (
+        "No tracker surfaced deadline_hit on the linux search — either "
+        "every slow tracker finished within 25 s (possible but rare) or "
+        "the deadline_hit plumb-through is broken. Check search.py's "
+        "_search_public_tracker → _last_public_tracker_diag → "
+        "stat.notes pipe."
+    )
+    for t in truncated:
+        assert t["notes"].get("deadline_seconds"), (
+            f"tracker {t['name']} has deadline_hit=True but no "
+            "deadline_seconds — the env value isn't being plumbed through"
+        )
+
+
+def test_dead_trackers_excluded_from_fan_out(linux_search: Dict) -> None:
+    """The 16 known-dead public trackers must NOT appear in
+    tracker_stats by default. Otherwise the dashboard drowns in
+    permanently-red chips that can never go green.
+    """
+    stat_names = {t["name"] for t in linux_search.get("tracker_stats", [])}
+    dead = {
+        "eztv", "kickass", "bt4g", "extratorrent", "one337x",
+        "bitru", "megapeer", "yts",
+        "nyaa",
+        "glotorrents", "pctorrent", "yihua", "torrentgalaxy",
+        "xfsub",
+        "yourbittorrent", "anilibra",
+        "solidtorrents", "therarbg", "torrentfunk",
+        "ali213", "btsow", "gamestorrents", "torrentkitty",
+    }
+    leaked = stat_names & dead
+    assert not leaked, (
+        f"Dead trackers leaked into the fan-out: {sorted(leaked)}. "
+        "Check _get_enabled_trackers → DEAD_PUBLIC_TRACKERS filter."
+    )
+
+
 def test_empty_trackers_surface_a_reason(linux_search: Dict) -> None:
     """Every empty tracker should tell us WHY.
 
@@ -132,13 +183,14 @@ def test_empty_trackers_surface_a_reason(linux_search: Dict) -> None:
             f"but no human-readable error summary"
         )
 
-    # Floor: at least a few classifications should be present. When the
-    # stack is working, we typically see >15 classifications (403s from
-    # kickass/eztv/bt4g/etc., DNS failures, timeouts). If that drops to
-    # zero the plumb-through is broken.
-    assert len(classified) >= 5, (
-        f"Only {len(classified)} of {len(empty)} empty trackers had a "
-        "classified error_type — the subprocess-stderr plumb-through is "
-        "likely broken. Empty-without-reason list: "
-        f"{sorted(t['name'] for t in genuinely_empty)}"
+    # Floor: at least one classification should be present. Since the
+    # upstream-dead 403/404/DNS trackers are now filtered out via
+    # `DEAD_PUBLIC_TRACKERS`, the usual classifications left after
+    # filtering are `deadline_timeout` (audiobookbay, torlock) and
+    # occasional `plugin_crashed` (snowfl). If *no* classification
+    # lands, the subprocess-stderr plumb-through is broken.
+    assert len(classified) >= 1, (
+        f"Zero of {len(empty)} empty trackers had a classified "
+        "error_type — the subprocess-stderr plumb-through is broken. "
+        f"Empty-without-reason list: {sorted(t['name'] for t in genuinely_empty)}"
     )

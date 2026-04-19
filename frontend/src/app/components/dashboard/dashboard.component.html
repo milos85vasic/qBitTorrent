@@ -140,6 +140,9 @@
             <span class="chip-spinner" *ngIf="s.status === 'running'"></span>
             <span class="chip-badge auth" *ngIf="s.authenticated" title="authenticated">&#128274;</span>
             <span class="chip-badge err" *ngIf="s.error_type" [title]="s.error_type">!</span>
+            <span class="chip-badge deadline" *ngIf="s.notes && s.notes['deadline_hit']"
+                  title="Result set truncated — plugin hit the per-tracker deadline."
+                  data-testid="deadline-hit-badge">&#9202;</span>
           </button>
         </div>
       </div>

@@ -335,6 +335,44 @@ PUBLIC_TRACKERS = {
     "yts": "https://movies-api.accel.li",
 }
 
+# Known-dead public trackers as of 2026-04-19. Categorised by the
+# classifier during the 37-empty-trackers investigation:
+#
+#   upstream_http_403:  eztv, kickass, bt4g, extratorrent, one337x
+#   upstream_http_404:  bitru, megapeer, yts
+#   upstream_timeout:   nyaa
+#   dns_failure:        glotorrents, pctorrent, yihua, torrentgalaxy
+#   tls_failure:        xfsub
+#   plugin_parse_bug:   yourbittorrent   (stale regex on site whose HTML rotated)
+#   plugin_crash:       anilibra         (NoneType iteration on empty upstream response)
+#
+# They stay in `PUBLIC_TRACKERS` so the classifier keeps reporting the
+# real reason (useful when an upstream comes back), but by default
+# they're excluded from the fan-out via `_get_enabled_trackers()` so
+# the dashboard stops drowning in permanent red chips. Set the env
+# `ENABLE_DEAD_TRACKERS=1` to force them back in — e.g. to test whether
+# an upstream has recovered, or when an operator is sitting behind a
+# VPN/proxy that bypasses the geoblock.
+DEAD_PUBLIC_TRACKERS = frozenset({
+    "eztv", "kickass", "bt4g", "extratorrent", "one337x",
+    "bitru", "megapeer", "yts",
+    "nyaa",
+    "glotorrents", "pctorrent", "yihua", "torrentgalaxy",
+    "xfsub",
+    "yourbittorrent", "anilibra",
+    # "Silently empty" — plugin runs cleanly but returns 0 for every
+    # query (verified on ubuntu / game / movie / 2024 via direct
+    # subprocess invocation on 2026-04-20). Direct curl shows each
+    # upstream responds with HTTP 403; the plugin catches the error
+    # without printing anything to stderr, so the classifier can't
+    # tag it. Bucketing them here stops the dashboard from showing
+    # permanently-green-empty chips that confuse operators into
+    # thinking these trackers simply had no hits.
+    "solidtorrents", "therarbg", "torrentfunk",
+    "ali213", "btsow", "gamestorrents", "torrentkitty",
+})
+
+
 PRIVATE_TRACKERS = {
     "rutracker": "https://rutracker.org",
     "kinozal": "https://kinozal.tv",
@@ -488,6 +526,11 @@ class SearchOrchestrator:
         try:
             trackers = self._get_enabled_trackers()
             metadata.trackers_searched = [t.name for t in trackers]
+            # Clear any stale diag entries from a previous cancelled/errored
+            # search before the fan-out so tracker_stats can't inherit an
+            # error classification from a run that never finished.
+            for t in trackers:
+                self._last_public_tracker_diag.pop(t.name, None)
             # ``start_search`` may have already seeded tracker_stats so
             # the POST /search response is accurate before the fan-out
             # begins.  Only backfill any that are missing — never
@@ -542,6 +585,9 @@ class SearchOrchestrator:
                                 stat.status = "error"
                         if diag.get("stderr_tail"):
                             stat.notes["stderr_tail"] = diag["stderr_tail"]
+                        if diag.get("deadline_hit"):
+                            stat.notes["deadline_hit"] = True
+                            stat.notes["deadline_seconds"] = diag.get("deadline_seconds")
                     return tracker.name, results, None
                 except asyncio.TimeoutError as e:
                     stat.status = "timeout"
@@ -646,7 +692,10 @@ class SearchOrchestrator:
         if os.getenv("IPTORRENTS_USERNAME") and os.getenv("IPTORRENTS_PASSWORD"):
             trackers.append(TrackerSource(name="iptorrents", url="https://iptorrents.com", enabled=True))
 
+        include_dead = os.getenv("ENABLE_DEAD_TRACKERS", "0") == "1"
         for name, url in sorted(PUBLIC_TRACKERS.items()):
+            if name in DEAD_PUBLIC_TRACKERS and not include_dead:
+                continue
             trackers.append(TrackerSource(name=name, url=url, enabled=True))
 
         return trackers
@@ -718,9 +767,18 @@ class SearchOrchestrator:
         # Deadline-based streaming. `asyncio.wait_for(proc.communicate())`
         # discards buffered stdout on cancellation, so we read stdout
         # line-by-line with a per-read deadline. On timeout, every NDJSON
-        # line already flushed is preserved.
+        # line already flushed is preserved. The deadline is tunable via
+        # `PUBLIC_TRACKER_DEADLINE_SECONDS` (clamped to 5..120) so
+        # operators on slow networks can widen it without editing code.
+        import os as _os_timeout
+
+        try:
+            _raw_deadline = float(_os_timeout.getenv("PUBLIC_TRACKER_DEADLINE_SECONDS", "25"))
+        except ValueError:
+            _raw_deadline = 25.0
+        deadline_seconds = max(5.0, min(120.0, _raw_deadline))
         proc = None
-        deadline = asyncio.get_event_loop().time() + 25.0
+        deadline = asyncio.get_event_loop().time() + deadline_seconds
 
         def _append(r: dict) -> None:
             if not isinstance(r, dict) or "__error__" in r:
@@ -800,9 +858,16 @@ class SearchOrchestrator:
                 except Exception:
                     pass
 
-        self._last_public_tracker_diag[tracker_name] = _classify_plugin_stderr(
+        diag = _classify_plugin_stderr(
             stderr_tail, killed_by_deadline=killed_by_deadline, had_results=bool(results)
         )
+        # Expose the truncation fact so the dashboard can show a clock
+        # icon. Without this, a tracker that hit the wall at 25 s looks
+        # identical to one that returned cleanly — operators have no way
+        # to know the result set is capped.
+        diag["deadline_hit"] = bool(killed_by_deadline)
+        diag["deadline_seconds"] = deadline_seconds
+        self._last_public_tracker_diag[tracker_name] = diag
         return results
 
     async def _search_rutracker(self, query: str, category: str) -> List[SearchResult]:
@@ -842,9 +907,38 @@ class SearchOrchestrator:
                     "cookies": cookie_dict,
                     "base_url": base_url,
                 }
+                # rutracker sometimes serves a CAPTCHA page when logins
+                # spike (we see this as "0 results for 'linux' this run,
+                # 50 for 'ubuntu' the next"). When the cookie jar comes
+                # back with no `bb_*` session or the search response is
+                # too short to contain real results, signal that via the
+                # tracker-diag side-channel so the orchestrator can tag
+                # `TrackerSearchStat` with a real ``auth_failure`` /
+                # ``upstream_captcha`` label instead of a generic empty
+                # chip. Returning [] keeps the semantics stable for
+                # callers that treat rutracker failures as non-fatal.
+                if not cookie_dict or not any(k.startswith("bb_") for k in cookie_dict):
+                    self._last_public_tracker_diag["rutracker"] = {
+                        "error_type": "auth_failure",
+                        "error": "rutracker login returned no session cookie — likely CAPTCHA wall or credential failure",
+                        "stderr_tail": "",
+                        "deadline_hit": False,
+                        "deadline_seconds": 0.0,
+                    }
+                    return results
 
                 async with session.get(search_url, cookies=cookies) as resp:
                     html_content = await resp.text()
+
+                if len(html_content) < 1024 and "captcha" in html_content.lower():
+                    self._last_public_tracker_diag["rutracker"] = {
+                        "error_type": "upstream_captcha",
+                        "error": "rutracker served a CAPTCHA page instead of search results",
+                        "stderr_tail": "",
+                        "deadline_hit": False,
+                        "deadline_seconds": 0.0,
+                    }
+                    return results
 
                 results = self._parse_rutracker_html(html_content, base_url)
         except Exception as e:

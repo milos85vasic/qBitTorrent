@@ -49,9 +49,19 @@ class yourbittorrent(object):
 
         def __findTorrents(self, html):
             torrents = []
-            html = re.findall(
+            # yourbittorrent.com rotates its HTML wrapper occasionally.
+            # When the expected `<div class="table-responsive">` chrome
+            # is absent (current state as of 2026-04-19 when logged-out
+            # visitors get an auth wall), the old `re.findall(...)[1]`
+            # raised IndexError and propagated out as an unhandled
+            # plugin exception. Guard with a miss → return [] so the
+            # orchestrator sees "empty" instead of a crash.
+            table_matches = re.findall(
                 r"<div class=\"table-responsive\">.+?</table></div>", html
-            )[1]
+            )
+            if len(table_matches) < 2:
+                return torrents
+            html = table_matches[1]
             trs = re.findall(r"<tr class=\"table-default\">.+?</tr>", html)
             for tr in trs:
                 # Extract from the A node all the needed information

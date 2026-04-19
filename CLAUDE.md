@@ -13,14 +13,28 @@ For deeper reference (technology stack, per-test-file mapping, full gotchas), se
   - Verify tests pass
   - Then commit
 
-- **REBUILD AND REBOOT is MANDATORY after every successful round of changes**:
-  - After all tests pass and fixes are committed, STOP all containers/services
-  - DELETE all `__pycache__` directories inside the container to prevent stale bytecode
-  - REBUILD containers to pick up latest code
-  - RESTART all services (containers + webui-bridge)
-  - VERIFY served content matches committed code (curl check for key changes)
-  - ONLY THEN proceed to manual testing approval
-  - This ensures the running environment matches the committed code exactly
+- **Pick the right restart level** (verified 2026-04-19 against the real
+  `docker-compose.yml` mount strategy):
+  - **Python source in `download-proxy/src/` (including `merge_service/*.py`)**
+    — bind-mounted via `./download-proxy:/config/download-proxy`. Just
+    `podman exec qbittorrent-proxy find /config/download-proxy -name __pycache__ -type d -exec rm -rf {} +`
+    then `podman restart qbittorrent-proxy`.
+  - **Plugin files in `plugins/`** — also bind-mounted through
+    `./config:/config`. After editing, `./install-plugin.sh` copies
+    them into `config/qBittorrent/nova3/engines/` (that path IS the
+    host side of the mount) and `podman restart qbittorrent-proxy`
+    picks them up. A direct edit to `config/qBittorrent/nova3/engines/X.py`
+    works for a one-shot try but will be clobbered on the next install
+    — source of truth is `plugins/X.py`.
+  - **`docker-compose.yml`, `start-proxy.sh`, env vars, base image** —
+    `podman compose down && podman compose up -d` (full recreate). A
+    `podman build` is only needed when `python:3.12-alpine` itself
+    needs to change.
+  - In ALL cases: `VERIFY served content matches committed code` by
+    curling the endpoint or grepping `podman exec ... cat /config/...`
+    — this is the cache-bust guard.
+  See `docs/MERGE_SEARCH_DIAGNOSTICS.md` §"Rebuild / restart contract"
+  for the full table.
 
 - **WebUI credentials `admin`/`admin` are hardcoded** — do not change.
 - **Never commit `.env`** — it contains tracker credentials.
