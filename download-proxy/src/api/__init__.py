@@ -101,15 +101,66 @@ async def health_check():
     return {"status": "healthy", "service": "merge-search", "version": "1.0.0"}
 
 
+@app.get("/api/v1/bridge/health")
+async def bridge_health():
+    """Probe the host webui-bridge (default port 7188).
+
+    The dashboard's "WebUI Bridge" link becomes disabled when this
+    returns ``healthy: false`` so users don't land on a dead page.
+    """
+    import aiohttp
+
+    bridge_url = os.getenv("BRIDGE_URL", "http://localhost:7188")
+    bridge_port = int(os.getenv("BRIDGE_PORT", "7188"))
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                bridge_url,
+                timeout=aiohttp.ClientTimeout(total=2),
+                allow_redirects=False,
+            ) as resp:
+                # Any 2xx / 3xx / 401 means something is listening.
+                healthy = resp.status < 500
+                return {
+                    "healthy": healthy,
+                    "status_code": resp.status,
+                    "bridge_url": bridge_url,
+                    "port": bridge_port,
+                }
+    except Exception as e:
+        logger.debug(f"Bridge health probe failed: {e}")
+        return {
+            "healthy": False,
+            "error": str(e),
+            "bridge_url": bridge_url,
+            "port": bridge_port,
+        }
+
+
 @app.get("/api/v1/config")
 async def get_config():
+    """Return the dashboard's user-facing service URLs.
+
+    ``qbittorrent_url`` points to the authenticated download proxy
+    (default port 7186) — the container-internal qBittorrent WebUI
+    (port 7185) answers 401 Unauthorized without the proxy shim.
+    ``qbittorrent_internal_url`` is still exposed for tooling that
+    needs the direct container endpoint.
+    """
     from config import get_config as load_config
 
     cfg = load_config()
+    # Externally accessible URL — browser goes through the auth proxy
+    # so the "qBittorrent WebUI" link does not land on a 401.
+    proxy_host = os.getenv("PROXY_HOST", cfg.qbittorrent_host)
+    proxy_port = int(os.getenv("PROXY_PORT", "7186"))
+    qbittorrent_webui_url = f"http://{proxy_host}:{proxy_port}"
     return {
-        "qbittorrent_url": f"http://{cfg.qbittorrent_host}:{cfg.qbittorrent_port}",
+        "qbittorrent_url": qbittorrent_webui_url,
+        "qbittorrent_internal_url": f"http://{cfg.qbittorrent_host}:{cfg.qbittorrent_port}",
         "qbittorrent_port": cfg.qbittorrent_port,
         "qbittorrent_host": cfg.qbittorrent_host,
+        "proxy_port": proxy_port,
     }
 
 

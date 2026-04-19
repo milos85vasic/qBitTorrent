@@ -42,6 +42,22 @@ class TestConfigEndpoint:
         assert "qbittorrent_host" in data
         assert data["qbittorrent_port"] == 7185
 
+    def test_config_qbittorrent_url_points_at_proxy(self):
+        """qBittorrent WebUI link must go through the authenticated proxy.
+
+        The in-container WebUI (port 7185) answers 401 without the proxy
+        shim, so the dashboard link must target the proxy port instead.
+        """
+        response = client.get("/api/v1/config")
+        assert response.status_code == 200
+        data = response.json()
+        # The proxy port defaults to 7186 and is what the browser should hit.
+        assert str(data.get("proxy_port", "")).endswith("7186")
+        assert "7186" in data["qbittorrent_url"]
+        # Internal URL is still exposed for tooling.
+        assert "qbittorrent_internal_url" in data
+        assert "7185" in data["qbittorrent_internal_url"]
+
 
 class TestHealthEndpoint:
     def test_health_check(self):
@@ -49,6 +65,30 @@ class TestHealthEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
+
+
+class TestBridgeHealthEndpoint:
+    def test_bridge_health_endpoint_exists(self):
+        """GET /api/v1/bridge/health always returns 200 with {healthy: bool}.
+
+        The probe itself talks to 127.0.0.1:<BRIDGE_PORT> with a 2s
+        timeout, so the endpoint never raises — it just reports
+        ``healthy: false`` when the host bridge is down.
+        """
+        response = client.get("/api/v1/bridge/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert "healthy" in data
+        assert isinstance(data["healthy"], bool)
+        assert "bridge_url" in data
+
+    def test_bridge_health_reports_down_when_unreachable(self, monkeypatch):
+        """If the bridge URL is misconfigured to a dead port, healthy=False."""
+        monkeypatch.setenv("BRIDGE_URL", "http://127.0.0.1:1")
+        response = client.get("/api/v1/bridge/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["healthy"] is False
 
 
 class TestStatsEndpoint:
