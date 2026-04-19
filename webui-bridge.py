@@ -21,6 +21,19 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import urllib.request
 import urllib.parse
 
+# Share the theme-bridge helpers with the sibling download-proxy so
+# the qBittorrent WebUI picks up our Darcula (or whatever is active)
+# palette regardless of which proxy served the page.
+_REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+_PLUGINS_DIR = os.path.join(_REPO_ROOT, "plugins")
+if _PLUGINS_DIR not in sys.path:
+    sys.path.insert(0, _PLUGINS_DIR)
+try:
+    import theme_injector  # type: ignore[import-untyped]
+except Exception as _exc:  # pragma: no cover — defensive
+    theme_injector = None  # type: ignore[assignment]
+    print(f"[WebUI-Bridge] theme_injector unavailable: {_exc}")
+
 # Configuration
 QBITTORRENT_HOST = os.environ.get("QBITTORRENT_HOST", "localhost")
 QBITTORRENT_PORT = int(os.environ.get("QBITTORRENT_PORT", "7185"))
@@ -56,6 +69,20 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
             query = urllib.parse.parse_qs(parsed.query)
+
+            # Serve the theme-bridge assets locally (skin.css + bootstrap.js)
+            # so the user-visible theme is identical to what the
+            # download-proxy at :7186 serves. Must come BEFORE the
+            # qBittorrent passthrough — these paths do not exist on the
+            # qBittorrent WebUI side.
+            if path.startswith("/__qbit_theme__/") and theme_injector is not None:
+                status, headers, payload = theme_injector.serve_theme_asset(path)
+                self.send_response(status)
+                for k, v in headers.items():
+                    self.send_header(k, v)
+                self.end_headers()
+                self.wfile.write(payload)
+                return
 
             # Check if this is a torrent download
             if "urls" in query:
@@ -206,14 +233,51 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
                 req.add_header(header, value)
 
             with urllib.request.urlopen(req, timeout=30) as resp:
+                raw_body = resp.read()
+                # Collect upstream headers so we can rewrite them before
+                # echoing. We need to strip transfer-encoding and rewrite
+                # content-length after any mutation.
+                upstream_headers = list(resp.headers.items())
+                content_type = resp.headers.get("Content-Type") or ""
+                content_encoding = resp.headers.get("Content-Encoding") or ""
+
+                # Theme bridge: on text/html, decompress (if gzipped),
+                # inject the two bridge tags, drop the encoding header,
+                # rewrite CSP so bootstrap.js can reach the merge
+                # service, and update Content-Length.
+                body = raw_body
+                mutated = False
+                stripped_encoding = False
+                if theme_injector is not None and content_type.lower().startswith("text/html"):
+                    decoded, ok = theme_injector.maybe_decode_body(raw_body, content_encoding)
+                    if ok:
+                        new_body = theme_injector.inject_theme_assets(decoded, content_type)
+                        if new_body is not decoded and new_body != decoded:
+                            body = new_body
+                            mutated = True
+                        elif content_encoding:
+                            body = decoded
+                            mutated = True
+                        if content_encoding:
+                            stripped_encoding = True
+
                 self.send_response(resp.status)
-                for header, value in resp.headers.items():
-                    # Let urllib handle chunked encoding bookkeeping.
-                    if header.lower() == "transfer-encoding":
+                for header, value in upstream_headers:
+                    header_lower = header.lower()
+                    if header_lower == "transfer-encoding":
                         continue
+                    if header_lower == "content-encoding" and stripped_encoding:
+                        continue
+                    if header_lower == "content-length" and mutated:
+                        # Recomputed below.
+                        continue
+                    if header_lower == "content-security-policy" and theme_injector is not None:
+                        value = theme_injector.rewrite_csp(value)
                     self.send_header(header, value)
+                if mutated:
+                    self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(resp.read())
+                self.wfile.write(body)
 
         except urllib.error.HTTPError as e:
             # Forward qBittorrent's status/headers/body so auth failures
