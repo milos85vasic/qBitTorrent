@@ -99,6 +99,33 @@
 
     <!-- Results Tab -->
     <div *ngIf="activeTab() === 'results'">
+      <div class="tracker-stats-bar" *ngIf="trackerStats().length > 0" data-testid="tracker-stats-bar">
+        <h3 class="stats-heading">
+          Trackers hit ({{ trackerStatsSummary().completedCount }} / {{ trackerStats().length }})
+          <span class="stats-pill success" *ngIf="trackerStatsSummary().successCount">&#10003; {{ trackerStatsSummary().successCount }}</span>
+          <span class="stats-pill empty"   *ngIf="trackerStatsSummary().emptyCount">&#8709; {{ trackerStatsSummary().emptyCount }}</span>
+          <span class="stats-pill error"   *ngIf="trackerStatsSummary().errorCount">&#9888; {{ trackerStatsSummary().errorCount }}</span>
+          <span class="stats-pill running" *ngIf="trackerStatsSummary().runningCount">&hellip; {{ trackerStatsSummary().runningCount }}</span>
+        </h3>
+        <div class="tracker-chips">
+          <button type="button"
+                  *ngFor="let s of trackerStats(); trackBy: trackStatByName"
+                  class="tracker-stat-chip"
+                  [class]="'status-' + s.status"
+                  [attr.data-tracker]="s.name"
+                  [attr.data-status]="s.status"
+                  [attr.aria-label]="'Details for ' + s.name"
+                  (click)="openTrackerStatDialog(s)">
+            <span class="status-dot" [class]="'dot-' + s.status"></span>
+            <span class="chip-name">{{ s.name }}</span>
+            <span class="chip-count" *ngIf="s.status !== 'pending' && s.status !== 'running'">{{ s.results_count }}</span>
+            <span class="chip-spinner" *ngIf="s.status === 'running'"></span>
+            <span class="chip-badge auth" *ngIf="s.authenticated" title="authenticated">&#128274;</span>
+            <span class="chip-badge err" *ngIf="s.error_type" [title]="s.error_type">!</span>
+          </button>
+        </div>
+      </div>
+
       <div *ngIf="sortedResults().length === 0 && liveResults().length === 0" class="empty-state">
         No search results yet. Enter a query above.
       </div>
@@ -241,3 +268,4 @@
 
 <app-magnet-dialog></app-magnet-dialog>
 <app-qbit-login-dialog></app-qbit-login-dialog>
+<app-tracker-stat-dialog></app-tracker-stat-dialog>

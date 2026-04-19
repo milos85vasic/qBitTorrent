@@ -16,8 +16,27 @@ export interface SearchResponse {
   total_results: number;
   merged_results: number;
   trackers_searched: string[];
+  tracker_stats?: TrackerSearchStat[];
   started_at: string;
   completed_at?: string;
+}
+
+export interface TrackerSearchStat {
+  name: string;
+  tracker_url: string;
+  status: 'pending' | 'running' | 'success' | 'empty' | 'error' | 'timeout' | 'cancelled';
+  results_count: number;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
+  error: string | null;
+  error_type: string | null;
+  authenticated: boolean;
+  attempt: number;
+  http_status: number | null;
+  category: string;
+  query: string;
+  notes: Record<string, unknown>;
 }
 
 export interface SearchResult {

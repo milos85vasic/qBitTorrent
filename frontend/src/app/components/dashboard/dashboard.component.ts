@@ -9,10 +9,11 @@ import { DialogService } from '../../services/dialog.service';
 import { SseService } from '../../services/sse.service';
 import {
   SearchResult, ActiveDownload, Schedule, Hook,
-  TrackerStatus, Source
+  TrackerStatus, Source, TrackerSearchStat
 } from '../../models/search.model';
 import { MagnetDialogComponent } from '../magnet-dialog/magnet-dialog.component';
 import { QbitLoginDialogComponent } from '../qbit-login-dialog/qbit-login-dialog.component';
+import { TrackerStatDialogComponent } from '../tracker-stat-dialog/tracker-stat-dialog.component';
 
 export interface TrackerChip {
   name: string;
@@ -29,7 +30,7 @@ export interface SourceStats {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScrollingModule, MagnetDialogComponent, QbitLoginDialogComponent],
+  imports: [CommonModule, FormsModule, ScrollingModule, MagnetDialogComponent, QbitLoginDialogComponent, TrackerStatDialogComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
@@ -42,6 +43,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   @ViewChild(MagnetDialogComponent) magnetDialog!: MagnetDialogComponent;
   @ViewChild(QbitLoginDialogComponent) qbitDialog!: QbitLoginDialogComponent;
+  @ViewChild(TrackerStatDialogComponent) trackerStatDialog!: TrackerStatDialogComponent;
 
   // Search state
   query = signal('');
@@ -53,6 +55,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   totalResults = signal(0);
   mergedResults = signal(0);
   searchErrors = signal<string[]>([]);
+  trackerStats = signal<TrackerSearchStat[]>([]);
 
   // Sorting
   sortColumn = signal('seeds');
@@ -64,6 +67,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const col = this.sortColumn();
     const dir = this.sortDirection();
     return this._sort(rows, col, dir);
+  });
+
+  // Bucket counts for the per-tracker chip bar header.  Running +
+  // pending share a bucket because from the user's perspective they
+  // are both "in flight".
+  readonly trackerStatsSummary = computed(() => {
+    const stats = this.trackerStats();
+    return {
+      successCount: stats.filter(s => s.status === 'success').length,
+      emptyCount:   stats.filter(s => s.status === 'empty').length,
+      errorCount:   stats.filter(s => s.status === 'error' || s.status === 'timeout').length,
+      runningCount: stats.filter(s => s.status === 'running' || s.status === 'pending').length,
+      completedCount: stats.filter(s => !['pending', 'running'].includes(s.status)).length,
+    };
   });
 
   // Tabs
@@ -217,11 +234,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.results.set([]);
     this.liveResults.set([]);
     this.searchErrors.set([]);
+    this.trackerStats.set([]);
 
     this.api.search({ query: q, limit: 50, sort_by: this.sortColumn(), sort_order: this.sortDirection() }).subscribe({
       next: (resp) => {
         this.searchId.set(resp.search_id);
         this.searchStatus.set(`Found ${resp.total_results} results...`);
+        this.trackerStats.set(((resp as any).tracker_stats as TrackerSearchStat[]) || []);
         if (resp.status === 'completed' && resp.results.length > 0) {
           this.results.set(resp.results);
           this.totalResults.set(resp.total_results);
@@ -251,6 +270,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
         case 'results_update':
           this.searchStatus.set(`Found ${event.data.total_results} results...`);
           break;
+        case 'tracker_started':
+          this.onTrackerStarted(event.data);
+          break;
+        case 'tracker_completed':
+          this.onTrackerCompleted(event.data);
+          break;
         case 'search_complete':
           this.isSearching.set(false);
           if (event.data.total_results > 0) {
@@ -270,12 +295,79 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  onTrackerStarted(data: any): void {
+    if (!data || typeof data.name !== 'string') return;
+    this.trackerStats.update(stats => {
+      const name = data.name as string;
+      const next = stats.slice();
+      const idx = next.findIndex(s => s.name === name);
+      if (idx >= 0) {
+        next[idx] = {
+          ...next[idx],
+          status: 'running',
+          started_at: data.started_at ?? next[idx].started_at,
+        };
+      } else {
+        next.push(this.normaliseStat({ ...data, status: 'running' }));
+      }
+      return next;
+    });
+  }
+
+  onTrackerCompleted(data: any): void {
+    if (!data || typeof data.name !== 'string') return;
+    this.trackerStats.update(stats => {
+      const name = data.name as string;
+      const next = stats.slice();
+      const idx = next.findIndex(s => s.name === name);
+      const merged = this.normaliseStat({ ...(idx >= 0 ? next[idx] : {}), ...data });
+      if (idx >= 0) {
+        next[idx] = merged;
+      } else {
+        next.push(merged);
+      }
+      return next;
+    });
+  }
+
+  private normaliseStat(raw: any): TrackerSearchStat {
+    return {
+      name: raw.name ?? 'unknown',
+      tracker_url: raw.tracker_url ?? '',
+      status: (raw.status ?? 'pending') as TrackerSearchStat['status'],
+      results_count: raw.results_count ?? 0,
+      started_at: raw.started_at ?? null,
+      completed_at: raw.completed_at ?? null,
+      duration_ms: raw.duration_ms ?? null,
+      error: raw.error ?? null,
+      error_type: raw.error_type ?? null,
+      authenticated: !!raw.authenticated,
+      attempt: raw.attempt ?? 1,
+      http_status: raw.http_status ?? null,
+      category: raw.category ?? 'all',
+      query: raw.query ?? '',
+      notes: raw.notes ?? {},
+    };
+  }
+
+  trackStatByName(_i: number, s: TrackerSearchStat): string {
+    return s.name;
+  }
+
+  openTrackerStatDialog(stat: TrackerSearchStat): void {
+    this.trackerStatDialog?.open(stat);
+  }
+
   loadSearchResults(searchId: string): void {
     this.api.getSearch(searchId).subscribe(resp => {
       this.results.set(resp.results);
       this.totalResults.set(resp.total_results);
       this.mergedResults.set(resp.merged_results);
       this.searchErrors.set((resp as any).errors || []);
+      const stats = (resp as any).tracker_stats as TrackerSearchStat[] | undefined;
+      if (stats && stats.length > 0) {
+        this.trackerStats.set(stats);
+      }
     });
   }
 

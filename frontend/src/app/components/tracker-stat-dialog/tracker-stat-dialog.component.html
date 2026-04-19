@@ -1,0 +1,81 @@
+<div class="modal-overlay show" *ngIf="visible() && stat() as s" (click)="onBackdrop($event)" data-testid="tracker-stat-dialog">
+  <div class="modal" role="dialog" aria-modal="true" [attr.aria-label]="'Tracker diagnostics for ' + s.name">
+    <header class="dialog-header">
+      <div class="title-row">
+        <span class="status-dot" [class]="'dot-' + s.status"></span>
+        <h3>{{ s.name }}</h3>
+        <span class="status-badge" [class]="statusClass(s.status)">{{ s.status }}</span>
+      </div>
+      <button class="close-x" type="button" (click)="close()" aria-label="Close">&times;</button>
+    </header>
+
+    <section class="dialog-section">
+      <h4>Identity</h4>
+      <dl class="kv">
+        <dt>Name</dt><dd>{{ s.name }}</dd>
+        <dt>URL</dt><dd><code>{{ s.tracker_url || '-' }}</code></dd>
+        <dt>Authenticated</dt>
+        <dd>
+          <span class="auth-badge" [class.yes]="s.authenticated" [class.no]="!s.authenticated">
+            {{ s.authenticated ? 'yes (session/credentials present)' : 'no (public tracker or no credentials)' }}
+          </span>
+        </dd>
+      </dl>
+    </section>
+
+    <section class="dialog-section">
+      <h4>Timing</h4>
+      <dl class="kv">
+        <dt>Started</dt><dd>{{ formatTimestamp(s.started_at) }}</dd>
+        <dt>Completed</dt><dd>{{ formatTimestamp(s.completed_at) }}</dd>
+        <dt>Duration</dt><dd>{{ formatDuration(s.duration_ms) }}</dd>
+      </dl>
+    </section>
+
+    <section class="dialog-section">
+      <h4>Result</h4>
+      <dl class="kv">
+        <dt>Status</dt><dd><span class="status-badge" [class]="statusClass(s.status)">{{ s.status }}</span></dd>
+        <dt>Results</dt><dd>{{ s.results_count }}</dd>
+        <dt>HTTP Status</dt><dd>{{ s.http_status ?? '-' }}</dd>
+      </dl>
+    </section>
+
+    <section class="dialog-section">
+      <h4>Query</h4>
+      <dl class="kv">
+        <dt>Query</dt><dd><code>{{ s.query || '-' }}</code></dd>
+        <dt>Category</dt><dd>{{ s.category || 'all' }}</dd>
+        <dt>Attempt</dt><dd>{{ s.attempt }}</dd>
+      </dl>
+    </section>
+
+    <section *ngIf="s.error || s.error_type" class="dialog-section error-section" data-testid="error-section">
+      <h4>Error</h4>
+      <dl class="kv">
+        <dt>Type</dt><dd><code>{{ s.error_type || '-' }}</code></dd>
+        <dt>Message</dt><dd><code>{{ s.error || '-' }}</code></dd>
+      </dl>
+    </section>
+
+    <section *ngIf="hasNotes()" class="dialog-section">
+      <h4>Notes</h4>
+      <dl class="kv">
+        <ng-container *ngFor="let note of notesEntries()">
+          <dt>{{ note.key }}</dt>
+          <dd><code>{{ note.value }}</code></dd>
+        </ng-container>
+      </dl>
+    </section>
+
+    <section class="dialog-section">
+      <h4>Raw JSON</h4>
+      <pre class="raw-json" data-testid="raw-json">{{ asJson() }}</pre>
+    </section>
+
+    <footer class="dialog-actions">
+      <button type="button" class="btn btn-secondary" (click)="copyJson()" data-testid="copy-json-btn">{{ copyLabel() }}</button>
+      <button type="button" class="btn btn-primary" (click)="close()" data-testid="close-btn">Close</button>
+    </footer>
+  </div>
+</div>
