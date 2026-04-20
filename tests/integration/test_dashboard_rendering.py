@@ -42,14 +42,12 @@ class TestDashboardHtmlStructure:
 class TestSearchApiResponseStructure:
     """Verify search API returns properly structured results."""
 
-    @pytest.fixture(scope="class")
-    def search_data(self, merge_service_live):
-        data = requests.post(
-            f"{merge_service_live}/api/v1/search/sync",
-            json={"query": "linux", "limit": 5},
-            timeout=180,
-        ).json()
-        return data
+    @pytest.fixture
+    def search_data(self, live_search_result):
+        # Uses the session-wide memo + file-lock serialiser, so the
+        # six assertion tests in this class share ONE 120-s search
+        # instead of each paying for their own.
+        return live_search_result("linux", 5)
 
     def test_search_returns_required_fields(self, search_data):
         assert "results" in search_data

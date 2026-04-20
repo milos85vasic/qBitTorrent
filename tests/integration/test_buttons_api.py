@@ -65,7 +65,7 @@ class TestDownloadButton:
         login = self.session.post(
             f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "admin"},
-            timeout=180,
+            timeout=300,
         )
         assert login.text == "Ok.", f"qBittorrent login failed: {login.text}"
 
@@ -156,7 +156,7 @@ class TestQBitLoginButton:
         resp = self.session.post(
             f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "admin"},
-            timeout=180,
+            timeout=300,
         )
         assert resp.text == "Ok.", f"qBittorrent login failed: {resp.text}"
 

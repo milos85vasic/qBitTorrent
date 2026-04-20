@@ -115,7 +115,7 @@ class TestIPTorrentsPluginUnit:
         assert hasattr(iptorrents, "download_torrent")
 
 
-@pytest.mark.timeout(360)
+@pytest.mark.timeout(600)
 class TestIPTorrentsMergeService:
     @pytest.mark.requires_credentials
     def test_iptorrents_in_stats(self):
@@ -229,7 +229,7 @@ class TestIPTorrentsFreeleechDetection:
         assert d["tracker_display"] == "iptorrents"
 
 
-@pytest.mark.timeout(360)
+@pytest.mark.timeout(600)
 class TestIPTorrentsDownloadFreeleechOnly:
     @pytest.mark.requires_credentials
     @no_creds

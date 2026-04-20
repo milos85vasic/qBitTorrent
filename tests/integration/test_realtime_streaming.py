@@ -32,7 +32,10 @@ class SSECapture:
     def start(self):
         def _run():
             try:
-                resp = requests.get(self.url, stream=True, timeout=30)
+                # (connect-timeout, read-timeout) — long read timeout
+                # because an SSE stream can sit idle for many seconds
+                # between per-tracker events during a slow fan-out.
+                resp = requests.get(self.url, stream=True, timeout=(10, 300))
                 for line in resp.iter_lines():
                     if line:
                         line = line.decode("utf-8")
@@ -204,22 +207,34 @@ class TestSSEStreaming:
 
         sse.close()
 
-        # The SSE stream emits several event types whose JSON bodies
-        # can all contain the substring "completed" (e.g.
-        # tracker_completed carries a `completed_at` field). Match the
-        # real search_complete event by total_results presence — that
-        # key exists on SearchMetadata.to_dict() only.
-        complete_events = [
-            e for e in sse.events
-            if '"total_results"' in e and '"status"' in e
-        ]
-        assert len(complete_events) > 0, (
-            f"Should have search_complete event (events captured: "
-            f"{len(sse.events)})"
+        # SSECapture only stores the `data:` JSON payload of each
+        # event, so we can't filter by event-name field. Identify the
+        # real ``search_complete`` event by its unique keys:
+        # ``trackers_searched`` (a list — not present on per-tracker
+        # events) + ``merged_results``.
+        complete_events = []
+        for e in sse.events:
+            if not e.startswith("{"):
+                continue
+            try:
+                payload = json.loads(e)
+            except Exception:
+                continue
+            if (
+                isinstance(payload, dict)
+                and "trackers_searched" in payload
+                and "merged_results" in payload
+                and "total_results" in payload
+            ):
+                complete_events.append(payload)
+
+        assert complete_events, (
+            f"Should have search_complete event (captured {len(sse.events)} "
+            f"events; sample keys from first 3: "
+            f"{[list(json.loads(e).keys())[:5] for e in sse.events[:3] if e.startswith('{')]})"
         )
 
-        complete_data = json.loads(complete_events[-1])
-        assert "total_results" in complete_data, "Complete event should have total_results"
+        complete_data = complete_events[-1]
         assert complete_data["total_results"] > 0, "Should find some results"
 
 

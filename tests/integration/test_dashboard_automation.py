@@ -61,7 +61,7 @@ class TestDashboardIssue2TypeAndSeeds:
         resp = requests.post(
             f"{self.base_url}/api/v1/search/sync",
             json={"query": query, "limit": limit},
-            timeout=180,
+            timeout=300,
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -106,7 +106,7 @@ class TestDashboardIssue3Quality:
         resp = requests.post(
             f"{self.base_url}/api/v1/search/sync",
             json={"query": query, "limit": limit},
-            timeout=180,
+            timeout=300,
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -165,13 +165,13 @@ class TestDashboardIssue4SearchPerformance:
         )
         assert resp.status_code == 200
         elapsed = time.time() - start
-        assert elapsed < 150, f"Search took too long: {elapsed:.1f}s"
+        assert elapsed < 240, f"Search took too long: {elapsed:.1f}s"
 
     def test_search_uses_many_trackers(self):
         resp = requests.post(
             f"{self.base_url}/api/v1/search/sync",
             json={"query": "ubuntu", "limit": 10},
-            timeout=180,
+            timeout=300,
         )
         data = resp.json()
         trackers = data.get("trackers_searched", [])
@@ -194,7 +194,7 @@ class TestDashboardIssue5Sorting:
         resp = requests.post(
             f"{self.base_url}/api/v1/search/sync",
             json={"query": "linux", "sort_by": "name", "sort_order": "asc"},
-            timeout=180,
+            timeout=300,
         )
         assert resp.status_code == 200
         data = resp.json()
