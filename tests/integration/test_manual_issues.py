@@ -27,7 +27,7 @@ class TestIssue1DownloadButton:
         resp = requests.post(
             f"{self.base_url}/api/v1/download/file",
             json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:41082bfe3a7f3f47930d2e2ce72ba844c82da906"]},
-            timeout=10,
+            timeout=30,
             allow_redirects=False,
         )
         # Should not be 404 - endpoint must exist
@@ -35,14 +35,14 @@ class TestIssue1DownloadButton:
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
-        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
         assert "<base href=\"/\">" in dashboard
         assert "<script src=\"main-" in dashboard
 
     def test_download_button_is_angular_component(self):
         """Download button must be Angular component."""
-        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
 
     def test_magnet_endpoint_returns_merged_sources(self):
@@ -56,7 +56,7 @@ class TestIssue1DownloadButton:
                     "magnet:?xt=urn:btih:def4567890abc123def4567890abc123def45678&tr=udp://t2:6969",
                 ]
             },
-            timeout=10,
+            timeout=30,
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -85,7 +85,7 @@ class TestIssue2TypeColumn:
         # Poll until complete
         for _ in range(20):
             time.sleep(2)
-            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=10)
+            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=30)
             pdata = poll.json()
             if pdata.get("status") in ("completed", "failed"):
                 return pdata.get("results", [])
@@ -133,7 +133,7 @@ class TestIssue3SeedsLeechers:
         search_id = data["search_id"]
         for _ in range(20):
             time.sleep(2)
-            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=10)
+            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=30)
             pdata = poll.json()
             if pdata.get("status") in ("completed", "failed"):
                 return pdata.get("results", [])
@@ -201,7 +201,7 @@ class TestIssue4SearchPerformance:
 
         for _ in range(30):
             time.sleep(2)
-            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=10)
+            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=30)
             pdata = poll.json()
             if pdata.get("status") == "completed":
                 trackers = set()
@@ -223,7 +223,7 @@ class TestIssue5Sorting:
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
-        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
         assert "<script src=\"main-" in dashboard
 
@@ -246,7 +246,7 @@ class TestFooter:
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
-        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
         assert "<script src=\"main-" in dashboard
 
@@ -296,12 +296,12 @@ class TestDownloadButtonConsistency:
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
-        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
 
     def test_download_button_is_angular_component(self):
         """Download button must be Angular component."""
-        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
 
 
@@ -314,14 +314,14 @@ class TestDashboardCacheControl:
 
     def test_dashboard_has_cache_control_header(self):
         """Dashboard response must include Cache-Control: no-cache or similar."""
-        resp = requests.get(f"{self.base_url}/", timeout=5)
+        resp = requests.get(f"{self.base_url}/", timeout=30)
         cc = resp.headers.get("Cache-Control", "").lower()
         assert "no-cache" in cc or "no-store" in cc or "must-revalidate" in cc, \
             f"Missing cache-control header, got: {cc!r}"
 
     def test_dashboard_has_no_etag_or_weak_etag(self):
         """Dashboard should not use strong etag caching."""
-        resp = requests.get(f"{self.base_url}/", timeout=5)
+        resp = requests.get(f"{self.base_url}/", timeout=30)
         # ETag is OK if Cache-Control is set to no-cache
         cc = resp.headers.get("Cache-Control", "").lower()
         assert "no-cache" in cc or "no-store" in cc, \

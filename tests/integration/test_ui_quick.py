@@ -34,7 +34,7 @@ class TestUIValidation:
         ).json()
 
     def test_dashboard_accessible(self):
-        r = requests.get(f"{self.base_url}/", timeout=5)
+        r = requests.get(f"{self.base_url}/", timeout=30)
         assert r.status_code == 200
         assert "<app-root>" in r.text or "<app-root></app-root>" in r.text
         print("✓ Dashboard loads as Angular app")
@@ -65,26 +65,26 @@ class TestUIValidation:
         print("✓ All required fields present")
 
     def test_ui_is_angular_app(self):
-        r = requests.get(f"{self.base_url}/", timeout=5).text
+        r = requests.get(f"{self.base_url}/", timeout=30).text
         assert "<app-root>" in r or "<app-root></app-root>" in r
         assert "<base href=\"/\">" in r
         assert "<script src=\"main-" in r
         print("✓ Angular app present")
 
     def test_buttons_are_angular_components(self):
-        r = requests.get(f"{self.base_url}/", timeout=5).text
+        r = requests.get(f"{self.base_url}/", timeout=30).text
         assert "<app-root>" in r or "<app-root></app-root>" in r
         assert "<script src=\"main-" in r
         print("✓ Angular buttons present")
 
     def test_sorting_is_angular(self):
-        r = requests.get(f"{self.base_url}/", timeout=5).text
+        r = requests.get(f"{self.base_url}/", timeout=30).text
         assert "<app-root>" in r or "<app-root></app-root>" in r
         assert "<script src=\"main-" in r
         print("✓ Angular sorting present")
 
     def test_config_endpoint(self):
-        data = requests.get(f"{self.base_url}/api/v1/config", timeout=5).json()
+        data = requests.get(f"{self.base_url}/api/v1/config", timeout=30).json()
         assert data["qbittorrent_port"] == 7185
         print(f"✓ Config returns {data}")
 

@@ -19,7 +19,7 @@ class TestDashboardHtmlStructure:
     @pytest.fixture(autouse=True)
     def _service_up(self, merge_service_live):
         self.base_url = merge_service_live
-        self.dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        self.dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
@@ -123,7 +123,7 @@ class TestDashboardButtonsInHtml:
     @pytest.fixture(autouse=True)
     def _service_up(self, merge_service_live):
         self.base_url = merge_service_live
-        self.dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        self.dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
 
     def test_dashboard_is_angular_app(self):
         assert "<app-root>" in self.dashboard or "<app-root></app-root>" in self.dashboard

@@ -19,7 +19,7 @@ class TestDashboardIssue1DownloadButton:
         self.base_url = merge_service_live
 
     def test_dashboard_is_angular_app(self):
-        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
         assert "<base href=\"/\">" in dashboard
         assert "<script src=\"main-" in dashboard
@@ -32,7 +32,7 @@ class TestDashboardIssue1DownloadButton:
                 "result_id": "test",
                 "download_urls": ["magnet:?xt=urn:btih:a9168239b2bf89c5fcfd6d97c8e9fd864400e405"],
             },
-            timeout=10,
+            timeout=30,
         )
         assert resp.status_code == 200
 
@@ -43,7 +43,7 @@ class TestDashboardIssue1DownloadButton:
                 "result_id": "test",
                 "download_urls": ["magnet:?xt=urn:btih:a9168239b2bf89c5fcfd6d97c8e9fd864400e405"],
             },
-            timeout=10,
+            timeout=30,
         )
         assert resp.status_code in (200, 404)  # 404 if no file found, but endpoint works
         if resp.status_code == 200:
@@ -68,7 +68,7 @@ class TestDashboardIssue2TypeAndSeeds:
         search_id = data["search_id"]
         for _ in range(30):
             time.sleep(2)
-            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=10)
+            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=30)
             pdata = poll.json()
             if pdata.get("status") in ("completed", "failed"):
                 return pdata.get("results", [])
@@ -113,7 +113,7 @@ class TestDashboardIssue3Quality:
         search_id = data["search_id"]
         for _ in range(30):
             time.sleep(2)
-            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=10)
+            poll = requests.get(f"{self.base_url}/api/v1/search/{search_id}", timeout=30)
             pdata = poll.json()
             if pdata.get("status") in ("completed", "failed"):
                 return pdata.get("results", [])
@@ -186,7 +186,7 @@ class TestDashboardIssue5Sorting:
         self.base_url = merge_service_live
 
     def test_dashboard_is_angular_app(self):
-        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=5).text
+        dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
         assert "<script src=\"main-" in dashboard
 

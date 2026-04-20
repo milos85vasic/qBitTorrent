@@ -201,9 +201,10 @@ WebUI\Port=${WEBUI_PORT:-7185}
 WebUI\Address=*
 WebUI\Username=admin
 WebUI\Password_PBKDF2="@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)"
-WebUI\LocalHostAuth=false
-WebUI\AuthSubnetWhitelist=0.0.0.0/0
-WebUI\AuthSubnetWhitelistEnabled=true
+WebUI\LocalHostAuth=true
+WebUI\AuthSubnetWhitelistEnabled=false
+WebUI\MaxAuthenticationFailCount=1000000
+WebUI\BanDuration=1
 WebUI\ServerDomains=*
 WebUI\UseUPNP=true
 WebUI\UseHTTPS=false

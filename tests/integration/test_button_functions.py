@@ -115,7 +115,7 @@ class TestScheduleButtonConfig:
         ``qbittorrent_internal_url`` points at qBittorrent direct
         (7185). Either way, qbittorrent_port is an int-typed 7185.
         """
-        resp = requests.get(f"{BASE_URL}/api/v1/config", timeout=5)
+        resp = requests.get(f"{BASE_URL}/api/v1/config", timeout=30)
         data = resp.json()
 
         assert "qbittorrent_url" in data

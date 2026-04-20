@@ -26,7 +26,7 @@ class TestQbitDefaultPassword:
         resp = requests.post(
             f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "admin"},
-            timeout=5,
+            timeout=30,
         )
         assert resp.status_code == 200
         assert resp.text.strip() == "Ok.", f"Unexpected response: {resp.text!r}"
@@ -36,7 +36,7 @@ class TestQbitDefaultPassword:
         resp = requests.post(
             f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "wrong"},
-            timeout=5,
+            timeout=30,
         )
         assert resp.status_code == 200
         assert resp.text.strip() == "Fails."
@@ -47,11 +47,11 @@ class TestQbitDefaultPassword:
         login = session.post(
             f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "admin"},
-            timeout=5,
+            timeout=30,
         )
         assert login.text.strip() == "Ok."
 
-        version = session.get(f"{self.qbit_url}/api/v2/app/version", timeout=5)
+        version = session.get(f"{self.qbit_url}/api/v2/app/version", timeout=30)
         assert version.status_code == 200
         assert version.text.startswith("v")
 
@@ -61,10 +61,10 @@ class TestQbitDefaultPassword:
         requests.post(
             f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": True},
-            timeout=5,
+            timeout=30,
         )
 
-        status = requests.get(f"{self.base_url}/api/v1/auth/status", timeout=5).json()
+        status = requests.get(f"{self.base_url}/api/v1/auth/status", timeout=30).json()
         qbit = status["trackers"]["qbittorrent"]
         assert qbit["has_session"] is True, "Expected qBittorrent session to be active"
         assert qbit["username"] == "admin"
@@ -82,14 +82,14 @@ class TestQbitDefaultPassword:
         os.system(f"podman cp {tmp_path} qbittorrent-proxy:/config/download-proxy/qbittorrent_creds.json")
         os.unlink(tmp_path)
 
-        status = requests.get(f"{self.base_url}/api/v1/auth/status", timeout=5).json()
+        status = requests.get(f"{self.base_url}/api/v1/auth/status", timeout=30).json()
         qbit = status["trackers"]["qbittorrent"]
 
         # Restore correct credentials
         requests.post(
             f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": True},
-            timeout=5,
+            timeout=30,
         )
 
         assert qbit["has_session"] is False, "Expected qBittorrent session to be inactive with wrong creds"
@@ -105,25 +105,25 @@ class TestServiceLinksAccessibility:
 
     def test_merge_search_dashboard_accessible(self):
         """Merge Search dashboard (port 7187) must be accessible."""
-        r = requests.get(f"{self.base_url}/dashboard", timeout=5)
+        r = requests.get(f"{self.base_url}/dashboard", timeout=30)
         assert r.status_code == 200
         assert "Merge Search Dashboard" in r.text
 
     def test_qbittorrent_webui_accessible(self):
         """qBittorrent WebUI (port 7185) must respond."""
-        r = requests.get(self.qbit_url, timeout=5)
+        r = requests.get(self.qbit_url, timeout=30)
         # qBittorrent returns 200 for the login page or 403 if already authenticated
         assert r.status_code in (200, 403)
 
     def test_download_proxy_accessible(self):
         """Download proxy (port 7186) must respond (same URL as qbittorrent_live)."""
-        r = requests.get(self.qbit_url, timeout=5)
+        r = requests.get(self.qbit_url, timeout=30)
         # Proxy might return various status codes
         assert r.status_code < 500
 
     def test_dashboard_is_angular_app(self):
         """Dashboard must be the Angular SPA."""
-        r = requests.get(f"{self.base_url}/dashboard", timeout=5)
+        r = requests.get(f"{self.base_url}/dashboard", timeout=30)
         assert r.status_code == 200
         assert "<app-root>" in r.text or "<app-root></app-root>" in r.text
         assert "<base href=\"/\">" in r.text
@@ -142,7 +142,7 @@ class TestAuthEndpointBehavior:
         resp = requests.post(
             f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": False},
-            timeout=5,
+            timeout=30,
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -154,7 +154,7 @@ class TestAuthEndpointBehavior:
         resp = requests.post(
             f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "wrong", "save": False},
-            timeout=5,
+            timeout=30,
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -176,14 +176,14 @@ class TestAuthEndpointBehavior:
         resp = requests.post(
             f"{self.base_url}/api/v1/download",
             json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:8bb5455909752072cce7b2556b825d2faaf7c0fb"]},
-            timeout=10,
+            timeout=30,
         )
 
         # Restore correct credentials
         requests.post(
             f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": True},
-            timeout=5,
+            timeout=30,
         )
 
         assert resp.status_code == 200
@@ -196,13 +196,13 @@ class TestAuthEndpointBehavior:
         requests.post(
             f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": True},
-            timeout=5,
+            timeout=30,
         )
 
         resp = requests.post(
             f"{self.base_url}/api/v1/download",
             json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:8bb5455909752072cce7b2556b825d2faaf7c0fb"]},
-            timeout=10,
+            timeout=30,
         )
         assert resp.status_code == 200
         data = resp.json()

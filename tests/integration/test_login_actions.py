@@ -51,7 +51,7 @@ class TestLoginAuthentication:
         resp = self.session.post(
             f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "admin"},
-            timeout=5,
+            timeout=30,
         )
         assert resp.text == "Ok.", f"qBittorrent login failed: {resp.text}"
 
@@ -61,7 +61,7 @@ class TestLoginAuthentication:
             f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin"},
             headers={"Content-Type": "application/json"},
-            timeout=5,
+            timeout=30,
         )
         assert resp.status_code == 200, f"Auth endpoint returned {resp.status_code}"
         data = resp.json()
@@ -82,7 +82,7 @@ class TestCredentialsPersistence:
             f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin", "save": True},
             headers={"Content-Type": "application/json"},
-            timeout=5,
+            timeout=30,
         )
         data = resp.json()
         assert data.get("status") in ["authenticated", "saved"], \

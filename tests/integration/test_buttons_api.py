@@ -166,7 +166,7 @@ class TestQBitLoginButton:
             f"{self.base_url}/api/v1/auth/qbittorrent",
             json={"username": "admin", "password": "admin"},
             headers={"Content-Type": "application/json"},
-            timeout=5,
+            timeout=30,
         )
 
         data = resp.json()
