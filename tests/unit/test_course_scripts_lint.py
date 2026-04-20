@@ -36,8 +36,10 @@ def _bash_binary() -> str | None:
 @pytest.mark.parametrize("track", TRACKS)
 def test_demo_sh_passes_bash_n(track: str) -> None:
     bash = _bash_binary()
-    if bash is None:
-        pytest.skip("bash not installed on this host")
+    assert bash is not None, (
+        "bash must be installed on this host — required for shell-script "
+        "linting. Install via `dnf install bash` / `apt install bash`."
+    )
     demo = COURSES_DIR / track / "demo.sh"
     assert demo.is_file(), f"courses/{track}/demo.sh missing"
     result = subprocess.run(

@@ -101,33 +101,30 @@ def test_footer_styles_use_design_system_tokens(footer_source: str) -> None:
     assert "#e94560" not in footer_source
 
 
-def test_footer_appears_in_served_bundle() -> None:
-    """If the dashboard is live, the compiled bundle must contain the
-    footer's footprint. Cleanly skips when the stack is not up.
+def test_footer_appears_in_served_bundle(merge_service_live: str) -> None:
+    """The compiled dashboard bundle must carry the footer footprint.
+
+    The ``merge_service_live`` fixture guarantees the stack is up;
+    this test now fails loudly when the served bundle is stale instead
+    of skipping, because the rebuild contract is explicitly documented
+    (see docs/MERGE_SEARCH_DIAGNOSTICS.md §"Rebuild / restart contract").
     """
     import urllib.request
 
-    try:
-        with urllib.request.urlopen("http://localhost:7187/", timeout=2) as resp:
-            body = resp.read().decode("utf-8", errors="ignore")
-    except Exception:
-        pytest.skip("merge-search not running on :7187 — re-run after ./start.sh")
+    with urllib.request.urlopen(f"{merge_service_live}/", timeout=5) as resp:
+        body = resp.read().decode("utf-8", errors="ignore")
 
     m = re.search(r"main-[A-Z0-9]+\.js", body)
-    if not m:
-        pytest.skip("main-*.js bundle link not found in served index.html")
+    assert m, "main-*.js bundle link must be in served index.html"
 
-    try:
-        with urllib.request.urlopen(f"http://localhost:7187/{m.group(0)}", timeout=5) as r:
-            bundle = r.read().decode("utf-8", errors="ignore")
-    except Exception as exc:
-        pytest.skip(f"bundle not reachable: {exc}")
+    with urllib.request.urlopen(
+        f"{merge_service_live}/{m.group(0)}", timeout=10
+    ) as r:
+        bundle = r.read().decode("utf-8", errors="ignore")
 
-    if "site-footer" not in bundle and "www.vasic.digital" not in bundle:
-        pytest.skip(
-            "Served bundle predates the footer restoration — rebuild + restart "
-            "qbittorrent-proxy (see CLAUDE.md 'REBUILD AND REBOOT') and re-run.",
-        )
-
+    assert "site-footer" in bundle or "www.vasic.digital" in bundle, (
+        "Served bundle predates the footer restoration — rebuild + "
+        "restart qbittorrent-proxy and re-run"
+    )
     assert "www.vasic.digital" in bundle, "footer URL must be in the compiled bundle"
     assert "Vasic Digital" in bundle, "footer brand text must be in the compiled bundle"

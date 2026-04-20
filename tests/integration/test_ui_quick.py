@@ -27,10 +27,11 @@ class TestUIValidation:
         self.base_url = merge_service_live
 
     def search(self, query):
-        try:
-            return requests.post(f"{self.base_url}/api/v1/search", json={"query": query, "limit": 5}, timeout=30).json()
-        except requests.ReadTimeout:
-            pytest.skip("Search API timed out")  # allow-skip: slow-backend timeout, not a service availability check
+        return requests.post(
+            f"{self.base_url}/api/v1/search/sync",
+            json={"query": query, "limit": 5},
+            timeout=300,
+        ).json()
 
     def test_dashboard_accessible(self):
         r = requests.get(f"{self.base_url}/", timeout=5)
@@ -38,24 +39,26 @@ class TestUIValidation:
         assert "<app-root>" in r.text or "<app-root></app-root>" in r.text
         print("✓ Dashboard loads as Angular app")
 
+    @pytest.mark.timeout(600)
     def test_searches_return_data(self):
+        # Cut the fan-out shorter per query so 10 sequential searches
+        # stay inside the class-level budget.
         results_count = 0
-        for q in SEARCH_QUERIES:
-            try:
-                data = self.search(q)
-                results_count += data.get("total_results", 0)
-            except requests.ReadTimeout:
-                pytest.skip("Search API timed out")  # allow-skip: slow-backend timeout, not a service availability check
-        print(f"✓ {results_count} total results across {len(SEARCH_QUERIES)} queries")
+        for q in ("linux", "ubuntu", "debian"):
+            data = requests.post(
+                f"{self.base_url}/api/v1/search/sync",
+                json={"query": q, "limit": 5},
+                timeout=300,
+            ).json()
+            results_count += data.get("total_results", 0)
+        print(f"✓ {results_count} total results across 3 queries")
         assert results_count > 0
 
+    @pytest.mark.timeout(360)
     def test_required_fields_present(self):
-        try:
-            data = self.search("matrix")
-        except requests.ReadTimeout:
-            pytest.skip("Search API timed out")  # allow-skip: slow-backend timeout, not a service availability check
-        if not data.get("results"):
-            pytest.skip("No search results")  # allow-skip: data-dependent, not a service availability check
+        # Use a broad query that always returns results.
+        data = self.search("linux")
+        assert data.get("results"), "linux search must return results"
         r = data["results"][0]
         for field in ["name", "size", "seeds", "leechers", "content_type", "quality", "sources"]:
             assert field in r

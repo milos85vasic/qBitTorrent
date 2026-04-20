@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("playwright.sync_api", reason="playwright not installed")
-
+# playwright is a hard requirement; import directly so a missing
+# install surfaces as a clear ImportError instead of a silent skip.
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 
@@ -116,21 +116,22 @@ def test_theme_switching_applies_tokens_and_persists(palettes: dict[str, dict[st
     # must grep the bundle, not the shell.
     import re
     m = re.search(r'main-[A-Z0-9]+\.js', body)
-    if not m:
-        pytest.skip("Could not locate main-*.js in the index HTML.")
+    assert m, (
+        "Could not locate main-*.js in the index HTML — "
+        "rebuild the frontend (`cd frontend && ng build`)"
+    )
     try:
         with urllib.request.urlopen(
-            f"{DASHBOARD_URL.rstrip('/')}/{m.group(0)}", timeout=5
+            f"{DASHBOARD_URL.rstrip('/')}/{m.group(0)}", timeout=10
         ) as r:
             bundle = r.read().decode("utf-8", errors="ignore")
     except Exception as exc:
         pytest.fail(f"Dashboard bundle {m.group(0)} not reachable: {exc}")
 
-    if "theme-picker" not in bundle and "palette-dropdown" not in bundle:
-        pytest.skip(
-            "Dashboard bundle does not yet include the theme-picker — rebuild + restart "
-            "qbittorrent-proxy (see CLAUDE.md 'REBUILD AND REBOOT') and re-run.",
-        )
+    assert "theme-picker" in bundle or "palette-dropdown" in bundle, (
+        "Dashboard bundle does not include the theme-picker — rebuild + "
+        "restart qbittorrent-proxy and re-run"
+    )
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)

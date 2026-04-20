@@ -42,8 +42,7 @@ def _is_production_ts(path: Path) -> bool:
 
 
 def _collect_production_ts() -> list[Path]:
-    if not APP_ROOT.is_dir():
-        pytest.skip(f"Frontend app root not present at {APP_ROOT}")
+    assert APP_ROOT.is_dir(), f"Frontend app root must exist at {APP_ROOT}"
     return sorted(p for p in APP_ROOT.rglob("*.ts") if _is_production_ts(p))
 
 

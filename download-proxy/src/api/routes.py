@@ -114,8 +114,12 @@ class SearchRequest(BaseModel):
 
 
 class SearchResultResponse(BaseModel):
+    # Some plugins emit size as an integer (byte count, including the
+    # sentinel -1 when unknown) and others as a pre-formatted string
+    # like "4.0 GB". Pydantic rejected the int variant and the whole
+    # response collapsed with a 500. Allow both and coerce downstream.
     name: str
-    size: str
+    size: str | int
     seeds: int
     leechers: int
     download_urls: List[str]
@@ -231,11 +235,25 @@ async def search(request: SearchRequest, req: Request):
     background ``asyncio.Task`` so the client can attach to
     ``/api/v1/search/stream/{search_id}`` and see results arrive
     live instead of waiting for the slowest tracker.
+
+    When the orchestrator is already at ``MAX_CONCURRENT_SEARCHES``
+    in-flight fan-outs, we return HTTP 429 so callers back off.
+    Without this cap, stress tests revealed the event loop starves
+    and even ``/health`` starts timing out.
     """
     from .hooks import dispatch_event
     import asyncio
 
     orch = _get_orchestrator(req)
+
+    if orch.is_search_queue_full():
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "merge service has reached MAX_CONCURRENT_SEARCHES "
+                f"({orch._max_concurrent_searches}); retry shortly"
+            ),
+        )
 
     await dispatch_event("search_start", {"query": request.query})
 
@@ -299,6 +317,15 @@ async def search_sync(request: SearchRequest, req: Request):
     import asyncio
 
     orch = _get_orchestrator(req)
+
+    if orch.is_search_queue_full():
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "merge service has reached MAX_CONCURRENT_SEARCHES "
+                f"({orch._max_concurrent_searches}); retry shortly"
+            ),
+        )
 
     await dispatch_event("search_start", {"query": request.query})
 
@@ -424,10 +451,15 @@ async def search_sync(request: SearchRequest, req: Request):
 
 @router.get("/search/stream/{search_id}")
 async def search_stream(search_id: str, req: Request):
-    from fastapi.responses import StreamingResponse
+    from fastapi.responses import StreamingResponse  # noqa: F401
     from .streaming import SSEHandler
 
     orch = _get_orchestrator(req)
+    # 404 up front for unknown search IDs so clients (and the
+    # integration tests that probe this path) don't hang on an
+    # open SSE socket waiting for events that will never come.
+    if search_id not in orch._active_searches:
+        raise HTTPException(status_code=404, detail="Search not found")
     return SSEHandler.create_streaming_response(
         SSEHandler.search_results_stream(search_id, orch, request=req)
     )

@@ -24,8 +24,9 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("playwright.sync_api", reason="playwright not installed")
-
+# playwright is a hard requirement for these e2e tests. If the import
+# fails, the tests legitimately cannot run and the failure is visible
+# rather than hidden behind a skip.
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 DASHBOARD_URL = os.environ.get("MERGE_SERVICE_URL", "http://localhost:7187").rstrip("/")
@@ -48,42 +49,33 @@ def _preflight() -> None:
     bridge is not yet deployed (rebuild + restart needed).
     """
     # 1) Dashboard reachable.
-    try:
-        with urllib.request.urlopen(DASHBOARD_URL + "/", timeout=3) as resp:
-            assert resp.status == 200, f"Dashboard returned {resp.status}"
-            body = resp.read().decode("utf-8", errors="ignore")
-    except Exception as exc:
-        pytest.skip(f"Merge dashboard at {DASHBOARD_URL}/ down: {exc}")  # allow-skip: local dev may not have stack running
+    with urllib.request.urlopen(DASHBOARD_URL + "/", timeout=5) as resp:
+        assert resp.status == 200, f"Dashboard returned {resp.status}"
+        body = resp.read().decode("utf-8", errors="ignore")
 
     # 2) Dashboard bundle has the theme picker.
     import re as _re
     m = _re.search(r"main-[A-Z0-9]+\.js", body)
-    if not m:
-        pytest.skip("Could not locate main-*.js in the index HTML.")  # allow-skip: pre-deploy SPA shell
-    try:
-        with urllib.request.urlopen(f"{DASHBOARD_URL}/{m.group(0)}", timeout=5) as r:
-            bundle = r.read().decode("utf-8", errors="ignore")
-    except Exception as exc:
-        pytest.skip(f"Dashboard bundle {m.group(0)} fetch error: {exc}")  # allow-skip: rebuild required
-    if "theme-picker" not in bundle and "palette-dropdown" not in bundle:
-        pytest.skip(  # allow-skip: rebuild + restart qbittorrent-proxy
-            "Dashboard bundle does not include the theme-picker — rebuild + restart "
-            "qbittorrent-proxy and re-run.",
-        )
+    assert m, (
+        "Could not locate main-*.js in the index HTML — rebuild the "
+        "frontend (`cd frontend && ng build`) and restart qbittorrent-proxy"
+    )
+    with urllib.request.urlopen(f"{DASHBOARD_URL}/{m.group(0)}", timeout=10) as r:
+        bundle = r.read().decode("utf-8", errors="ignore")
+    assert "theme-picker" in bundle or "palette-dropdown" in bundle, (
+        "Dashboard bundle does not include the theme-picker — rebuild + "
+        "restart qbittorrent-proxy and re-run"
+    )
 
     # 3) Proxy reachable.
-    try:
-        with urllib.request.urlopen(PROXY_URL + "/", timeout=3) as resp:
-            proxy_body = resp.read().decode("utf-8", errors="ignore")
-    except Exception as exc:
-        pytest.skip(f"Download proxy at {PROXY_URL}/ down: {exc}")  # allow-skip: start.sh not yet run
+    with urllib.request.urlopen(PROXY_URL + "/", timeout=5) as resp:
+        proxy_body = resp.read().decode("utf-8", errors="ignore")
 
     # 4) Bridge injected.
-    if "/__qbit_theme__/skin.css" not in proxy_body:
-        pytest.skip(  # allow-skip: rebuild + restart qbittorrent-proxy
-            "qBittorrent WebUI is not serving the theme bridge yet — rebuild + restart "
-            "qbittorrent-proxy so plugins/download_proxy.py is live.",
-        )
+    assert "/__qbit_theme__/skin.css" in proxy_body, (
+        "qBittorrent WebUI is not serving the theme bridge yet — rebuild "
+        "+ restart qbittorrent-proxy so plugins/download_proxy.py is live"
+    )
 
 
 @pytest.fixture(scope="module", autouse=True)

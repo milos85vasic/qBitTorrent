@@ -20,13 +20,15 @@ class TestMagnetDialog:
         self.base_url = merge_service_live
         self.session = requests.Session()
 
-    def search_and_get_first_result(self, query="matrix"):
+    def search_and_get_first_result(self, query="linux"):
         """Perform search and return first result."""
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
+            f"{self.base_url}/api/v1/search/sync",
             json={"query": query, "limit": 1},
             headers={"Content-Type": "application/json"},
+            timeout=300,
         )
+        assert resp.status_code == 200, f"search failed: {resp.status_code}"
         results = resp.json().get("results", [])
         if results:
             return results[0]
@@ -52,10 +54,10 @@ class TestMagnetDialog:
         html = self.session.get(self.base_url).text
         assert "<app-root>" in html or "<app-root></app-root>" in html, "Dashboard should be Angular app"
 
-    @pytest.mark.timeout(120)
+    @pytest.mark.timeout(300)
     def test_generateMagnet_creates_valid_uri(self):
         """generateMagnet should create valid magnet URI."""
-        result = self.search_and_get_first_result("matrix")
+        result = self.search_and_get_first_result("linux")
         assert result is not None, "Need search results"
 
         name = result.get("name")
@@ -101,21 +103,20 @@ class TestMobileMagnetExecution:
         self.base_url = merge_service_live
         self.session = requests.Session()
 
-    @pytest.mark.timeout(120)
+    @pytest.mark.timeout(300)
     def test_magnet_link_can_be_opened(self):
         """Magnet link should be openable as URL."""
-        result = (
-            self.session.post(
-                f"{self.base_url}/api/v1/search",
-                json={"query": "test", "limit": 1},
-                headers={"Content-Type": "application/json"},
-            )
-            .json()
-            .get("results", [])
+        resp = self.session.post(
+            f"{self.base_url}/api/v1/search/sync",
+            json={"query": "linux", "limit": 1},
+            headers={"Content-Type": "application/json"},
+            timeout=300,
         )
+        assert resp.status_code == 200, f"search failed: {resp.status_code}"
+        result = resp.json().get("results", [])
 
         if not result:
-            pytest.skip("No search results")  # allow-skip: data-dependent, not a service availability check
+            assert False, "query returned 0 results — check tracker fan-out"
 
         from urllib.parse import quote
 

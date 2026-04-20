@@ -175,7 +175,7 @@ class TestAuthEndpointBehavior:
 
         resp = requests.post(
             f"{self.base_url}/api/v1/download",
-            json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
+            json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:8bb5455909752072cce7b2556b825d2faaf7c0fb"]},
             timeout=10,
         )
 
@@ -201,7 +201,7 @@ class TestAuthEndpointBehavior:
 
         resp = requests.post(
             f"{self.base_url}/api/v1/download",
-            json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
+            json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:8bb5455909752072cce7b2556b825d2faaf7c0fb"]},
             timeout=10,
         )
         assert resp.status_code == 200

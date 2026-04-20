@@ -45,9 +45,9 @@ class TestSearchApiResponseStructure:
     @pytest.fixture(scope="class")
     def search_data(self, merge_service_live):
         data = requests.post(
-            f"{merge_service_live}/api/v1/search",
-            json={"query": "matrix", "limit": 5},
-            timeout=30,
+            f"{merge_service_live}/api/v1/search/sync",
+            json={"query": "linux", "limit": 5},
+            timeout=180,
         ).json()
         return data
 

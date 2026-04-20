@@ -18,7 +18,7 @@ class TestMagnetButton:
     def search_get_result(self, query="matrix"):
         """Perform search and return first result."""
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
+            f"{self.base_url}/api/v1/search/sync",
             json={"query": query, "limit": 1},
             headers={"Content-Type": "application/json"},
         )
@@ -65,7 +65,7 @@ class TestDownloadButton:
         login = self.session.post(
             f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "admin"},
-            timeout=5,
+            timeout=180,
         )
         assert login.text == "Ok.", f"qBittorrent login failed: {login.text}"
 
@@ -73,13 +73,13 @@ class TestDownloadButton:
         """/api/v1/download should accept download request."""
         # First get a search result with download URLs
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
-            json={"query": "matrix", "limit": 1},
+            f"{self.base_url}/api/v1/search/sync",
+            json={"query": "linux", "limit": 1},
             headers={"Content-Type": "application/json"},
         )
         results = resp.json().get("results", [])
         if not results:
-            pytest.skip("No search results")  # allow-skip: data-dependent, not a service availability check
+            assert False, "query returned 0 results — check tracker fan-out"
 
         result = results[0]
         download_urls = result.get("download_urls", [])
@@ -94,7 +94,7 @@ class TestDownloadButton:
             # Should get a valid response (not 500 error)
             assert download_resp.status_code != 500, "Download API returns 500"
         else:
-            pytest.skip("No download URLs in result")  # allow-skip: data-dependent, not a service availability check
+            assert False, "result had no download URLs — check plugin output"
 
     def test_download_api_returns_proper_response(self):
         """Download API should return proper JSON response."""
@@ -156,7 +156,7 @@ class TestQBitLoginButton:
         resp = self.session.post(
             f"{self.qbit_url}/api/v2/auth/login",
             data={"username": "admin", "password": "admin"},
-            timeout=5,
+            timeout=180,
         )
         assert resp.text == "Ok.", f"qBittorrent login failed: {resp.text}"
 

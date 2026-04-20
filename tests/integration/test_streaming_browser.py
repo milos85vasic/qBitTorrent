@@ -40,15 +40,19 @@ class TestStreamingBrowser:
 
         print("\n[PASS] Dashboard loads as Angular app")
 
+    @pytest.mark.timeout(180)
     def test_search_returns_results(self):
-        """Search should return results from API."""
+        """Search should return a search_id + running-style status."""
         import requests
 
-        resp = requests.post(f"{BASE_URL}/api/v1/search", json={"query": SEARCH_QUERY, "limit": 10}, timeout=60)
+        resp = requests.post(f"{BASE_URL}/api/v1/search", json={"query": SEARCH_QUERY, "limit": 10}, timeout=30)
         data = resp.json()
 
         assert "search_id" in data
-        assert data["status"] in ("completed", "in_progress", "searching")
+        # POST /search is async: it returns immediately with status
+        # "running". Accept that + legacy spellings in case the service
+        # evolves.
+        assert data["status"] in ("completed", "running", "in_progress", "searching")
 
         print(f"\n[PASS] Search returned {data.get('total_results', 0)} results")
 
@@ -96,21 +100,23 @@ class TestStreamingBrowser:
 
         assert name_count > 0, "Should have result events with names"
 
+    @pytest.mark.timeout(300)
     def test_search_endpoint_works(self):
         """Full search + stream should work end-to-end."""
         import requests
 
         # 1. Start search
-        resp = requests.post(f"{BASE_URL}/api/v1/search", json={"query": "ubuntu", "limit": 5}, timeout=60)
+        resp = requests.post(f"{BASE_URL}/api/v1/search", json={"query": "linux", "limit": 5}, timeout=60)
         data = resp.json()
 
         assert "search_id" in data
         search_id = data["search_id"]
 
-        # 2. Poll for status
-        for _ in range(15):
-            time.sleep(1)
-            status_resp = requests.get(f"{BASE_URL}/api/v1/search/{search_id}")
+        # 2. Poll for status — fan-out can take up to 150 s.
+        status = {}
+        for _ in range(150):
+            time.sleep(2)
+            status_resp = requests.get(f"{BASE_URL}/api/v1/search/{search_id}", timeout=10)
             status = status_resp.json()
 
             if status.get("status") == "completed":

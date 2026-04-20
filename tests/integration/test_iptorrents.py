@@ -28,13 +28,14 @@ def _fetch(
     method: str = "GET",
     data: bytes | None = None,
     headers: dict | None = None,
+    timeout: int = 300,
 ):
     req = urllib.request.Request(url, data=data, method=method)
     if headers:
         for k, v in headers.items():
             req.add_header(k, v)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8", errors="replace")
             return resp.status, body, dict(resp.headers)
     except urllib.error.HTTPError as e:
@@ -48,8 +49,12 @@ def _has_iptorrents_creds():
     return bool(os.environ.get("IPTORRENTS_USERNAME") and os.environ.get("IPTORRENTS_PASSWORD"))
 
 
-@pytest.fixture(scope="module")
-def load_env():
+def _bootstrap_env_from_dotenv():
+    """Load .env into os.environ at module import time so the
+    ``no_creds`` marker, which is evaluated during collection, can see
+    the credentials. Previously this lived in a module-scope fixture
+    that ran AFTER the decorator was applied, so IPTorrents tests
+    skipped even with creds in .env."""
     env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
     if os.path.isfile(env_path):
         with open(env_path) as f:
@@ -63,9 +68,19 @@ def load_env():
                     os.environ[k] = v
 
 
+_bootstrap_env_from_dotenv()
+
+
+@pytest.fixture(scope="module")
+def load_env():
+    """Compatibility shim — .env is now loaded at module import."""
+    _bootstrap_env_from_dotenv()
+
+
 no_creds = pytest.mark.skipif(
     not (os.environ.get("IPTORRENTS_USERNAME") or os.environ.get("IPTORRENTS_USER")),
-    reason="IPTorrents credentials not configured in environment",
+    reason="IPTorrents credentials not configured in environment — "
+           "set IPTORRENTS_USERNAME / IPTORRENTS_PASSWORD in .env",
 )
 
 
@@ -100,15 +115,16 @@ class TestIPTorrentsPluginUnit:
         assert hasattr(iptorrents, "download_torrent")
 
 
+@pytest.mark.timeout(360)
 class TestIPTorrentsMergeService:
     @pytest.mark.requires_credentials
     def test_iptorrents_in_stats(self):
+        if not _has_iptorrents_creds():
+            pytest.fail("IPTorrents credentials are required; set IPTORRENTS_USERNAME/IPTORRENTS_PASSWORD")
         status, body, _ = _fetch(f"{MERGE_URL}/api/v1/stats")
         assert status == 200
         data = json.loads(body)
         tracker_names = [t["name"] for t in data.get("trackers", [])]
-        if not _has_iptorrents_creds():
-            pytest.skip("IPTorrents creds not set")  # allow-skip: credential-gated
         assert "iptorrents" in tracker_names, f"iptorrents not in enabled trackers: {tracker_names}"
 
     @pytest.mark.requires_credentials
@@ -116,7 +132,7 @@ class TestIPTorrentsMergeService:
     def test_search_returns_results(self):
         data = json.dumps({"query": "ubuntu", "limit": 10}).encode()
         status, body, _ = _fetch(
-            f"{MERGE_URL}/api/v1/search",
+            f"{MERGE_URL}/api/v1/search/sync",
             method="POST",
             data=data,
             headers={"Content-Type": "application/json"},
@@ -130,19 +146,20 @@ class TestIPTorrentsMergeService:
     def test_search_results_have_freeleech_field(self):
         data = json.dumps({"query": "1080p", "limit": 20}).encode()
         status, body, _ = _fetch(
-            f"{MERGE_URL}/api/v1/search",
+            f"{MERGE_URL}/api/v1/search/sync",
             method="POST",
             data=data,
             headers={"Content-Type": "application/json"},
         )
-        if status not in (200, 201, 202):
-            pytest.skip(f"Search returned {status}")  # allow-skip: upstream tracker response, not merge-service availability
+        assert status in (200, 201, 202), f"Search failed: {status} {body}"
         result = json.loads(body)
-        for r in result.get("results", []):
-            if r.get("tracker") == "iptorrents":
-                assert "freeleech" in r, "Missing freeleech field in iptorrents result"
-                return
-        pytest.skip("No iptorrents results in this search")  # allow-skip: data-dependent outcome
+        ip_results = [r for r in result.get("results", []) if r.get("tracker") == "iptorrents"]
+        assert ip_results, (
+            "No iptorrents results — check IPTorrents credentials/health. "
+            f"total_results={result.get('total_results')}"
+        )
+        for r in ip_results:
+            assert "freeleech" in r, "Missing freeleech field in iptorrents result"
 
 
 class TestIPTorrentsFreeleechDetection:
@@ -212,19 +229,19 @@ class TestIPTorrentsFreeleechDetection:
         assert d["tracker_display"] == "iptorrents"
 
 
+@pytest.mark.timeout(360)
 class TestIPTorrentsDownloadFreeleechOnly:
     @pytest.mark.requires_credentials
     @no_creds
     def test_search_freeleech_via_merge_service(self):
         data = json.dumps({"query": "1080p", "limit": 20}).encode()
         status, body, _ = _fetch(
-            f"{MERGE_URL}/api/v1/search",
+            f"{MERGE_URL}/api/v1/search/sync",
             method="POST",
             data=data,
             headers={"Content-Type": "application/json"},
         )
-        if status not in (200, 201, 202):
-            pytest.skip(f"Search returned {status}")  # allow-skip: upstream tracker response, not merge-service availability
+        assert status in (200, 201, 202), f"Search failed: {status} {body}"
 
         result = json.loads(body)
         ip_results = [
@@ -241,8 +258,11 @@ class TestIPTorrentsDownloadFreeleechOnly:
         from iptorrents import iptorrents
 
         engine = iptorrents()
-        if not engine.session:
-            pytest.skip("Could not login to IPTorrents")  # allow-skip: credential-gated login failure
+        assert engine.session, (
+            "IPTorrents login failed with credentials set — check "
+            "IPTORRENTS_USERNAME/IPTORRENTS_PASSWORD and that the "
+            "tracker is reachable"
+        )
         import io
         from contextlib import redirect_stdout
 

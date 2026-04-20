@@ -83,17 +83,10 @@ def test_bridge_injects_theme_on_html_responses(bridge_src: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.timeout(10)
-def test_bridge_serves_skin_css_live() -> None:
-    try:
-        with urllib.request.urlopen("http://localhost:7188/", timeout=2) as r:
-            if r.status != 200:
-                pytest.skip(f"bridge returned {r.status}")
-    except Exception:
-        pytest.skip("webui-bridge not up on :7188")
-
+@pytest.mark.timeout(15)
+def test_bridge_serves_skin_css_live(webui_bridge_live: str) -> None:
     with urllib.request.urlopen(
-        "http://localhost:7188/__qbit_theme__/skin.css", timeout=3
+        f"{webui_bridge_live}/__qbit_theme__/skin.css", timeout=10
     ) as resp:
         assert resp.status == 200
         body = resp.read().decode("utf-8")
@@ -101,17 +94,10 @@ def test_bridge_serves_skin_css_live() -> None:
         assert resp.headers.get("Content-Type", "").startswith("text/css")
 
 
-@pytest.mark.timeout(10)
-def test_bridge_serves_bootstrap_js_live() -> None:
-    try:
-        with urllib.request.urlopen("http://localhost:7188/", timeout=2) as r:
-            if r.status != 200:
-                pytest.skip(f"bridge returned {r.status}")
-    except Exception:
-        pytest.skip("webui-bridge not up on :7188")
-
+@pytest.mark.timeout(15)
+def test_bridge_serves_bootstrap_js_live(webui_bridge_live: str) -> None:
     with urllib.request.urlopen(
-        "http://localhost:7188/__qbit_theme__/bootstrap.js", timeout=3
+        f"{webui_bridge_live}/__qbit_theme__/bootstrap.js", timeout=10
     ) as resp:
         assert resp.status == 200
         body = resp.read().decode("utf-8")
@@ -122,39 +108,31 @@ def test_bridge_serves_bootstrap_js_live() -> None:
         assert "addEventListener" in body and "theme" in body
 
 
-@pytest.mark.timeout(15)
-def test_bridge_html_response_contains_injected_tags_live() -> None:
+@pytest.mark.timeout(30)
+def test_bridge_html_response_contains_injected_tags_live(webui_bridge_live: str) -> None:
     """After logging in, GET / must have both the <link> and <script>
     bridge tags injected into the HTML.
     """
-    try:
-        with urllib.request.urlopen("http://localhost:7188/", timeout=2) as r:
-            if r.status != 200:
-                pytest.skip(f"bridge returned {r.status}")
-    except Exception:
-        pytest.skip("webui-bridge not up on :7188")
-
     # Post credentials + keep cookie.
     import http.cookiejar
     jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
     data = urllib.parse.urlencode({"username": "admin", "password": "admin"}).encode()
     req = urllib.request.Request(
-        "http://localhost:7188/api/v2/auth/login",
+        f"{webui_bridge_live}/api/v2/auth/login",
         data=data,
         headers={
             "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": "http://localhost:7188",
+            "Referer": webui_bridge_live,
         },
         method="POST",
     )
-    with opener.open(req, timeout=5) as resp:
-        if resp.status != 200:
-            pytest.skip(f"login returned {resp.status}")
+    with opener.open(req, timeout=10) as resp:
+        assert resp.status == 200, f"login returned {resp.status}"
 
     # Fetch a theme-relevant page: the WebUI shell at /.
     req2 = urllib.request.Request(
-        "http://localhost:7188/",
+        f"{webui_bridge_live}/",
         headers={"Accept-Encoding": "identity"},
     )
     with opener.open(req2, timeout=5) as resp:

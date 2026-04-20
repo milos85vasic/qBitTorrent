@@ -48,20 +48,18 @@ def test_dashboard_template_has_no_qbittorrent_fixed_leak() -> None:
     assert "qBittorrent-Fixed" not in tpl
 
 
-def test_served_bundle_title_matches() -> None:
-    """Live probe — only meaningful after rebuild + container restart.
-    Skips cleanly if merge-search is not running.
+def test_served_bundle_title_matches(merge_service_live: str) -> None:
+    """Live probe — merge-search must be running and serving the
+    renamed title. The ``merge_service_live`` fixture guarantees the
+    service is up; this test now fails loudly instead of skipping if
+    the served bundle is stale (pointer to rebuild + restart).
     """
-    try:
-        with urllib.request.urlopen("http://localhost:7187/", timeout=2) as r:
-            body = r.read().decode("utf-8", errors="ignore")
-    except Exception:
-        pytest.skip("merge-search not up on :7187 — rerun after ./start.sh")
+    with urllib.request.urlopen(f"{merge_service_live}/", timeout=5) as r:
+        body = r.read().decode("utf-8", errors="ignore")
     m = re.search(r"<title>([^<]+)</title>", body)
     assert m is not None, "served index has no <title>"
-    if m.group(1) != EXPECTED_TITLE:
-        pytest.skip(
-            f"Served bundle still advertises {m.group(1)!r} — rebuild + "
-            "restart qbittorrent-proxy to pick up the rename."
-        )
-    assert m.group(1) == EXPECTED_TITLE
+    assert m.group(1) == EXPECTED_TITLE, (
+        f"served bundle advertises {m.group(1)!r} instead of "
+        f"{EXPECTED_TITLE!r}. Rebuild + restart qbittorrent-proxy to "
+        "pick up the rename."
+    )

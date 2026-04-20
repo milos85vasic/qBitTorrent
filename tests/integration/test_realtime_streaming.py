@@ -183,26 +183,42 @@ class TestSSEStreaming:
         # This assertion WILL FAIL without the fix - check for any result data or name field
         assert len(events_with_names) > 0, "Should receive individual result events"
 
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(300)
     def test_search_complete_has_totals(self):
-        """search_complete event should include total counts."""
-        resp = requests.post(f"{self.base_url}/api/v1/search", json={"query": "test", "limit": 5}, timeout=60)
+        """search_complete event should include total counts.
+
+        The fan-out takes 90-150s with the default deadline/concurrency
+        caps, so the SSE consumer needs a matching budget — 60s bails
+        while the search is still streaming per-tracker events.
+        """
+        resp = requests.post(f"{self.base_url}/api/v1/search", json={"query": "linux", "limit": 5}, timeout=60)
         data = resp.json()
         search_id = data["search_id"]
 
         sse = SSECapture(f"{self.base_url}/api/v1/search/stream/{search_id}").start()
 
-        max_time = 60
+        max_time = 240
         start = time.time()
         while not sse.done and time.time() - start < max_time:
             time.sleep(0.5)
 
         sse.close()
 
-        complete_events = [e for e in sse.events if "completed" in e]
-        assert len(complete_events) > 0, "Should have search_complete event"
+        # The SSE stream emits several event types whose JSON bodies
+        # can all contain the substring "completed" (e.g.
+        # tracker_completed carries a `completed_at` field). Match the
+        # real search_complete event by total_results presence — that
+        # key exists on SearchMetadata.to_dict() only.
+        complete_events = [
+            e for e in sse.events
+            if '"total_results"' in e and '"status"' in e
+        ]
+        assert len(complete_events) > 0, (
+            f"Should have search_complete event (events captured: "
+            f"{len(sse.events)})"
+        )
 
-        complete_data = json.loads(complete_events[0])
+        complete_data = json.loads(complete_events[-1])
         assert "total_results" in complete_data, "Complete event should have total_results"
         assert complete_data["total_results"] > 0, "Should find some results"
 

@@ -23,15 +23,8 @@ BRIDGE_JS = "/__qbit_theme__/bootstrap.js"
 
 
 def _fetch(url: str) -> tuple[int, str, bytes]:
-    try:
-        with urllib.request.urlopen(url, timeout=3) as resp:
-            return resp.status, resp.headers.get("Content-Type", ""), resp.read()
-    except Exception as exc:
-        pytest.skip(  # allow-skip: proxy needs rebuild/restart in local dev
-            f"download-proxy at {url} down ({exc}). "
-            "Run ./start.sh and (after edits) rebuild + restart qbittorrent-proxy "
-            "to exercise this contract.",
-        )
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        return resp.status, resp.headers.get("Content-Type", ""), resp.read()
 
 
 def test_proxy_root_injects_theme_bridge():
@@ -40,15 +33,14 @@ def test_proxy_root_injects_theme_bridge():
     # qBittorrent serves HTML at /.
     assert ctype.lower().startswith("text/html"), f"unexpected content-type {ctype}"
     text = body.decode("utf-8", errors="ignore")
-    if BRIDGE_CSS not in text or BRIDGE_JS not in text:
-        pytest.skip(
-            "theme bridge is not injected in proxied HTML — rebuild + restart "
-            "qbittorrent-proxy so plugins/download_proxy.py is live.",
-        )
-    # Once injected both references are present (the injector emits a
-    # pair, but each reference is independent so check both separately).
-    assert BRIDGE_CSS in text
-    assert BRIDGE_JS in text
+    assert BRIDGE_CSS in text, (
+        f"theme bridge CSS link {BRIDGE_CSS} missing from proxied HTML — "
+        "rebuild + restart qbittorrent-proxy so plugins/download_proxy.py is live"
+    )
+    assert BRIDGE_JS in text, (
+        f"theme bridge JS tag {BRIDGE_JS} missing from proxied HTML — "
+        "rebuild + restart qbittorrent-proxy so plugins/download_proxy.py is live"
+    )
 
 
 def test_bridge_css_is_served_with_no_cache():

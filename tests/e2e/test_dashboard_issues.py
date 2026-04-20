@@ -128,7 +128,10 @@ class TestE2EIssue4SearchCompletes:
         orch = SearchOrchestrator()
         trackers = orch._get_enabled_trackers()
         public = [t for t in trackers if t.name not in ("rutracker", "kinozal", "nnmclub", "iptorrents")]
-        assert len(public) >= 30, f"Only {len(public)} public trackers"
+        # After the DEAD_PUBLIC_TRACKERS filter (added 2026-04-20),
+        # only ~14 live public plugins remain in the default fan-out.
+        # See docs/MERGE_SEARCH_DIAGNOSTICS.md §Dead trackers.
+        assert len(public) >= 10, f"Only {len(public)} public trackers"
 
     def test_subprocess_script_contains_tracker_name(self):
         """The generated script must hardcode the tracker name."""

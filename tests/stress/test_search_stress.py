@@ -32,32 +32,54 @@ class TestSearchStress:
 
     @pytest.mark.timeout(300)
     def test_rapid_fire_searches(self):
-        """50 rapid searches should not crash the service."""
+        """50 rapid searches should not crash the service.
+
+        The merge service admits up to ``MAX_CONCURRENT_SEARCHES``
+        in-flight fan-outs before returning HTTP 429. Both 200
+        (accepted) and 429 (queue-full backpressure) count as healthy
+        service behaviour — the only thing we're testing here is that
+        the service doesn't fall over, so ``/health`` must still
+        respond at the end.
+        """
         success = 0
+        queued = 0
         failure = 0
         for i in range(50):
             try:
                 resp = requests.post(
                     f"{self.base_url}/api/v1/search",
                     json={"query": f"stress{i}", "limit": 3},
-                    timeout=5,
+                    timeout=10,
                 )
                 if resp.status_code == 200:
                     success += 1
+                elif resp.status_code == 429:
+                    queued += 1
                 else:
                     failure += 1
             except (requests.Timeout, requests.ConnectionError):
                 failure += 1
 
-        # Should have majority successes
-        assert success > 20, f"Only {success}/50 rapid searches succeeded"
+        # Most requests should get a response (200 or 429); connection
+        # failures are the bad outcome.
+        accepted = success + queued
+        assert accepted >= 40, (
+            f"Only {accepted}/50 rapid searches got a response "
+            f"(200={success}, 429={queued}, fail={failure})"
+        )
         # Service should still be healthy
-        health = requests.get(f"{self.base_url}/health", timeout=5)
+        health = requests.get(f"{self.base_url}/health", timeout=10)
         assert health.status_code == 200
 
     @pytest.mark.timeout(300)
     def test_burst_concurrent_searches(self):
-        """20 simultaneous searches should complete without deadlock."""
+        """20 simultaneous searches should complete without deadlock.
+
+        With MAX_CONCURRENT_SEARCHES=8 (default), up to 8 bursts get
+        accepted and the rest receive HTTP 429. Count both as "did not
+        crash" — the regression we care about is deadlock / connection
+        failure.
+        """
         results = []
 
         def search(i):
@@ -79,14 +101,21 @@ class TestSearchStress:
                 except Exception:
                     results.append(-1)
 
-        success_count = sum(1 for r in results if r == 200)
-        assert success_count >= 10, f"Only {success_count}/20 burst searches succeeded"
+        responded = sum(1 for r in results if r in (200, 429))
+        assert responded >= 15, (
+            f"Only {responded}/20 burst searches got a response "
+            f"(statuses={results})"
+        )
 
-    @pytest.mark.timeout(120)
+    @pytest.mark.timeout(180)
     def test_sustained_load(self):
-        """Sustained load over 20 seconds should not crash service."""
+        """Sustained load over 20 seconds should not crash service.
+
+        Mixed 200/429 responses are fine — we just need the service to
+        stay responsive and return a real status for most requests.
+        """
         start = time.time()
-        success = 0
+        responded = 0
         failure = 0
 
         while time.time() - start < 20:
@@ -94,18 +123,21 @@ class TestSearchStress:
                 resp = requests.post(
                     f"{self.base_url}/api/v1/search",
                     json={"query": "sustained", "limit": 5},
-                    timeout=10,
+                    timeout=15,
                 )
-                if resp.status_code == 200:
-                    success += 1
+                if resp.status_code in (200, 429):
+                    responded += 1
                 else:
                     failure += 1
             except (requests.Timeout, requests.ConnectionError):
                 failure += 1
             time.sleep(0.3)
 
-        assert success >= 2, f"Only {success} sustained searches succeeded"
-        health = requests.get(f"{self.base_url}/health", timeout=5)
+        assert responded >= 20, (
+            f"Only {responded} sustained requests got a response "
+            f"(failures={failure})"
+        )
+        health = requests.get(f"{self.base_url}/health", timeout=10)
         assert health.status_code == 200
 
     @pytest.mark.timeout(180)
@@ -117,7 +149,7 @@ class TestSearchStress:
                 resp = requests.post(
                     f"{self.base_url}/api/v1/search",
                     json={"query": f"abort{i}", "limit": 10},
-                    timeout=5,  # Short timeout to trigger "aborts"
+                    timeout=10,  # Short-ish timeout to trigger "aborts"
                 )
                 return resp.status_code
             except requests.Timeout:
@@ -130,10 +162,10 @@ class TestSearchStress:
             results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
         # Should not crash regardless of outcomes
-        health = requests.get(f"{self.base_url}/health", timeout=5)
+        health = requests.get(f"{self.base_url}/health", timeout=10)
         assert health.status_code == 200
 
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(240)
     def test_stats_endpoint_under_stress(self):
         """Stats endpoint should remain accurate under load."""
         # Run some searches
@@ -148,7 +180,7 @@ class TestSearchStress:
             futures = [executor.submit(search, i) for i in range(10)]
             # Check stats while searches running
             for _ in range(5):
-                stats = requests.get(f"{self.base_url}/api/v1/stats", timeout=5)
+                stats = requests.get(f"{self.base_url}/api/v1/stats", timeout=15)
                 assert stats.status_code == 200
                 time.sleep(1)
             for f in concurrent.futures.as_completed(futures):
@@ -156,11 +188,18 @@ class TestSearchStress:
 
     @pytest.mark.timeout(180)
     def test_file_descriptor_exhaustion_prevention(self):
-        """Service should not exhaust file descriptors under load."""
+        """Service should not exhaust file descriptors under load.
+
+        /health is a trivial no-op route — if it can't respond under
+        mild concurrency (50 parallel workers × 100 requests) the
+        event loop is starving. The concurrent-search cap keeps
+        background fan-outs from hogging the loop so /health stays
+        responsive.
+        """
         # Many concurrent connections
         def connect(i):
             try:
-                resp = requests.get(f"{self.base_url}/health", timeout=5)
+                resp = requests.get(f"{self.base_url}/health", timeout=10)
                 return resp.status_code
             except Exception:
                 return -1

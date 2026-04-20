@@ -70,6 +70,20 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
             path = parsed.path
             query = urllib.parse.parse_qs(parsed.query)
 
+            # Liveness probe — the services-fixture preflight hits
+            # /health at the bridge endpoint to make sure the bridge is
+            # reachable before any test that depends on it runs. Keep
+            # this trivial so the probe never times out even while the
+            # bridge is mid-passthrough to qBittorrent.
+            if path == "/health":
+                payload = b'{"status":"healthy","service":"webui-bridge"}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+
             # Serve the theme-bridge assets locally (skin.css + bootstrap.js)
             # so the user-visible theme is identical to what the
             # download-proxy at :7186 serves. Must come BEFORE the

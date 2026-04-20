@@ -105,22 +105,16 @@ def test_bridge_uses_threaded_http_server(src: str) -> None:
 
 
 @pytest.mark.timeout(20)
-def test_bridge_serves_concurrent_requests_without_blocking() -> None:
+def test_bridge_serves_concurrent_requests_without_blocking(webui_bridge_live: str) -> None:
     """Live smoke: fire 5 concurrent GETs at the bridge and ensure
     none time out (regression for the 'WebUI Bridge (down)' report).
+    The ``webui_bridge_live`` fixture errors if the bridge is down.
     """
     import concurrent.futures
     import urllib.request
 
-    try:
-        with urllib.request.urlopen("http://localhost:7188/", timeout=2) as r:
-            if r.status != 200:
-                pytest.skip(f"bridge returned {r.status}")
-    except Exception:
-        pytest.skip("webui-bridge not up on :7188")
-
     def _hit() -> int:
-        with urllib.request.urlopen("http://localhost:7188/", timeout=3) as r:
+        with urllib.request.urlopen(f"{webui_bridge_live}/", timeout=5) as r:
             return r.status
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
@@ -128,7 +122,7 @@ def test_bridge_serves_concurrent_requests_without_blocking() -> None:
     assert all(s == 200 for s in results), f"not all concurrent probes returned 200: {results}"
 
 
-def test_bridge_live_login_round_trip() -> None:
+def test_bridge_live_login_round_trip(webui_bridge_live: str) -> None:
     """Live-stack smoke: POST /api/v2/auth/login through :7188 must
     return 200 with body starting with 'Ok.', and a subsequent
     cookie-bearing request must succeed.
@@ -137,28 +131,20 @@ def test_bridge_live_login_round_trip() -> None:
     import urllib.request
     import urllib.parse
 
-    try:
-        # Quick probe to see if bridge is up.
-        with urllib.request.urlopen("http://localhost:7188/", timeout=2) as resp:
-            if resp.status != 200:
-                pytest.skip(f"bridge at :7188 returned {resp.status}")
-    except Exception:
-        pytest.skip("webui-bridge not up on :7188")
-
     jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
     data = urllib.parse.urlencode({"username": "admin", "password": "admin"}).encode()
     req = urllib.request.Request(
-        "http://localhost:7188/api/v2/auth/login",
+        f"{webui_bridge_live}/api/v2/auth/login",
         data=data,
         headers={
             "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": "http://localhost:7188",
+            "Referer": webui_bridge_live,
         },
         method="POST",
     )
     try:
-        with opener.open(req, timeout=5) as resp:
+        with opener.open(req, timeout=10) as resp:
             assert resp.status == 200, f"login returned {resp.status}"
             body = resp.read().decode("utf-8", errors="ignore")
             assert body.strip().startswith("Ok"), f"login body: {body!r}"
@@ -169,5 +155,5 @@ def test_bridge_live_login_round_trip() -> None:
         )
 
     # Cookie-bearing API call should succeed.
-    with opener.open("http://localhost:7188/api/v2/app/version", timeout=5) as resp:
+    with opener.open(f"{webui_bridge_live}/api/v2/app/version", timeout=10) as resp:
         assert resp.status == 200

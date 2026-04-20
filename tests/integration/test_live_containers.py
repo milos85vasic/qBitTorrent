@@ -236,9 +236,10 @@ class TestContainerEnvironment:
     @pytest.mark.requires_credentials
     def test_rutracker_creds_configured(self):
         r = _exec("qbittorrent-proxy", "env | grep RUTRACKER_USERNAME || true")
-        has_creds = r.stdout.strip() != ""
-        if not has_creds:
-            pytest.skip("RUTRACKER_USERNAME not configured in .env — optional for testing")  # allow-skip: credential-gated
+        assert r.stdout.strip(), (
+            "RUTRACKER_USERNAME must be configured in .env — "
+            "required for the rutracker plugin to search"
+        )
 
     def test_proxy_port_env(self):
         r = _exec("qbittorrent-proxy", "echo $PROXY_PORT")
@@ -247,14 +248,21 @@ class TestContainerEnvironment:
     def test_merge_port_env(self):
         r = _exec("qbittorrent-proxy", "echo $MERGE_SERVICE_PORT")
         port = r.stdout.strip()
-        if not port:
-            pytest.skip("MERGE_SERVICE_PORT not explicitly set (uses default 7187)")  # allow-skip: optional config var
-        assert port == "7187", f"MERGE_SERVICE_PORT is: {port}"
+        # MERGE_SERVICE_PORT may be unset (compose uses the 7187 default).
+        # Treat empty as equivalent to the default — assert the actual
+        # listen port works via /health instead.
+        if port:
+            assert port == "7187", f"MERGE_SERVICE_PORT is: {port}"
+        # Always verify the service is listening on 7187 regardless.
+        hr = _fetch(f"{MERGE_URL}/health")
+        assert hr[0] == 200, f"merge service not reachable on 7187: {hr[0]}"
 
     def test_shared_tmp_mount(self):
         r = _exec("qbittorrent-proxy", "ls -la /shared-tmp/ 2>/dev/null || true")
-        if r.returncode != 0:
-            pytest.skip("/shared-tmp not mounted — requires container restart with updated docker-compose")  # allow-skip: optional compose feature
+        assert r.returncode == 0 and "/shared-tmp" not in r.stderr, (
+            "/shared-tmp must be mounted — update docker-compose.yml and "
+            "`podman compose up -d` to pick up the mount"
+        )
 
     def test_shared_tmp_in_qbittorrent(self):
         r = _exec("qbittorrent", "ls -la /shared-tmp/")

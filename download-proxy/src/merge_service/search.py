@@ -424,6 +424,18 @@ class SearchOrchestrator:
         # `_inflight_count` is an instrument for tests and Phase 6 metrics.
         # It is only meaningful while a search is running.
         self._inflight_count: int = 0
+        # Stress tests discovered that firing 50+ searches in a row
+        # starved the event loop: each fan-out spawns up to
+        # `_max_concurrent_trackers` subprocesses, plus aiohttp
+        # sessions for private trackers, and even `/health` stopped
+        # responding. Cap concurrent SEARCHES (independent of the
+        # per-search tracker cap) at `MAX_CONCURRENT_SEARCHES`; when
+        # the cap is saturated the API returns 429 Too Many Requests
+        # so clients back off instead of piling more work on top.
+        self._max_concurrent_searches: int = max(
+            1, int(_os.getenv("MAX_CONCURRENT_SEARCHES", "8"))
+        )
+        self._active_search_count: int = 0
 
     def _load_env(self):
         import logging
@@ -454,6 +466,16 @@ class SearchOrchestrator:
                                         os.environ[k] = v
                     except Exception as e:
                         logger.debug(f"Could not load env from {path}: {e}")
+
+    def is_search_queue_full(self) -> bool:
+        """True when the number of in-flight `_run_search` tasks is at
+        or above ``MAX_CONCURRENT_SEARCHES``.
+
+        Callers should translate this into HTTP 429 so clients back off
+        instead of piling more subprocess fan-outs on a starving event
+        loop. See `docs/MERGE_SEARCH_DIAGNOSTICS.md` §Stress.
+        """
+        return self._active_search_count >= self._max_concurrent_searches
 
     def start_search(
         self,
@@ -523,6 +545,7 @@ class SearchOrchestrator:
         if metadata is None:
             return
 
+        self._active_search_count += 1
         try:
             trackers = self._get_enabled_trackers()
             metadata.trackers_searched = [t.name for t in trackers]
@@ -632,6 +655,8 @@ class SearchOrchestrator:
             metadata.status = "failed"
             metadata.errors.append(str(e))
             metadata.completed_at = datetime.now(timezone.utc)
+        finally:
+            self._active_search_count = max(0, self._active_search_count - 1)
 
     async def search(
         self,

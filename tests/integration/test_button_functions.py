@@ -17,12 +17,18 @@ class TestButtonFunctions:
         self.base_url = BASE_URL
         self.session = requests.Session()
 
-    def search_and_get_results(self, query="matrix"):
-        """Perform search and return results."""
+    def search_and_get_results(self, query="linux"):
+        """Perform search and return results. Using 'linux' by default
+        so every live-infra test has reliable data.
+        """
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
+            f"{self.base_url}/api/v1/search/sync",
             json={"query": query, "limit": 3},
             headers={"Content-Type": "application/json"},
+            timeout=300,
+        )
+        assert resp.status_code == 200, (
+            f"search failed: {resp.status_code} {resp.text[:200]}"
         )
         return resp.json().get("results", [])
 
@@ -54,10 +60,10 @@ class TestButtonFunctions:
         # This is just existence check
         print("Y Magnet API endpoint exists")
 
-    @pytest.mark.timeout(120)
+    @pytest.mark.timeout(300)
     def test_results_have_download_urls(self):
         """Results should have download_urls for buttons to work."""
-        results = self.search_and_get_results("matrix")
+        results = self.search_and_get_results("linux")
 
         assert len(results) > 0
         r = results[0]
@@ -67,10 +73,11 @@ class TestButtonFunctions:
 
         print(f"\nY Download URLs: {len(r['download_urls'])} URLs in first result")
 
-    @pytest.mark.timeout(120)
+    @pytest.mark.timeout(300)
     def test_results_have_sources(self):
         """Results should have sources for display."""
-        results = self.search_and_get_results("matrix")
+        results = self.search_and_get_results("linux")
+        assert results, "linux search must return results"
 
         r = results[0]
         assert "sources" in r
@@ -102,12 +109,21 @@ class TestScheduleButtonConfig:
         assert "<app-root>" in html or "<app-root></app-root>" in html
 
     def test_config_has_qbittorrent_url(self):
-        """Config should contain qBittorrent URL."""
-        resp = requests.get(f"{BASE_URL}/api/v1/config")
+        """Config should contain qBittorrent URL fields.
+
+        The public ``qbittorrent_url`` points at the proxy (7186); the
+        ``qbittorrent_internal_url`` points at qBittorrent direct
+        (7185). Either way, qbittorrent_port is an int-typed 7185.
+        """
+        resp = requests.get(f"{BASE_URL}/api/v1/config", timeout=5)
         data = resp.json()
 
         assert "qbittorrent_url" in data
-        assert "7185" in data["qbittorrent_url"]
+        assert data["qbittorrent_port"] == 7185
+        # Internal URL (direct-to-qBittorrent) always carries 7185.
+        assert "7185" in data.get("qbittorrent_internal_url", ""), (
+            f"internal URL should reference 7185, got: {data.get('qbittorrent_internal_url')}"
+        )
 
         print(f"\nY Config: {data}")
 

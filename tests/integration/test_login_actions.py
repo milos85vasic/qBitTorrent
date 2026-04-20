@@ -110,13 +110,13 @@ class TestMagnetDialog:
     def test_generateMagnet_produces_valid_uri(self):
         """generateMagnet should produce valid magnet URI."""
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
-            json={"query": "test", "limit": 1},
+            f"{self.base_url}/api/v1/search/sync",
+            json={"query": "linux", "limit": 1},
             headers={"Content-Type": "application/json"},
         )
         results = resp.json().get("results", [])
         if not results:
-            pytest.skip("No search results")  # allow-skip: data-dependent, not a service availability check
+            assert False, "query returned 0 results — check tracker fan-out"
 
         name = results[0].get("name", "test")
         from urllib.parse import quote
@@ -137,13 +137,13 @@ class TestMagnetAddToQbit:
         """Adding magnet via download API should work."""
         # First get a valid magnet from search
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
-            json={"query": "matrix", "limit": 1},
+            f"{self.base_url}/api/v1/search/sync",
+            json={"query": "linux", "limit": 1},
             headers={"Content-Type": "application/json"},
         )
         results = resp.json().get("results", [])
         if not results:
-            pytest.skip("No search results")  # allow-skip: data-dependent, not a service availability check
+            assert False, "query returned 0 results — check tracker fan-out"
 
         # Try download endpoint
         download_resp = self.session.post(
@@ -214,8 +214,8 @@ class TestFullUserFlows:
     def test_search_returns_results(self):
         """Search should return results."""
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
-            json={"query": "matrix", "limit": 3},
+            f"{self.base_url}/api/v1/search/sync",
+            json={"query": "linux", "limit": 3},
             headers={"Content-Type": "application/json"},
         )
         data = resp.json()
@@ -225,8 +225,8 @@ class TestFullUserFlows:
     def test_results_have_download_urls(self):
         """Results should have download URLs."""
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
-            json={"query": "matrix", "limit": 1},
+            f"{self.base_url}/api/v1/search/sync",
+            json={"query": "linux", "limit": 1},
             headers={"Content-Type": "application/json"},
         )
         results = resp.json().get("results", [])
@@ -236,8 +236,8 @@ class TestFullUserFlows:
     def test_results_have_name(self):
         """Results should have name."""
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
-            json={"query": "matrix", "limit": 1},
+            f"{self.base_url}/api/v1/search/sync",
+            json={"query": "linux", "limit": 1},
             headers={"Content-Type": "application/json"},
         )
         results = resp.json().get("results", [])
@@ -247,8 +247,8 @@ class TestFullUserFlows:
     def test_results_have_size(self):
         """Results should have size."""
         resp = self.session.post(
-            f"{self.base_url}/api/v1/search",
-            json={"query": "matrix", "limit": 1},
+            f"{self.base_url}/api/v1/search/sync",
+            json={"query": "linux", "limit": 1},
             headers={"Content-Type": "application/json"},
         )
         results = resp.json().get("results", [])

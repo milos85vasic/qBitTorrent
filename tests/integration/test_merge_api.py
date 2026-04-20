@@ -67,6 +67,7 @@ class TestSearchEndpoint:
     @patch("api.routes._get_orchestrator")
     def test_search_with_valid_query(self, mock_get_orch, client):
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         meta = MagicMock()
         meta.search_id = "test-search-123"
         meta.query = "interstellar"
@@ -84,7 +85,7 @@ class TestSearchEndpoint:
             "sys.modules",
             {"merge_service.search": MagicMock(TrackerSource=MagicMock())},
         ):
-            resp = client.post("/api/v1/search", json={"query": "interstellar"})
+            resp = client.post("/api/v1/search/sync", json={"query": "interstellar"})
 
         assert resp.status_code == 200
         data = resp.json()
@@ -94,16 +95,17 @@ class TestSearchEndpoint:
         assert "trackers_searched" in data
 
     def test_search_with_empty_query_returns_422(self, client):
-        resp = client.post("/api/v1/search", json={"query": ""})
+        resp = client.post("/api/v1/search/sync", json={"query": ""})
         assert resp.status_code == 422
 
     def test_search_with_missing_body_returns_422(self, client):
-        resp = client.post("/api/v1/search")
+        resp = client.post("/api/v1/search/sync")
         assert resp.status_code == 422
 
     @patch("api.routes._get_orchestrator")
     def test_search_with_defaults(self, mock_get_orch, client):
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         meta = MagicMock()
         meta.search_id = "abc"
         meta.query = "test"
@@ -121,7 +123,7 @@ class TestSearchEndpoint:
             "sys.modules",
             {"merge_service.search": MagicMock(TrackerSource=MagicMock())},
         ):
-            resp = client.post("/api/v1/search", json={"query": "test"})
+            resp = client.post("/api/v1/search/sync", json={"query": "test"})
 
         assert resp.status_code == 200
 
@@ -130,6 +132,7 @@ class TestSearchByIdEndpoint:
     @patch("api.routes._get_orchestrator")
     def test_get_unknown_search_returns_404(self, mock_get_orch, client):
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         orch.get_search_status.return_value = None
         orch._last_merged_results = {}
         mock_get_orch.return_value = orch
@@ -140,6 +143,7 @@ class TestSearchByIdEndpoint:
     @patch("api.routes._get_orchestrator")
     def test_get_existing_search_returns_200(self, mock_get_orch, client):
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         meta = MagicMock()
         meta.search_id = "known-id"
         meta.query = "ubuntu"
@@ -268,6 +272,7 @@ class TestAbortSearchEndpoint:
     @patch("api.routes._get_orchestrator")
     def test_abort_existing_search(self, mock_get_orch, client):
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         orch._active_searches = {"search-123": MagicMock(status="running")}
         mock_get_orch.return_value = orch
 
@@ -281,6 +286,7 @@ class TestAbortSearchEndpoint:
     @patch("api.routes._get_orchestrator")
     def test_abort_unknown_search(self, mock_get_orch, client):
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         orch._active_searches = {}
         mock_get_orch.return_value = orch
 
@@ -330,6 +336,7 @@ class TestDownloadEndpoint:
     @patch("api.routes.aiohttp.ClientSession")
     def test_download_auth_failed_403(self, mock_session_cls, mock_get_orch, client):
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         mock_get_orch.return_value = orch
 
         mock_session = MagicMock()
@@ -355,6 +362,7 @@ class TestDownloadEndpoint:
     def test_download_auth_failed_200_body_fails(self, mock_session_cls, mock_get_orch, client):
         """qBittorrent returns HTTP 200 with body 'Fails.' on bad credentials."""
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         mock_get_orch.return_value = orch
 
         mock_session = MagicMock()
@@ -380,6 +388,7 @@ class TestDownloadEndpoint:
     def test_download_empty_urls(self, mock_session_cls, mock_get_orch, client):
         """Download with empty URLs should return failed status, not crash."""
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         mock_get_orch.return_value = orch
 
         mock_session = MagicMock()
@@ -408,13 +417,14 @@ class TestDownloadEndpoint:
     def test_download_connection_error(self, mock_session_cls, mock_get_orch, client):
         """Download when qBittorrent is unreachable should return connection_failed."""
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         mock_get_orch.return_value = orch
 
         mock_session_cls.side_effect = Exception("Connection refused")
 
         resp = client.post(
             "/api/v1/download",
-            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
+            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:e9bb4ead5d7ed51aa7d310d7cfef92b9b273a77f"]},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -425,6 +435,7 @@ class TestDownloadEndpoint:
     def test_download_qbit_rejects_add(self, mock_session_cls, mock_get_orch, client):
         """Download when qBittorrent auth succeeds but add-torrent fails."""
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         mock_get_orch.return_value = orch
 
         mock_session = MagicMock()
@@ -453,7 +464,7 @@ class TestDownloadEndpoint:
 
         resp = client.post(
             "/api/v1/download",
-            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
+            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:e9bb4ead5d7ed51aa7d310d7cfef92b9b273a77f"]},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -467,6 +478,7 @@ class TestDownloadEndpoint:
     def test_download_successful_add(self, mock_session_cls, mock_get_orch, client):
         """Download when qBittorrent accepts the torrent."""
         orch = MagicMock()
+        orch.is_search_queue_full.return_value = False
         mock_get_orch.return_value = orch
 
         mock_session = MagicMock()
@@ -495,7 +507,7 @@ class TestDownloadEndpoint:
 
         resp = client.post(
             "/api/v1/download",
-            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:abc123"]},
+            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:e9bb4ead5d7ed51aa7d310d7cfef92b9b273a77f"]},
         )
         assert resp.status_code == 200
         data = resp.json()
