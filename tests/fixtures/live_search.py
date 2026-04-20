@@ -92,35 +92,37 @@ def live_search_result(
     ``MAX_CONCURRENT_SEARCHES`` saturation out of the test suite.
     """
     def _search(query: str = "linux", limit: int = 5) -> dict:
+        # NOTE: we do NOT take ``_file_lock()`` here — the
+        # autouse ``_serialize_live_searches`` fixture in the
+        # integration + e2e conftests already holds it for the
+        # lifetime of each test. Re-acquiring the same POSIX lock on
+        # a new fd deadlocks within the same process.
         key = (query, limit)
         if key in _live_search_cache:
             return _live_search_cache[key]
-        with _file_lock():
-            if key in _live_search_cache:
-                return _live_search_cache[key]
-            attempts = 3
-            last_err: Optional[Exception] = None
-            for attempt in range(attempts):
-                try:
-                    resp = requests.post(
-                        f"{merge_service_live}/api/v1/search/sync",
-                        json={"query": query, "limit": limit},
-                        timeout=300,
-                    )
-                except Exception as exc:
-                    last_err = exc
-                    time.sleep(2 * (attempt + 1))
-                    continue
-                if resp.status_code == 429:
-                    # Queue-full: back off and retry.
-                    time.sleep(5 * (attempt + 1))
-                    continue
-                resp.raise_for_status()
-                data = resp.json()
-                _live_search_cache[key] = data
-                return data
-            raise RuntimeError(
-                f"live_search_result({query!r}, {limit}) failed after "
-                f"{attempts} attempts — last error: {last_err}"
-            )
+        attempts = 3
+        last_err: Optional[Exception] = None
+        for attempt in range(attempts):
+            try:
+                resp = requests.post(
+                    f"{merge_service_live}/api/v1/search/sync",
+                    json={"query": query, "limit": limit},
+                    timeout=300,
+                )
+            except Exception as exc:
+                last_err = exc
+                time.sleep(2 * (attempt + 1))
+                continue
+            if resp.status_code == 429:
+                # Queue-full: back off and retry.
+                time.sleep(5 * (attempt + 1))
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            _live_search_cache[key] = data
+            return data
+        raise RuntimeError(
+            f"live_search_result({query!r}, {limit}) failed after "
+            f"{attempts} attempts — last error: {last_err}"
+        )
     return _search
