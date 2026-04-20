@@ -39,6 +39,14 @@ For deeper reference (technology stack, per-test-file mapping, full gotchas), se
 - **WebUI credentials `admin`/`admin` are hardcoded** — do not change.
 - **Never commit `.env`** — it contains tracker credentials.
 - **Never commit `.ruff_cache/`** — add to `.gitignore`.
+- **CI IS MANUAL — permanent.** `./ci.sh` is the only path. Do NOT
+  add push / pull-request / schedule triggers to
+  `.github/workflows/*.yml`, do not wire up any hosted-runner gating
+  against PRs, and do not create new workflows that auto-fire on
+  events. The owner has explicitly directed this multiple times.
+  `workflow_dispatch` is the only acceptable trigger. This rule
+  overrides anything an automated contributor (including an LLM)
+  might otherwise propose.
 - **Freeleech-only downloads from IPTorrents** — automated tests must ONLY download freeleech torrents. Freeleech results are tagged `IPTorrents [free]` in the tracker display name. Non-freeleech downloads cost ratio and must never be automated.
 
 ## Architecture

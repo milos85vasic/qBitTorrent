@@ -29,10 +29,29 @@ def test_pyproject_declares_project_metadata(pyproject: dict) -> None:
 
 
 def test_pytest_ini_options_strict_and_cov(pyproject: dict) -> None:
+    """Strictness knobs must be on by default; coverage flags moved
+    out of `addopts` and into ``scripts/run-tests.sh`` on 2026-04-20
+    so single-file pytest runs stop failing the 1 % `fail_under`
+    gate. See CLAUDE.md + docs/TEST_SUITE_GUIDE.md.
+    """
     opts = pyproject["tool"]["pytest"]["ini_options"]
     addopts_joined = " ".join(opts["addopts"])
-    for flag in ("-ra", "--strict-markers", "--strict-config", "--cov=", "--cov-report=term-missing", "--cov-report=xml"):
+    for flag in ("-ra", "--strict-markers", "--strict-config"):
         assert flag in addopts_joined, f"pytest addopts missing {flag!r}: {addopts_joined!r}"
+    # Coverage flags MUST NOT be in default addopts (they live in
+    # scripts/run-tests.sh instead).
+    for banned in ("--cov=", "--cov-report"):
+        assert banned not in addopts_joined, (
+            f"pytest addopts must not contain {banned!r}; coverage lives "
+            f"in scripts/run-tests.sh now"
+        )
+    # But the run-tests.sh wrapper must still configure coverage.
+    import pathlib
+    runner = pathlib.Path(__file__).resolve().parents[2] / "scripts" / "run-tests.sh"
+    assert runner.is_file(), "scripts/run-tests.sh must exist"
+    runner_src = runner.read_text(encoding="utf-8")
+    for flag in ("--cov=download-proxy/src", "--cov=plugins", "--cov-report=term-missing"):
+        assert flag in runner_src, f"scripts/run-tests.sh missing {flag!r}"
     assert opts["testpaths"] == ["tests"]
     assert "asyncio_mode" in opts
     assert opts["asyncio_mode"] == "auto"

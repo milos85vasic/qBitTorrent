@@ -1022,9 +1022,18 @@ class SearchOrchestrator:
 
         return results
 
-    def _parse_size_string(self, size_str: str) -> int:
+    def _parse_size_string(self, size_str) -> int:
         import re
 
+        # Plugins also emit int (byte counts, sometimes the -1 sentinel
+        # for "unknown"). Coerce defensively so the whole search
+        # doesn't tip over on a single non-string size.
+        if size_str is None:
+            return 0
+        if isinstance(size_str, (int, float)):
+            return int(size_str) if size_str > 0 else 0
+        if not isinstance(size_str, str):
+            return 0
         size_str = size_str.strip().upper()
         multipliers = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
         match = re.match(r"([\d.]+)\s*([KMGT]?B)", size_str)

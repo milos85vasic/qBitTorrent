@@ -291,8 +291,21 @@ class Deduplicator:
         normalized = re.sub(r"\s+", " ", normalized).strip().lower()
         return normalized
 
-    def _parse_size(self, size_str: str) -> Optional[float]:
-        """Parse size string to bytes."""
+    def _parse_size(self, size_str) -> Optional[float]:
+        """Parse size → bytes.
+
+        Accepts both pre-formatted strings (``"4.0 GB"``) and raw
+        numeric values (some plugins emit a byte count int, including
+        the ``-1`` sentinel). Previously the deduplicator crashed the
+        whole fan-out with
+        ``'int' object has no attribute 'strip'``.
+        """
+        if size_str is None:
+            return None
+        if isinstance(size_str, (int, float)):
+            return None if size_str < 0 else float(size_str)
+        if not isinstance(size_str, str):
+            return None
         if not size_str:
             return None
 

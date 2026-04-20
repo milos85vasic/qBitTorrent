@@ -137,11 +137,49 @@ _ensure_webui_credentials() {
         sed -i "s|^WebUI\\\\Password_PBKDF2=.*|WebUI\\\\Password_PBKDF2=${pbkdf2_hash}|" "$config_file"
     fi
 
+    # Migrate existing configs to the auth-ban-disabled settings.
+    # qBittorrent's default (5 failed attempts → IP ban) trips the
+    # test suite's repeated login probes and leaves every subsequent
+    # connection 403'd. Force the settings in even on configs that
+    # predate them.
+    _enforce_config_line "$config_file" "WebUI\\\\LocalHostAuth" "true" "[Preferences]"
+    _enforce_config_line "$config_file" "WebUI\\\\AuthSubnetWhitelistEnabled" "false" "[Preferences]"
+    _enforce_config_line "$config_file" "WebUI\\\\MaxAuthenticationFailCount" "1000000" "[Preferences]"
+    _enforce_config_line "$config_file" "WebUI\\\\BanDuration" "1" "[Preferences]"
+
     local dup_lines
     dup_lines=$(grep -n "^\\[Application\\]$" "$config_file" 2>/dev/null | tail -n +2 | cut -d: -f1 | sort -rn || true)
     for line_num in $dup_lines; do
         sed -i "${line_num}d" "$config_file"
     done
+}
+
+# Insert-or-replace a key=value under a given [section] header.
+# Handles the qBittorrent backslash-escaped keys (e.g. WebUI\LocalHostAuth).
+_enforce_config_line() {
+    local config_file="$1"
+    local key="$2"     # backslash-escaped for sed regex
+    local value="$3"
+    local section="$4"
+
+    if grep -qE "^${key}=" "$config_file" 2>/dev/null; then
+        sed -i -E "s|^${key}=.*|${key}=${value}|" "$config_file"
+    else
+        # Insert under the section header if it exists; otherwise
+        # append at EOF.
+        local literal_section
+        literal_section=$(printf '%s' "$section" | sed 's/[][]/\\&/g')
+        if grep -qE "^${literal_section}" "$config_file" 2>/dev/null; then
+            # Insert immediately after the section header.
+            awk -v sec="$section" -v line="${key}=${value}" '
+                BEGIN { inserted = 0 }
+                { print }
+                !inserted && $0 == sec { print line; inserted = 1 }
+            ' "$config_file" > "${config_file}.tmp" && mv "${config_file}.tmp" "$config_file"
+        else
+            printf '\n%s\n%s=%s\n' "$section" "$key" "$value" >> "$config_file"
+        fi
+    fi
 }
 
 update_qbittorrent_config() {

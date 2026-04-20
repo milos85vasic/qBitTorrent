@@ -72,11 +72,30 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
 
             # Liveness probe — the services-fixture preflight hits
             # /health at the bridge endpoint to make sure the bridge is
-            # reachable before any test that depends on it runs. Keep
-            # this trivial so the probe never times out even while the
-            # bridge is mid-passthrough to qBittorrent.
+            # reachable before any test that depends on it runs. Return
+            # a deeper signal: also probe the qBittorrent backend on
+            # :7185 so `healthy` doesn't just mean "the python server is
+            # up" but "the passthrough works." The probe timeout is
+            # short so a slow qBittorrent doesn't hang the liveness
+            # check — we degrade to `status:degraded` instead.
             if path == "/health":
-                payload = b'{"status":"healthy","service":"webui-bridge"}'
+                import http.client as _http
+                import json as _json
+                backend_status = "unknown"
+                try:
+                    conn = _http.HTTPConnection("localhost", 7185, timeout=2)
+                    conn.request("GET", "/")
+                    resp = conn.getresponse()
+                    backend_status = "ok" if resp.status < 500 else f"http_{resp.status}"
+                    conn.close()
+                except Exception as exc:
+                    backend_status = f"unreachable:{type(exc).__name__}"
+                overall = "healthy" if backend_status == "ok" else "degraded"
+                payload = _json.dumps({
+                    "status": overall,
+                    "service": "webui-bridge",
+                    "backend": backend_status,
+                }).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))

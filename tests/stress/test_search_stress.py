@@ -15,6 +15,49 @@ import pytest
 import requests
 
 
+def _purge_qbittorrent_torrents(qbit_url: str = "http://localhost:7186") -> None:
+    """Delete every torrent from qBittorrent.
+
+    Stress tests add many synthetic torrents. If they pile up across
+    runs, qBittorrent starts slowing down (large state files, lock
+    contention) and the stress-test floors stop holding. Call this
+    before/after the class so each run starts clean.
+    """
+    try:
+        import http.cookiejar
+        import urllib.request
+        import urllib.parse
+
+        jar = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+        data = urllib.parse.urlencode({"username": "admin", "password": "admin"}).encode()
+        opener.open(
+            urllib.request.Request(
+                f"{qbit_url}/api/v2/auth/login", data=data, method="POST"
+            ),
+            timeout=10,
+        )
+        resp = opener.open(f"{qbit_url}/api/v2/torrents/info", timeout=10)
+        import json as _json
+        torrents = _json.loads(resp.read().decode("utf-8"))
+        hashes = "|".join(t["hash"] for t in torrents)
+        if hashes:
+            opener.open(
+                urllib.request.Request(
+                    f"{qbit_url}/api/v2/torrents/delete",
+                    data=urllib.parse.urlencode(
+                        {"hashes": hashes, "deleteFiles": "false"}
+                    ).encode(),
+                    method="POST",
+                ),
+                timeout=15,
+            )
+    except Exception:
+        # Best effort — stress tests must not fail because the purge
+        # itself had a transient blip.
+        pass
+
+
 @pytest.mark.stress
 class TestSearchStress:
     """Search endpoint stress testing.
@@ -29,6 +72,12 @@ class TestSearchStress:
     @pytest.fixture(autouse=True)
     def _service_up(self, merge_service_live):
         self.base_url = merge_service_live
+        # Start clean — purge any torrent state left behind by prior
+        # stress runs so the service isn't carrying hundreds of stub
+        # torrents into this class.
+        _purge_qbittorrent_torrents()
+        yield
+        _purge_qbittorrent_torrents()
 
     @pytest.mark.timeout(300)
     def test_rapid_fire_searches(self):

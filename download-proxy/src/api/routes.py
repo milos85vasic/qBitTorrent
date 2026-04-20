@@ -449,20 +449,46 @@ async def search_sync(request: SearchRequest, req: Request):
     return response
 
 
+_sse_stream_count = 0
+_SSE_STREAM_MAX = int(os.environ.get("MAX_CONCURRENT_SSE_STREAMS", "32"))
+
+
 @router.get("/search/stream/{search_id}")
 async def search_stream(search_id: str, req: Request):
     from fastapi.responses import StreamingResponse  # noqa: F401
     from .streaming import SSEHandler
 
+    global _sse_stream_count
     orch = _get_orchestrator(req)
     # 404 up front for unknown search IDs so clients (and the
     # integration tests that probe this path) don't hang on an
     # open SSE socket waiting for events that will never come.
     if search_id not in orch._active_searches:
         raise HTTPException(status_code=404, detail="Search not found")
-    return SSEHandler.create_streaming_response(
-        SSEHandler.search_results_stream(search_id, orch, request=req)
-    )
+    # Cap concurrent open SSE streams. Each stream reserves an event
+    # loop task and holds a tracker_results dict pointer; without a
+    # cap a trivial client loop can exhaust sockets/fds.
+    if _sse_stream_count >= _SSE_STREAM_MAX:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"merge service has {_SSE_STREAM_MAX} open SSE streams "
+                "— retry shortly"
+            ),
+        )
+
+    async def _wrapped():
+        global _sse_stream_count
+        _sse_stream_count += 1
+        try:
+            async for frame in SSEHandler.search_results_stream(
+                search_id, orch, request=req
+            ):
+                yield frame
+        finally:
+            _sse_stream_count = max(0, _sse_stream_count - 1)
+
+    return SSEHandler.create_streaming_response(_wrapped())  # noqa: F841
 
 
 @router.get("/search/{search_id}", response_model=SearchResponse)

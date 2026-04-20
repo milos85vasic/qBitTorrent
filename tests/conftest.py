@@ -57,6 +57,12 @@ from tests.fixtures.services import (  # noqa: F401 -- re-exported
     webui_bridge_endpoint,
     webui_bridge_live,
 )
+from tests.fixtures.live_search import (  # noqa: F401 -- re-exported
+    _live_search_cache,
+    fresh_magnet_hash,
+    fresh_magnet_uri,
+    live_search_result,
+)
 
 
 @pytest.fixture

@@ -190,8 +190,13 @@ class TestAuthEndpointBehavior:
         data = resp.json()
         assert data["status"] == "auth_failed"
 
-    def test_download_endpoint_succeeds_with_valid_creds(self):
-        """POST /download must return initiated when qBittorrent accepts login."""
+    def test_download_endpoint_succeeds_with_valid_creds(self, fresh_magnet_uri):
+        """POST /download must return initiated when qBittorrent accepts login.
+
+        ``fresh_magnet_uri`` is a random 40-char-hex btih so
+        qBittorrent can't duplicate-reject it if a previous run
+        added the same synthetic torrent.
+        """
         # Ensure correct credentials are saved
         requests.post(
             f"{self.base_url}/api/v1/auth/qbittorrent",
@@ -201,7 +206,7 @@ class TestAuthEndpointBehavior:
 
         resp = requests.post(
             f"{self.base_url}/api/v1/download",
-            json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:8bb5455909752072cce7b2556b825d2faaf7c0fb"]},
+            json={"result_id": "test", "download_urls": [fresh_magnet_uri]},
             timeout=30,
         )
         assert resp.status_code == 200
