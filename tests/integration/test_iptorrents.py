@@ -28,7 +28,7 @@ def _fetch(
     method: str = "GET",
     data: bytes | None = None,
     headers: dict | None = None,
-    timeout: int = 300,
+    timeout: int = 420,
 ):
     req = urllib.request.Request(url, data=data, method=method)
     if headers:

@@ -11,6 +11,12 @@ requires-python = ">=3.12"
 minversion = "7.4"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# pytest-asyncio 1.3 created a fresh event loop PER TEST by default,
+# and its teardown occasionally fired while a previous test's
+# ``_tracker_results`` cleanup was still scheduled on the closed
+# loop. Promoting the default scope to "class" keeps async tests in
+# the same class on one loop so teardown order is deterministic.
+asyncio_default_test_loop_scope = "class"
 # Coverage flags moved out of the default `addopts` so
 # `pytest tests/unit/foo.py` doesn't fail the 1% `fail_under` gate on
 # partial runs. Use `scripts/run-tests.sh` (or pass

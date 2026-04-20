@@ -146,19 +146,26 @@ class TestUISearchVariety:
                     assert ct is not None, "content_type should not be None"
 
     @pytest.mark.timeout(600)
-    def test_quality_detection(self):
-        """Quality should be detected."""
+    def test_quality_detection(self, live_search_result):
+        """Quality should be detected on at least one result."""
         qualities_seen = set()
 
-        for query in self.QUICK_QUERIES[:3]:
-            data = self.search(query)
-            if data.get("total_results", 0) > 0:
+        # Use the session-cached live_search_result so we don't fan
+        # out three separate 120 s searches just to grep quality
+        # strings. "linux" always returns enough results in our
+        # live-stack smoke runs; supplementary queries are skipped.
+        for query in ["linux", "ubuntu", "matrix"]:
+            data = live_search_result(query, 10)
+            if data.get("total_results", 0) > 0 and data.get("results"):
                 r = data["results"][0]
                 q = r.get("quality", "unknown")
                 qualities_seen.add(q)
 
         print(f"\n=== Qualities detected: {qualities_seen} ===")
-        assert len(qualities_seen) > 0
+        assert len(qualities_seen) > 0, (
+            "No results had a quality field — check plugin output + "
+            "enricher pipeline"
+        )
 
     @pytest.mark.timeout(240)
     def test_sources_merged(self):
