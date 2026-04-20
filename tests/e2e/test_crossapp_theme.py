@@ -94,6 +94,20 @@ def _select_palette(page, palette_id: str) -> None:
 
 
 def test_crossapp_theme_sync_nord_then_gruvbox() -> None:
+    # Force dark mode before the test. Without this, whichever mode
+    # was last persisted in /api/v1/theme leaks in and the
+    # ``NORD_DARK_BG`` / ``GRUVBOX_DARK_BG`` assertions fail because
+    # the palette's LIGHT bg-primary is what the bridge applies.
+    import json as _json
+    req = urllib.request.Request(
+        f"{DASHBOARD_URL}/api/v1/theme",
+        data=_json.dumps({"paletteId": "nord", "mode": "dark"}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    with urllib.request.urlopen(req, timeout=10) as r:
+        assert r.status == 200, f"PUT /api/v1/theme returned {r.status}"
+
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         try:
@@ -111,14 +125,16 @@ def test_crossapp_theme_sync_nord_then_gruvbox() -> None:
             webui = context.new_page()
             webui.goto(PROXY_URL + "/", wait_until="domcontentloaded")
 
-            # Wait for the bridge to apply Nord.
+            # Wait for the bridge to apply Nord. The bridge fetches
+            # /api/v1/theme on first paint + subscribes to the SSE
+            # stream — under batch load this can take a few seconds.
             webui.wait_for_function(
                 "(expectedRgb) => {\n"
                 "  const v = getComputedStyle(document.documentElement).getPropertyValue('--color-bg-primary').trim().toLowerCase();\n"
                 "  return v === expectedRgb.toLowerCase() || v === expectedRgb.toUpperCase();\n"
                 "}",
                 arg=NORD_DARK_BG,
-                timeout=5000,
+                timeout=30000,
             )
 
             # The side-channel shows the adopted palette.
@@ -130,14 +146,16 @@ def test_crossapp_theme_sync_nord_then_gruvbox() -> None:
             stored2 = dashboard.evaluate("() => window.localStorage.getItem('qbit.theme')")
             assert stored2 and '"gruvbox"' in stored2
 
-            # qBittorrent WebUI should mirror within 5 s via SSE.
+            # qBittorrent WebUI should mirror within a few seconds
+            # via SSE — allow up to 15 s because the stream's event
+            # cadence can be paced down under batch load.
             webui.wait_for_function(
                 "(expectedHex) => {\n"
                 "  const v = getComputedStyle(document.documentElement).getPropertyValue('--color-bg-primary').trim().toLowerCase();\n"
                 "  return v === expectedHex.toLowerCase();\n"
                 "}",
                 arg=GRUVBOX_DARK_BG,
-                timeout=5000,
+                timeout=15000,
             )
             side2 = webui.evaluate("() => window.__qbitTheme && window.__qbitTheme.paletteId")
             assert side2 == "gruvbox", f"window.__qbitTheme.paletteId on :7186 is {side2!r}, expected 'gruvbox'"

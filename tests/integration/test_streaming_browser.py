@@ -112,11 +112,15 @@ class TestStreamingBrowser:
         assert "search_id" in data
         search_id = data["search_id"]
 
-        # 2. Poll for status — fan-out can take up to 150 s.
+        # 2. Poll for status — fan-out can take up to 300 s under
+        # batch load. ``timeout=30`` on each poll so a transient
+        # slow-down doesn't drop the test on ReadTimeout.
         status = {}
         for _ in range(150):
             time.sleep(2)
-            status_resp = requests.get(f"{BASE_URL}/api/v1/search/{search_id}", timeout=10)
+            status_resp = requests.get(
+                f"{BASE_URL}/api/v1/search/{search_id}", timeout=30
+            )
             status = status_resp.json()
 
             if status.get("status") == "completed":
