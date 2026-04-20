@@ -120,6 +120,20 @@ Default: `5`. Semaphore-bounded fan-out width. Wall-clock latency is
 approximately `deadline × (tracker_count / max_concurrent)` in the
 worst case. Lower this on constrained hosts to keep memory bounded.
 
+### `MAX_CONCURRENT_SEARCHES`
+
+Default: `8`. Per-orchestrator cap on the number of in-flight
+`_run_search` fan-outs. When saturated, both `POST /api/v1/search`
+and `POST /api/v1/search/sync` return HTTP 429 with a
+`retry shortly` hint so callers back off rather than piling more
+subprocess work on a starving event loop.
+
+Stress tests revealed that without this cap, 50 rapid POSTs would
+spawn 50 × 24 = 1200 simultaneous subprocess spawns and even
+`/health` stopped responding. With the cap in place the service
+remains responsive (at most 8 × 24 = ~200 subprocesses mid-flight,
+plus the 5-per-fan-out semaphore actually runs closer to 40).
+
 ## Dashboard chip legend
 
 | Icon      | Meaning                                                      |
