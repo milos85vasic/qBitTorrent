@@ -101,10 +101,24 @@ def _read_local_storage(page, key: str) -> str | None:
 def test_theme_switching_applies_tokens_and_persists(palettes: dict[str, dict[str, dict[str, str]]]) -> None:
     # Quick availability probe — we want a loud failure if the merge
     # service is down, not a silent skip.
+    import json as _json
     import urllib.request
 
+    # Force dark mode upfront so the test compares against the dark
+    # palette tokens. Without this, whichever mode was persisted last
+    # leaks in and the bgPrimary etc. assertions fail because the
+    # bridge applied the LIGHT variant.
+    _put = urllib.request.Request(
+        f"{DASHBOARD_URL.rstrip('/')}/api/v1/theme",
+        data=_json.dumps({"paletteId": "darcula", "mode": "dark"}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    with urllib.request.urlopen(_put, timeout=10) as r:
+        assert r.status == 200
+
     try:
-        with urllib.request.urlopen(DASHBOARD_URL, timeout=3) as resp:
+        with urllib.request.urlopen(DASHBOARD_URL, timeout=10) as resp:
             assert resp.status == 200, f"Dashboard returned {resp.status}"
             body = resp.read().decode("utf-8", errors="ignore")
     except Exception as exc:

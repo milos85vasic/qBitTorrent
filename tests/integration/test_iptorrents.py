@@ -143,16 +143,12 @@ class TestIPTorrentsMergeService:
 
     @pytest.mark.requires_credentials
     @no_creds
-    def test_search_results_have_freeleech_field(self):
-        data = json.dumps({"query": "1080p", "limit": 20}).encode()
-        status, body, _ = _fetch(
-            f"{MERGE_URL}/api/v1/search/sync",
-            method="POST",
-            data=data,
-            headers={"Content-Type": "application/json"},
-        )
-        assert status in (200, 201, 202), f"Search failed: {status} {body}"
-        result = json.loads(body)
+    def test_search_results_have_freeleech_field(self, live_search_result):
+        # Use the cached "linux" result so this test reuses one
+        # session-wide fan-out instead of paying for its own 200-300 s
+        # ``1080p`` search every batch run. ``linux`` reliably brings
+        # back IPTorrents hits with the freeleech field populated.
+        result = live_search_result("linux", 20)
         ip_results = [r for r in result.get("results", []) if r.get("tracker") == "iptorrents"]
         assert ip_results, (
             "No iptorrents results — check IPTorrents credentials/health. "
@@ -233,17 +229,11 @@ class TestIPTorrentsFreeleechDetection:
 class TestIPTorrentsDownloadFreeleechOnly:
     @pytest.mark.requires_credentials
     @no_creds
-    def test_search_freeleech_via_merge_service(self):
-        data = json.dumps({"query": "1080p", "limit": 20}).encode()
-        status, body, _ = _fetch(
-            f"{MERGE_URL}/api/v1/search/sync",
-            method="POST",
-            data=data,
-            headers={"Content-Type": "application/json"},
-        )
-        assert status in (200, 201, 202), f"Search failed: {status} {body}"
-
-        result = json.loads(body)
+    def test_search_freeleech_via_merge_service(self, live_search_result):
+        # Reuse the session-cached search instead of issuing a fresh
+        # ``1080p`` fan-out. Both tests in this class assert the same
+        # invariant on iptorrents freeleech rows.
+        result = live_search_result("linux", 20)
         ip_results = [
             r for r in result.get("results", []) if r.get("tracker") == "iptorrents" and r.get("freeleech") is True
         ]
