@@ -23,7 +23,7 @@ _POLLUTING_ROOTS = ("api", "merge_service", "config")
 
 
 @pytest.fixture(autouse=True)
-def _isolate_download_proxy_modules():
+def _isolate_download_proxy_modules(request):
     """Keep each test's ``sys.modules`` scribbles from leaking into the next.
 
     Several pre-existing test files install throw-away stub packages for
@@ -32,7 +32,20 @@ def _isolate_download_proxy_modules():
     leak into the next test, any subsequent ``from api.routes import X``
     fails with ``'api' is not a package``. This autouse fixture snapshots
     the relevant entries before the test runs and restores them after.
+
+    SKIPPED for ``tests/e2e/test_full_pipeline.py`` — that file imports
+    ``SearchMetadata`` / ``SearchOrchestrator`` etc. at module scope and
+    keeps live references. When the snapshot/restore wipes ``merge_service``
+    out from under it, pytest-asyncio's coroutine cleanup tries to resolve
+    those names against a module that no longer exists, producing
+    ``KeyError: '__import__'`` "Exception ignored" warnings and marking the
+    @pytest.mark.asyncio tests as failed.
     """
+    test_path = str(request.node.fspath)
+    skip_isolation = "tests/e2e/test_full_pipeline.py" in test_path
+    if skip_isolation:
+        yield
+        return
     saved = {
         k: v
         for k, v in sys.modules.items()
