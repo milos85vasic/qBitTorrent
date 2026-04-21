@@ -3,7 +3,6 @@ API endpoints for scheduled search management.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -21,9 +20,9 @@ class ScheduleCreateRequest(BaseModel):
 
 
 class ScheduleUpdateRequest(BaseModel):
-    enabled: Optional[bool] = None
-    interval_minutes: Optional[int] = Field(default=None, ge=5, le=10080)
-    name: Optional[str] = None
+    enabled: bool | None = None
+    interval_minutes: int | None = Field(default=None, ge=5, le=10080)
+    name: str | None = None
 
 
 def _get_scheduler(request: Request):
@@ -100,9 +99,7 @@ async def get_schedule(schedule_id: str, req: Request):
 
 
 @router.patch("/{schedule_id}")
-async def update_schedule(
-    schedule_id: str, request: ScheduleUpdateRequest, req: Request
-):
+async def update_schedule(schedule_id: str, request: ScheduleUpdateRequest, req: Request):
     scheduler = _get_scheduler(req)
     search = scheduler.get_scheduled_search(schedule_id)
     if not search:

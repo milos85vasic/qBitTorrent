@@ -7,12 +7,11 @@ Uses JSON file persistence at /config/download-proxy/hooks.json.
 
 import asyncio
 import collections
-import os
 import json
-import uuid
 import logging
-from typing import List, Optional
-from datetime import datetime, timezone
+import os
+import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -123,7 +122,7 @@ async def create_hook(request: HookCreateRequest):
         "enabled": request.enabled,
         "timeout": request.timeout,
         "environment": request.environment,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
     hooks = _load_hooks()
@@ -156,12 +155,12 @@ async def delete_hook(hook_id: str):
 
 
 @router.get("/logs")
-async def get_execution_logs(limit: int = 50, hook_name: Optional[str] = None):
+async def get_execution_logs(limit: int = 50, hook_name: str | None = None):
     async with _execution_logs_lock:
         snapshot = list(_execution_logs)
     logs = snapshot[-limit:]
     if hook_name:
-        logs = [l for l in logs if l.get("hook_name") == hook_name]
+        logs = [line for line in logs if line.get("hook_name") == hook_name]
     return {"logs": logs, "count": len(logs)}
 
 
@@ -206,4 +205,4 @@ async def dispatch_event(event_type: str, event_data: dict):
     await extend_hook_logs(new_logs)
 
 
-__all__ = ["router", "dispatch_event", "append_hook_log", "extend_hook_logs"]
+__all__ = ["append_hook_log", "dispatch_event", "extend_hook_logs", "router"]

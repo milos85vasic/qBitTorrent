@@ -3,9 +3,11 @@ Core data models for the merge service.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
+
+from cachetools import TTLCache
 
 
 class ContentType(Enum):
@@ -35,11 +37,11 @@ class TrackerSource:
     name: str
     url: str
     enabled: bool = True
-    last_checked: Optional[datetime] = None
+    last_checked: datetime | None = None
     health_status: str = "unknown"
-    scrape_url: Optional[str] = None
+    scrape_url: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "url": self.url,
@@ -52,18 +54,18 @@ class TrackerSource:
 
 @dataclass
 class CanonicalIdentity:
-    infohash: Optional[str] = None
-    title: Optional[str] = None
-    year: Optional[int] = None
-    content_type: Optional[ContentType] = None
-    season: Optional[int] = None
-    episode: Optional[int] = None
-    resolution: Optional[str] = None
-    codec: Optional[str] = None
-    group: Optional[str] = None
-    metadata_source: Optional[str] = None
+    infohash: str | None = None
+    title: str | None = None
+    year: int | None = None
+    content_type: ContentType | None = None
+    season: int | None = None
+    episode: int | None = None
+    resolution: str | None = None
+    codec: str | None = None
+    group: str | None = None
+    metadata_source: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "infohash": self.infohash,
             "title": self.title,
@@ -86,13 +88,13 @@ class SearchResult:
     seeds: int
     leechers: int
     engine_url: str
-    desc_link: Optional[str] = None
-    pub_date: Optional[str] = None
-    tracker: Optional[str] = None
-    category: Optional[str] = None
+    desc_link: str | None = None
+    pub_date: str | None = None
+    tracker: str | None = None
+    category: str | None = None
     freeleech: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = {
             "name": self.name,
             "link": self.link,
@@ -118,12 +120,12 @@ class SearchResult:
 @dataclass
 class MergedResult:
     canonical_identity: CanonicalIdentity
-    original_results: List[SearchResult] = field(default_factory=list)
+    original_results: list[SearchResult] = field(default_factory=list)
     total_seeds: int = 0
     total_leechers: int = 0
-    best_quality: Optional[QualityTier] = None
-    download_urls: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    best_quality: QualityTier | None = None
+    download_urls: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def add_source(self, result: SearchResult):
         self.original_results.append(result)
@@ -132,7 +134,7 @@ class MergedResult:
         if result.link not in self.download_urls:
             self.download_urls.append(result.link)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "canonical_identity": self.canonical_identity.to_dict(),
             "sources": [
@@ -146,9 +148,7 @@ class MergedResult:
         }
 
 
-def _classify_plugin_stderr(
-    stderr: str, *, killed_by_deadline: bool, had_results: bool
-) -> Dict[str, Any]:
+def _classify_plugin_stderr(stderr: str, *, killed_by_deadline: bool, had_results: bool) -> dict[str, Any]:
     """Categorise a plugin subprocess's stderr into a structured diagnostic.
 
     Public trackers run as isolated python subprocesses, and their
@@ -229,20 +229,20 @@ class TrackerSearchStat:
     tracker_url: str = ""
     status: str = "pending"  # pending | running | success | empty | error | timeout | cancelled
     results_count: int = 0
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    duration_ms: Optional[int] = None
-    error: Optional[str] = None
-    error_type: Optional[str] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    duration_ms: int | None = None
+    error: str | None = None
+    error_type: str | None = None
     authenticated: bool = False
     attempt: int = 1
-    http_status: Optional[int] = None  # when available from the plugin
+    http_status: int | None = None  # when available from the plugin
     category: str = "all"
     query: str = ""
     # Free-form notes for future diagnostics the plugin wants to surface.
-    notes: Dict[str, Any] = field(default_factory=dict)
+    notes: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "tracker_url": self.tracker_url,
@@ -267,16 +267,16 @@ class SearchMetadata:
     search_id: str
     query: str
     category: str = "all"
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: Optional[datetime] = None
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
     total_results: int = 0
     merged_results: int = 0
-    trackers_searched: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+    trackers_searched: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     status: str = "running"
-    tracker_stats: Dict[str, "TrackerSearchStat"] = field(default_factory=dict)
+    tracker_stats: dict[str, "TrackerSearchStat"] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "search_id": self.search_id,
             "query": self.query,
@@ -288,10 +288,7 @@ class SearchMetadata:
             "trackers_searched": self.trackers_searched,
             "errors": self.errors,
             "status": self.status,
-            "tracker_stats": [
-                s.to_dict()
-                for s in sorted(self.tracker_stats.values(), key=lambda s: s.name)
-            ],
+            "tracker_stats": [s.to_dict() for s in sorted(self.tracker_stats.values(), key=lambda s: s.name)],
         }
 
 
@@ -353,24 +350,41 @@ PUBLIC_TRACKERS = {
 # `ENABLE_DEAD_TRACKERS=1` to force them back in — e.g. to test whether
 # an upstream has recovered, or when an operator is sitting behind a
 # VPN/proxy that bypasses the geoblock.
-DEAD_PUBLIC_TRACKERS = frozenset({
-    "eztv", "kickass", "bt4g", "extratorrent", "one337x",
-    "bitru", "megapeer", "yts",
-    "nyaa",
-    "glotorrents", "pctorrent", "yihua", "torrentgalaxy",
-    "xfsub",
-    "yourbittorrent", "anilibra",
-    # "Silently empty" — plugin runs cleanly but returns 0 for every
-    # query (verified on ubuntu / game / movie / 2024 via direct
-    # subprocess invocation on 2026-04-20). Direct curl shows each
-    # upstream responds with HTTP 403; the plugin catches the error
-    # without printing anything to stderr, so the classifier can't
-    # tag it. Bucketing them here stops the dashboard from showing
-    # permanently-green-empty chips that confuse operators into
-    # thinking these trackers simply had no hits.
-    "solidtorrents", "therarbg", "torrentfunk",
-    "ali213", "btsow", "gamestorrents", "torrentkitty",
-})
+DEAD_PUBLIC_TRACKERS = frozenset(
+    {
+        "eztv",
+        "kickass",
+        "bt4g",
+        "extratorrent",
+        "one337x",
+        "bitru",
+        "megapeer",
+        "yts",
+        "nyaa",
+        "glotorrents",
+        "pctorrent",
+        "yihua",
+        "torrentgalaxy",
+        "xfsub",
+        "yourbittorrent",
+        "anilibra",
+        # "Silently empty" — plugin runs cleanly but returns 0 for every
+        # query (verified on ubuntu / game / movie / 2024 via direct
+        # subprocess invocation on 2026-04-20). Direct curl shows each
+        # upstream responds with HTTP 403; the plugin catches the error
+        # without printing anything to stderr, so the classifier can't
+        # tag it. Bucketing them here stops the dashboard from showing
+        # permanently-green-empty chips that confuse operators into
+        # thinking these trackers simply had no hits.
+        "solidtorrents",
+        "therarbg",
+        "torrentfunk",
+        "ali213",
+        "btsow",
+        "gamestorrents",
+        "torrentkitty",
+    }
+)
 
 
 PRIVATE_TRACKERS = {
@@ -383,7 +397,6 @@ PRIVATE_TRACKERS = {
 
 class SearchOrchestrator:
     def __init__(self):
-        import asyncio
         from .deduplicator import Deduplicator
         from .validator import TrackerValidator
 
@@ -393,34 +406,29 @@ class SearchOrchestrator:
         # Bounded, self-expiring stores so long-running processes don't leak
         # memory.  Previously these were plain dicts that grew without bound
         # and kept entries forever.
-        from cachetools import TTLCache as _TTLCache
         import os as _os_ttl
+
+        from cachetools import TTLCache as _TTLCache
 
         _max_searches = max(1, int(_os_ttl.getenv("MAX_ACTIVE_SEARCHES", "256")))
         _ttl = max(1, int(_os_ttl.getenv("ACTIVE_SEARCH_TTL_SECONDS", "3600")))
-        self._active_searches: "TTLCache[str, SearchMetadata]" = _TTLCache(
-            maxsize=_max_searches, ttl=_ttl
-        )
-        self._tracker_sessions: Dict[str, Any] = {}
-        self._last_merged_results: "TTLCache[str, tuple]" = _TTLCache(
-            maxsize=_max_searches, ttl=_ttl
-        )
-        self._tracker_results: Dict[str, Dict[str, List[Any]]] = {}
+        self._active_searches: TTLCache[str, SearchMetadata] = _TTLCache(maxsize=_max_searches, ttl=_ttl)
+        self._tracker_sessions: dict[str, Any] = {}
+        self._last_merged_results: TTLCache[str, tuple] = _TTLCache(maxsize=_max_searches, ttl=_ttl)
+        self._tracker_results: dict[str, dict[str, list[Any]]] = {}
         # Side-channel: `_search_public_tracker` writes a diagnostic
         # dict here keyed by tracker name so the orchestrator can thread
         # error info into TrackerSearchStat without changing the return
         # type of every _search_* helper. Overwritten on each call so
         # stale entries can't leak into the next search. Keys live only
         # for the duration of a single orchestrator fan-out.
-        self._last_public_tracker_diag: Dict[str, Dict[str, Any]] = {}
+        self._last_public_tracker_diag: dict[str, dict[str, Any]] = {}
         # Bounded tracker fan-out.  Without this, asyncio.gather spawned one
         # task per tracker (~40+) with no backpressure, which let subprocess
         # spawns and aiohttp sessions starve the event loop under load.
         import os as _os
 
-        self._max_concurrent_trackers: int = max(
-            1, int(_os.getenv("MAX_CONCURRENT_TRACKERS", "5"))
-        )
+        self._max_concurrent_trackers: int = max(1, int(_os.getenv("MAX_CONCURRENT_TRACKERS", "5")))
         # `_inflight_count` is an instrument for tests and Phase 6 metrics.
         # It is only meaningful while a search is running.
         self._inflight_count: int = 0
@@ -432,9 +440,7 @@ class SearchOrchestrator:
         # per-search tracker cap) at `MAX_CONCURRENT_SEARCHES`; when
         # the cap is saturated the API returns 429 Too Many Requests
         # so clients back off instead of piling more work on top.
-        self._max_concurrent_searches: int = max(
-            1, int(_os.getenv("MAX_CONCURRENT_SEARCHES", "8"))
-        )
+        self._max_concurrent_searches: int = max(1, int(_os.getenv("MAX_CONCURRENT_SEARCHES", "8")))
         self._active_search_count: int = 0
 
     def _load_env(self):
@@ -512,7 +518,7 @@ class SearchOrchestrator:
                     category=category,
                     authenticated=self._is_tracker_authenticated(t.name),
                 )
-        except Exception:
+        except Exception:  # noqa: S110
             # Never let a tracker-enumeration failure block search start.
             pass
         self._active_searches[search_id] = metadata
@@ -584,7 +590,7 @@ class SearchOrchestrator:
                     )
                     metadata.tracker_stats[tracker.name] = stat
                 stat.status = "running"
-                stat.started_at = datetime.now(timezone.utc)
+                stat.started_at = datetime.now(UTC)
                 t0 = _time.perf_counter()
                 try:
                     results = await self._search_tracker(tracker, query, category)
@@ -612,7 +618,7 @@ class SearchOrchestrator:
                             stat.notes["deadline_hit"] = True
                             stat.notes["deadline_seconds"] = diag.get("deadline_seconds")
                     return tracker.name, results, None
-                except asyncio.TimeoutError as e:
+                except TimeoutError as e:
                     stat.status = "timeout"
                     stat.error = str(e) or "timeout"
                     stat.error_type = "TimeoutError"
@@ -625,7 +631,7 @@ class SearchOrchestrator:
                     logger.error(f"Tracker {tracker.name} error: {e}")
                     return tracker.name, [], str(e)
                 finally:
-                    stat.completed_at = datetime.now(timezone.utc)
+                    stat.completed_at = datetime.now(UTC)
                     stat.duration_ms = int((_time.perf_counter() - t0) * 1000)
 
             semaphore = asyncio.Semaphore(self._max_concurrent_trackers)
@@ -650,11 +656,11 @@ class SearchOrchestrator:
             metadata.merged_results = len(merged)
             self._last_merged_results[search_id] = (merged, all_results)
             metadata.status = "completed"
-            metadata.completed_at = datetime.now(timezone.utc)
+            metadata.completed_at = datetime.now(UTC)
         except Exception as e:
             metadata.status = "failed"
             metadata.errors.append(str(e))
-            metadata.completed_at = datetime.now(timezone.utc)
+            metadata.completed_at = datetime.now(UTC)
         finally:
             self._active_search_count = max(0, self._active_search_count - 1)
 
@@ -704,7 +710,7 @@ class SearchOrchestrator:
             return bool(os.getenv("IPTORRENTS_USERNAME") and os.getenv("IPTORRENTS_PASSWORD"))
         return False
 
-    def _get_enabled_trackers(self) -> List[TrackerSource]:
+    def _get_enabled_trackers(self) -> list[TrackerSource]:
         import os
 
         trackers = []
@@ -725,7 +731,7 @@ class SearchOrchestrator:
 
         return trackers
 
-    async def _search_tracker(self, tracker: TrackerSource, query: str, category: str) -> List[SearchResult]:
+    async def _search_tracker(self, tracker: TrackerSource, query: str, category: str) -> list[SearchResult]:
         """Dispatch to the right plugin and return its results.
 
         Per-plugin diagnostic info (subprocess stderr, error classification)
@@ -738,7 +744,7 @@ class SearchOrchestrator:
         import logging
 
         logger = logging.getLogger(__name__)
-        results: List[SearchResult] = []
+        results: list[SearchResult] = []
 
         try:
             self._load_env()
@@ -757,7 +763,7 @@ class SearchOrchestrator:
 
         return results
 
-    async def _search_public_tracker(self, tracker_name: str, query: str, category: str) -> List[SearchResult]:
+    async def _search_public_tracker(self, tracker_name: str, query: str, category: str) -> list[SearchResult]:
         import asyncio
         import json
         import logging
@@ -842,10 +848,8 @@ class SearchOrchestrator:
                     killed_by_deadline = True
                     break
                 try:
-                    line = await asyncio.wait_for(
-                        proc.stdout.readline(), timeout=remaining
-                    )
-                except asyncio.TimeoutError:
+                    line = await asyncio.wait_for(proc.stdout.readline(), timeout=remaining)
+                except TimeoutError:
                     killed_by_deadline = True
                     break
                 if not line:  # EOF
@@ -855,23 +859,23 @@ class SearchOrchestrator:
                     continue
                 try:
                     _append(json.loads(line_s))
-                except Exception:
+                except Exception:  # noqa: S112
                     continue
 
             if proc.returncode is None:
-                try:
+                try:  # noqa: SIM105
                     proc.kill()
-                except Exception:
+                except Exception:  # noqa: S110
                     pass
             try:
                 stderr_tail = (await proc.stderr.read()).decode(errors="replace").strip()
                 if stderr_tail:
                     logger.debug(f"Plugin {tracker_name} stderr: {stderr_tail[:300]}")
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
-            try:
+            try:  # noqa: SIM105
                 await proc.wait()
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
 
         except Exception as e:
@@ -880,12 +884,10 @@ class SearchOrchestrator:
                 try:
                     proc.kill()
                     await proc.wait()
-                except Exception:
+                except Exception:  # noqa: S110
                     pass
 
-        diag = _classify_plugin_stderr(
-            stderr_tail, killed_by_deadline=killed_by_deadline, had_results=bool(results)
-        )
+        diag = _classify_plugin_stderr(stderr_tail, killed_by_deadline=killed_by_deadline, had_results=bool(results))
         # Expose the truncation fact so the dashboard can show a clock
         # icon. Without this, a tracker that hit the wall at 25 s looks
         # identical to one that returned cleanly — operators have no way
@@ -895,13 +897,12 @@ class SearchOrchestrator:
         self._last_public_tracker_diag[tracker_name] = diag
         return results
 
-    async def _search_rutracker(self, query: str, category: str) -> List[SearchResult]:
-        import os
-        import aiohttp
-        import re
-        import html
+    async def _search_rutracker(self, query: str, category: str) -> list[SearchResult]:
         import logging
+        import os
         from urllib.parse import urlencode
+
+        import aiohttp
 
         logger = logging.getLogger(__name__)
         results = []
@@ -971,9 +972,9 @@ class SearchOrchestrator:
 
         return results
 
-    def _parse_rutracker_html(self, html_content: str, base_url: str) -> List[SearchResult]:
-        import re
+    def _parse_rutracker_html(self, html_content: str, base_url: str) -> list[SearchResult]:
         import html
+        import re
 
         results = []
 
@@ -1017,7 +1018,7 @@ class SearchOrchestrator:
                         )
                     )
                 except Exception as e:
-                    logger.debug(f"Skipping malformed RuTracker result: {e}")
+                    logger.debug(f"Skipping malformed RuTracker result: {e}")  # noqa: F821
                     continue
 
         return results
@@ -1051,12 +1052,13 @@ class SearchOrchestrator:
             bytes_size /= 1024
         return f"{bytes_size:.1f} PB"
 
-    async def _search_kinozal(self, query: str, category: str) -> List[SearchResult]:
+    async def _search_kinozal(self, query: str, category: str) -> list[SearchResult]:
         import gzip
-        import os
         import logging
-        import aiohttp
+        import os
         from urllib.parse import urlencode
+
+        import aiohttp
 
         logger = logging.getLogger(__name__)
         results = []
@@ -1105,7 +1107,7 @@ class SearchOrchestrator:
 
         return results
 
-    def _parse_kinozal_html(self, html_content: str, base_url: str) -> List[SearchResult]:
+    def _parse_kinozal_html(self, html_content: str, base_url: str) -> list[SearchResult]:
         import re
         from html import unescape
 
@@ -1116,7 +1118,7 @@ class SearchOrchestrator:
             r">(?P<leech>\d+?)<.+?s\'>(?P<pub_date>.+?)</td>",
             re.S,
         )
-        cyrillic_table = str.maketrans({"Т": "T", "Г": "G", "М": "M", "К": "K", "Б": "B"})
+        cyrillic_table = str.maketrans({"Т": "T", "Г": "G", "М": "M", "К": "K", "Б": "B"})  # noqa: RUF001
         url_dl = base_url.replace("//", "//dl.")
 
         for tor in torrent_re.finditer(html_content):
@@ -1135,16 +1137,17 @@ class SearchOrchestrator:
                     )
                 )
             except Exception as e:
-                logger.debug(f"Skipping malformed Kinozal result: {e}")
+                logger.debug(f"Skipping malformed Kinozal result: {e}")  # noqa: F821
                 continue
 
         return results
 
-    async def _search_nnmclub(self, query: str, category: str) -> List[SearchResult]:
-        import os
+    async def _search_nnmclub(self, query: str, category: str) -> list[SearchResult]:
         import logging
-        import aiohttp
+        import os
         from urllib.parse import urlencode
+
+        import aiohttp
 
         logger = logging.getLogger(__name__)
         results = []
@@ -1183,7 +1186,7 @@ class SearchOrchestrator:
 
         return results
 
-    def _parse_nnmclub_html(self, html_content: str, base_url: str) -> List[SearchResult]:
+    def _parse_nnmclub_html(self, html_content: str, base_url: str) -> list[SearchResult]:
         import re
         from html import unescape
 
@@ -1210,18 +1213,17 @@ class SearchOrchestrator:
                     )
                 )
             except Exception as e:
-                logger.debug(f"Skipping malformed NNMClub result: {e}")
+                logger.debug(f"Skipping malformed NNMClub result: {e}")  # noqa: F821
                 continue
 
         return results
 
-    async def _search_iptorrents(self, query: str, category: str) -> List[SearchResult]:
-        import os
+    async def _search_iptorrents(self, query: str, category: str) -> list[SearchResult]:
         import logging
-        import aiohttp
-        import re
-        import html
+        import os
         from urllib.parse import urlencode
+
+        import aiohttp
 
         logger = logging.getLogger(__name__)
         results = []
@@ -1276,9 +1278,9 @@ class SearchOrchestrator:
 
         return results
 
-    def _parse_iptorrents_html(self, html_content: str, base_url: str) -> List[SearchResult]:
-        import re
+    def _parse_iptorrents_html(self, html_content: str, base_url: str) -> list[SearchResult]:
         import html
+        import re
 
         results = []
         table_match = re.search(r'<table[^>]*id="torrents"[^>]*>(.+?)</table>', html_content, re.S)
@@ -1330,16 +1332,15 @@ class SearchOrchestrator:
                     )
                 )
             except Exception as e:
-                logger.debug(f"Skipping malformed IPTorrents result: {e}")
+                logger.debug(f"Skipping malformed IPTorrents result: {e}")  # noqa: F821
                 continue
 
         return results
 
-    async def fetch_torrent(self, tracker: str, url: str) -> Optional[bytes]:
-        import os
-        import aiohttp
+    async def fetch_torrent(self, tracker: str, url: str) -> bytes | None:
         import logging
-        import re
+
+        import aiohttp
 
         logger = logging.getLogger(__name__)
         session_data = self._tracker_sessions.get(tracker)
@@ -1391,9 +1392,9 @@ class SearchOrchestrator:
             logger.error(f"fetch_torrent {tracker}: {e}")
             return None
 
-    async def _fetch_rutracker_redirect(self, session, url: str, cookies: dict, base_url: str) -> Optional[bytes]:
-        import re
+    async def _fetch_rutracker_redirect(self, session, url: str, cookies: dict, base_url: str) -> bytes | None:
         import logging
+        import re
 
         logger = logging.getLogger(__name__)
         try:
@@ -1413,7 +1414,7 @@ class SearchOrchestrator:
             logger.error(f"_fetch_rutracker_redirect: {e}")
         return None
 
-    async def _fetch_kinozal_torrent(self, session, url: str, cookies: dict, base_url: str) -> Optional[bytes]:
+    async def _fetch_kinozal_torrent(self, session, url: str, cookies: dict, base_url: str) -> bytes | None:
         import logging
 
         logger = logging.getLogger(__name__)
@@ -1429,10 +1430,10 @@ class SearchOrchestrator:
             logger.error(f"_fetch_kinozal_torrent: {e}")
         return None
 
-    def get_search_status(self, search_id: str) -> Optional[SearchMetadata]:
+    def get_search_status(self, search_id: str) -> SearchMetadata | None:
         return self._active_searches.get(search_id)
 
-    def get_live_results(self, search_id: str) -> List[Any]:
+    def get_live_results(self, search_id: str) -> list[Any]:
         """Get all results found so far for a search, not yet merged.
 
         FIX: Also check _last_merged_results which IS populated incrementally
@@ -1449,13 +1450,13 @@ class SearchOrchestrator:
 
         # Fallback: check _last_merged_results (populated INCREMENTALLY)
         if search_id in self._last_merged_results:
-            merged, all_results = self._last_merged_results[search_id]
+            _merged, all_results = self._last_merged_results[search_id]
             if all_results:
                 return all_results
 
         return []
 
-    def get_all_tracker_results(self, search_id: str) -> List[Any]:
+    def get_all_tracker_results(self, search_id: str) -> list[Any]:
         """Get all results from _tracker_results."""
         if search_id not in self._tracker_results:
             return []
@@ -1465,5 +1466,5 @@ class SearchOrchestrator:
                 results.extend(tracker_results)
         return results
 
-    def get_active_searches(self) -> List[SearchMetadata]:
+    def get_active_searches(self) -> list[SearchMetadata]:
         return list(self._active_searches.values())

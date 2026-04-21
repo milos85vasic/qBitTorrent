@@ -2,20 +2,19 @@
 Tracker authentication endpoints — CAPTCHA proxy for RuTracker.
 """
 
-import os
-import sys
-import re
 import base64
 import logging
+import os
+import re
 import secrets
-from typing import Optional
+import sys
 
 _src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +23,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # Bounded + self-expiring store for outstanding CAPTCHA challenges.
 # Previously a plain dict that grew without bound and kept entries forever,
 # leaking memory over long sessions.
-from cachetools import TTLCache as _TTLCache  # noqa: E402
+from cachetools import TTLCache  # noqa: E402
 
 _PENDING_CAPTCHAS_MAX = int(os.getenv("PENDING_CAPTCHAS_MAX", "1024"))
 _PENDING_CAPTCHAS_TTL = int(os.getenv("PENDING_CAPTCHAS_TTL_SECONDS", "900"))
-_pending_captchas: "TTLCache[str, dict]" = _TTLCache(
-    maxsize=_PENDING_CAPTCHAS_MAX, ttl=_PENDING_CAPTCHAS_TTL
-)
+_pending_captchas: TTLCache[str, dict] = TTLCache(maxsize=_PENDING_CAPTCHAS_MAX, ttl=_PENDING_CAPTCHAS_TTL)
 
 
 def _get_orchestrator():
@@ -78,24 +75,26 @@ async def rutracker_auth_status():
 
     base_url = session.get("base_url", "https://rutracker.org")
     try:
-        async with aiohttp.ClientSession() as client:
-            async with client.get(
+        async with (
+            aiohttp.ClientSession() as client,
+            client.get(
                 f"{base_url}/forum/index.php",
                 cookies=cookies,
                 timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
-                text = await resp.text()
-                if 'id="logged-in-username"' in text:
-                    return {
-                        "authenticated": True,
-                        "status": "active",
-                        "message": "RuTracker session is active.",
-                    }
+            ) as resp,
+        ):
+            text = await resp.text()
+            if 'id="logged-in-username"' in text:
                 return {
-                    "authenticated": False,
-                    "status": "expired",
-                    "message": "Session expired. Re-login required.",
+                    "authenticated": True,
+                    "status": "active",
+                    "message": "RuTracker session is active.",
                 }
+            return {
+                "authenticated": False,
+                "status": "expired",
+                "message": "Session expired. Re-login required.",
+            }
     except Exception as e:
         return {
             "authenticated": False,
@@ -207,7 +206,7 @@ async def rutracker_fetch_captcha():
         raise
     except Exception as e:
         logger.error(f"Error fetching RuTracker CAPTCHA: {e}")
-        raise HTTPException(status_code=502, detail=f"Failed to fetch login page: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to fetch login page: {e}") from e
 
 
 @router.post("/rutracker/login")
@@ -291,7 +290,7 @@ async def rutracker_login_with_captcha(request: CaptchaLoginRequest):
         raise
     except Exception as e:
         logger.error(f"Error during RuTracker login: {e}")
-        raise HTTPException(status_code=500, detail=f"Login failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {e}") from e
 
 
 @router.post("/rutracker/cookie-login")
@@ -316,22 +315,24 @@ async def rutracker_cookie_login(request: CookieLoginRequest):
     import aiohttp
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(
                 f"{base_url}/forum/index.php",
                 cookies=cookie_jar,
                 timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
-                text = await resp.text()
-                if 'id="logged-in-username"' not in text:
-                    raise HTTPException(
-                        status_code=401,
-                        detail="Cookie is invalid or expired.",
-                    )
+            ) as resp,
+        ):
+            text = await resp.text()
+            if 'id="logged-in-username"' not in text:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Cookie is invalid or expired.",
+                )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Could not verify cookie: {e}")
+        raise HTTPException(status_code=502, detail=f"Could not verify cookie: {e}") from e
 
     orch._tracker_sessions["rutracker"] = {
         "cookies": cookie_jar,
@@ -352,7 +353,7 @@ def _load_qbit_credentials():
         try:
             with open(creds_path) as f:
                 return json.load(f)
-        except Exception:
+        except Exception:  # noqa: S110
             pass
     username = os.getenv("QBITTORRENT_USER", os.getenv("QBITTORRENT_USERNAME", ""))
     password = os.getenv("QBITTORRENT_PASS", os.getenv("QBITTORRENT_PASSWORD", ""))
@@ -381,15 +382,17 @@ async def all_trackers_auth_status():
     if creds:
         qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:7185")
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
                     f"{qbit_url}/api/v2/auth/login",
                     data={"username": creds.get("username", "admin"), "password": creds.get("password", "admin")},
                     timeout=aiohttp.ClientTimeout(total=5),
-                ) as resp:
-                    login_text = await resp.text()
-                    qbit_has_session = resp.status == 200 and login_text.strip() == "Ok."
-        except Exception:
+                ) as resp,
+            ):
+                login_text = await resp.text()
+                qbit_has_session = resp.status == 200 and login_text.strip() == "Ok."
+        except Exception:  # noqa: S110
             pass
     trackers["qbittorrent"] = {
         "has_session": qbit_has_session,
@@ -403,7 +406,7 @@ async def all_trackers_auth_status():
 async def qbittorrent_logout():
     creds_path = "/config/download-proxy/qbittorrent_creds.json"
     try:
-        if os.path.exists(creds_path):
+        if os.path.exists(creds_path):  # noqa: ASYNC240
             os.remove(creds_path)
         return {"status": "logged_out", "message": "Credentials cleared"}
     except Exception as e:

@@ -8,15 +8,14 @@ Provides:
 - Event dispatching to registered hooks
 """
 
+import json
+import logging
 import os
 import subprocess
-import logging
-import json
-from typing import List, Optional, Callable, Dict, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +38,12 @@ class HookEvent:
     """Event payload for hook execution."""
 
     event_type: HookEventType
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    search_id: Optional[str] = None
-    download_id: Optional[str] = None
-    data: Dict[str, Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    search_id: str | None = None
+    download_id: str | None = None
+    data: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "event_type": self.event_type.value,
             "timestamp": self.timestamp.isoformat(),
@@ -63,7 +62,7 @@ class HookConfig:
     script_path: str
     enabled: bool = True
     timeout: int = 30  # seconds
-    environment: Dict[str, str] = field(default_factory=dict)
+    environment: dict[str, str] = field(default_factory=dict)
 
     def validate(self) -> bool:
         """Validate hook configuration."""
@@ -81,9 +80,9 @@ class HookDispatcher:
     """Dispatches events to registered hooks."""
 
     def __init__(self, timeout: int = 30):
-        self._hooks: Dict[HookEventType, List[HookConfig]] = {}
+        self._hooks: dict[HookEventType, list[HookConfig]] = {}
         self._timeout = timeout
-        self._execution_log: List[Dict[str, Any]] = []
+        self._execution_log: list[dict[str, Any]] = []
 
     def register_hook(self, hook: HookConfig):
         """Register a hook for an event type."""
@@ -101,7 +100,7 @@ class HookDispatcher:
         if event in self._hooks:
             self._hooks[event] = [h for h in self._hooks[event] if h.name != name]
 
-    def get_hooks(self, event: HookEventType) -> List[HookConfig]:
+    def get_hooks(self, event: HookEventType) -> list[HookConfig]:
         """Get all hooks registered for an event type."""
         return self._hooks.get(event, [])
 
@@ -136,10 +135,10 @@ class HookDispatcher:
             env["DOWNLOAD_ID"] = event.download_id
 
         # Execute script
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: ASYNC221
                 [hook.script_path],
                 capture_output=True,
                 text=True,
@@ -147,7 +146,7 @@ class HookDispatcher:
                 env=env,
             )
 
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            duration = (datetime.now(UTC) - start_time).total_seconds()
 
             log_entry = {
                 "hook_name": hook.name,
@@ -190,13 +189,13 @@ class HookDispatcher:
                 }
             )
 
-    def get_execution_log(self) -> List[Dict[str, Any]]:
+    def get_execution_log(self) -> list[dict[str, Any]]:
         """Get the execution log."""
         return self._execution_log
 
 
 # Global dispatcher instance
-_dispatcher: Optional[HookDispatcher] = None
+_dispatcher: HookDispatcher | None = None
 
 
 def get_dispatcher() -> HookDispatcher:
@@ -207,9 +206,7 @@ def get_dispatcher() -> HookDispatcher:
     return _dispatcher
 
 
-def create_default_hook(
-    name: str, event: HookEventType, script_path: str
-) -> HookConfig:
+def create_default_hook(name: str, event: HookEventType, script_path: str) -> HookConfig:
     """Create a hook configuration with defaults."""
     return HookConfig(
         name=name,

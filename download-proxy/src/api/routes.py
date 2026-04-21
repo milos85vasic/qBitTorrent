@@ -3,18 +3,17 @@ API routes for the merge service.
 """
 
 import asyncio
-import uuid
-import logging
-import sys
-import re
-import os
 import json
+import logging
+import os
+import re
 import urllib.parse
+import uuid
+
 import aiohttp
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from typing import List, Optional
 
 try:
     from . import theme_state
@@ -76,19 +75,20 @@ async def stream_theme(request: Request):
     is sent every 15s when idle so proxies don't hang up the
     connection.
     """
+
     async def gen():
         store = theme_state.get_store()
         queue = store.subscribe()
         try:
             current = store.get()
-            yield f"event: theme\ndata: {json.dumps(current.to_dict())}\n\n".encode("utf-8")
+            yield f"event: theme\ndata: {json.dumps(current.to_dict())}\n\n".encode()
             while True:
                 if await request.is_disconnected():
                     break
                 try:
                     state = await asyncio.wait_for(queue.get(), timeout=15)
-                    yield f"event: theme\ndata: {json.dumps(state.to_dict())}\n\n".encode("utf-8")
-                except asyncio.TimeoutError:
+                    yield f"event: theme\ndata: {json.dumps(state.to_dict())}\n\n".encode()
+                except TimeoutError:
                     yield b": keepalive\n\n"
         finally:
             store.unsubscribe(queue)
@@ -122,13 +122,13 @@ class SearchResultResponse(BaseModel):
     size: str | int
     seeds: int
     leechers: int
-    download_urls: List[str]
-    quality: Optional[str] = None
-    content_type: Optional[str] = None
-    desc_link: Optional[str] = None
-    tracker: Optional[str] = None
-    sources: List[dict] = Field(default_factory=list)
-    metadata: Optional[dict] = None
+    download_urls: list[str]
+    quality: str | None = None
+    content_type: str | None = None
+    desc_link: str | None = None
+    tracker: str | None = None
+    sources: list[dict] = Field(default_factory=list)
+    metadata: dict | None = None
     freeleech: bool = False
 
 
@@ -136,28 +136,27 @@ class SearchResponse(BaseModel):
     search_id: str
     query: str
     status: str
-    results: List[SearchResultResponse] = Field(default_factory=list)
+    results: list[SearchResultResponse] = Field(default_factory=list)
     total_results: int
     merged_results: int
-    trackers_searched: List[str] = Field(default_factory=list)
-    errors: List[str] = Field(
+    trackers_searched: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(
         default_factory=list,
         description="Per-tracker error strings (e.g. 'rutracker: HTTP 503')",
     )
-    tracker_stats: List[dict] = Field(
+    tracker_stats: list[dict] = Field(
         default_factory=list,
         description=(
-            "Per-tracker run-time diagnostics (status, result count, "
-            "timings, error details, authentication flag)."
+            "Per-tracker run-time diagnostics (status, result count, timings, error details, authentication flag)."
         ),
     )
     started_at: str
-    completed_at: Optional[str] = None
+    completed_at: str | None = None
 
 
 class DownloadRequest(BaseModel):
     result_id: str = Field(..., description="Merged result ID")
-    download_urls: List[str] = Field(..., description="URLs to download")
+    download_urls: list[str] = Field(..., description="URLs to download")
 
 
 def _parse_size_to_bytes(size_str: str) -> float:
@@ -210,7 +209,7 @@ def _detect_quality(name: str, size: str) -> str:
     return "unknown"
 
 
-def _to_response(r, content_type: Optional[str] = None) -> SearchResultResponse:
+def _to_response(r, content_type: str | None = None) -> SearchResultResponse:
     return SearchResultResponse(
         name=r.name,
         size=r.size,
@@ -241,8 +240,9 @@ async def search(request: SearchRequest, req: Request):
     Without this cap, stress tests revealed the event loop starves
     and even ``/health`` starts timing out.
     """
-    from .hooks import dispatch_event
     import asyncio
+
+    from .hooks import dispatch_event
 
     orch = _get_orchestrator(req)
 
@@ -250,8 +250,7 @@ async def search(request: SearchRequest, req: Request):
         raise HTTPException(
             status_code=429,
             detail=(
-                "merge service has reached MAX_CONCURRENT_SEARCHES "
-                f"({orch._max_concurrent_searches}); retry shortly"
+                f"merge service has reached MAX_CONCURRENT_SEARCHES ({orch._max_concurrent_searches}); retry shortly"
             ),
         )
 
@@ -286,7 +285,7 @@ async def search(request: SearchRequest, req: Request):
         except Exception as e:
             logger.error(f"Background search {metadata.search_id} failed: {e}")
 
-    asyncio.create_task(_background())
+    asyncio.create_task(_background())  # noqa: RUF006
 
     # Return immediately — the caller should attach to SSE for real-time
     # results.  Any callers that want the old blocking behaviour can hit
@@ -313,8 +312,8 @@ async def search_sync(request: SearchRequest, req: Request):
     set in a single response.  Real-time clients should use
     ``POST /search`` + ``GET /search/stream/{search_id}``.
     """
+
     from .hooks import dispatch_event
-    import asyncio
 
     orch = _get_orchestrator(req)
 
@@ -322,8 +321,7 @@ async def search_sync(request: SearchRequest, req: Request):
         raise HTTPException(
             status_code=429,
             detail=(
-                "merge service has reached MAX_CONCURRENT_SEARCHES "
-                f"({orch._max_concurrent_searches}); retry shortly"
+                f"merge service has reached MAX_CONCURRENT_SEARCHES ({orch._max_concurrent_searches}); retry shortly"
             ),
         )
 
@@ -456,6 +454,7 @@ _SSE_STREAM_MAX = int(os.environ.get("MAX_CONCURRENT_SSE_STREAMS", "32"))
 @router.get("/search/stream/{search_id}")
 async def search_stream(search_id: str, req: Request):
     from fastapi.responses import StreamingResponse  # noqa: F401
+
     from .streaming import SSEHandler
 
     global _sse_stream_count
@@ -471,24 +470,19 @@ async def search_stream(search_id: str, req: Request):
     if _sse_stream_count >= _SSE_STREAM_MAX:
         raise HTTPException(
             status_code=429,
-            detail=(
-                f"merge service has {_SSE_STREAM_MAX} open SSE streams "
-                "— retry shortly"
-            ),
+            detail=(f"merge service has {_SSE_STREAM_MAX} open SSE streams — retry shortly"),
         )
 
     async def _wrapped():
         global _sse_stream_count
         _sse_stream_count += 1
         try:
-            async for frame in SSEHandler.search_results_stream(
-                search_id, orch, request=req
-            ):
+            async for frame in SSEHandler.search_results_stream(search_id, orch, request=req):
                 yield frame
         finally:
             _sse_stream_count = max(0, _sse_stream_count - 1)
 
-    return SSEHandler.create_streaming_response(_wrapped())  # noqa: F841
+    return SSEHandler.create_streaming_response(_wrapped())
 
 
 @router.get("/search/{search_id}", response_model=SearchResponse)
@@ -500,7 +494,7 @@ async def get_search(search_id: str, req: Request):
     result_resp = []
     stored = orch._last_merged_results.get(search_id)
     if stored:
-        merged, all_results = stored
+        merged, _all_results = stored
         for m in merged[:50]:
             best = m.original_results[0] if m.original_results else None
             if best:
@@ -540,7 +534,6 @@ async def abort_search(search_id: str, req: Request):
 
 @router.get("/downloads/active")
 async def get_active_downloads():
-    import aiohttp
 
     qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:7185")
     qbit_user = _get_qbit_username()
@@ -583,12 +576,11 @@ async def get_active_downloads():
 
 @router.post("/auth/qbittorrent")
 async def auth_qbittorrent(request: Request):
-    import aiohttp
     from pydantic import BaseModel
 
     class QBitLoginRequest(BaseModel):
         username: str = "admin"
-        password: str = "admin"
+        password: str = "admin"  # noqa: S105
         save: bool = False
 
     try:
@@ -600,33 +592,35 @@ async def auth_qbittorrent(request: Request):
     qbit_url = os.getenv("QBITTORRENT_URL", "http://localhost:7185")
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
                 f"{qbit_url}/api/v2/auth/login",
                 data={"username": req.username, "password": req.password},
-            ) as resp:
-                login_text = await resp.text()
-                if resp.status == 200 and login_text.strip() == "Ok.":
-                    cookies = resp.cookies
-                    async with session.get(f"{qbit_url}/api/v2/app/version", cookies=cookies) as vresp:
-                        version = await vresp.text() if vresp.status == 200 else "unknown"
+            ) as resp,
+        ):
+            login_text = await resp.text()
+            if resp.status == 200 and login_text.strip() == "Ok.":
+                cookies = resp.cookies
+                async with session.get(f"{qbit_url}/api/v2/app/version", cookies=cookies) as vresp:
+                    version = await vresp.text() if vresp.status == 200 else "unknown"
 
-                    if req.save:
-                        creds_dir = "/config/download-proxy"
-                        os.makedirs(creds_dir, exist_ok=True)
-                        with open(f"{creds_dir}/qbittorrent_creds.json", "w") as f:
-                            json.dump({"username": req.username, "password": req.password}, f)
+                if req.save:
+                    creds_dir = "/config/download-proxy"
+                    os.makedirs(creds_dir, exist_ok=True)
+                    with open(f"{creds_dir}/qbittorrent_creds.json", "w") as f:  # noqa: ASYNC230
+                        json.dump({"username": req.username, "password": req.password}, f)
 
-                    return {
-                        "status": "authenticated",
-                        "version": version,
-                        "message": "Login successful",
-                    }
-                else:
-                    return {
-                        "status": "failed",
-                        "error": "Invalid credentials",
-                    }
+                return {
+                    "status": "authenticated",
+                    "version": version,
+                    "message": "Login successful",
+                }
+            else:
+                return {
+                    "status": "failed",
+                    "error": "Invalid credentials",
+                }
     except Exception as e:
         logger.error(f"qBittorrent auth error: {e}")
         return {
@@ -636,15 +630,15 @@ async def auth_qbittorrent(request: Request):
 
 
 def _load_saved_qbit_credentials():
-    import os
     import json
+    import os
 
     creds_file = "/config/download-proxy/qbittorrent_creds.json"
     if os.path.isfile(creds_file):
         try:
-            with open(creds_file, "r") as f:
+            with open(creds_file) as f:
                 return json.load(f)
-        except Exception:
+        except Exception:  # noqa: S110
             pass
     return None
 
@@ -676,7 +670,7 @@ TRACKER_DOMAINS = (
 )
 
 
-def _is_tracker_url(url: str) -> Optional[str]:
+def _is_tracker_url(url: str) -> str | None:
     from urllib.parse import urlparse
 
     try:
@@ -698,8 +692,8 @@ def _is_tracker_url(url: str) -> Optional[str]:
 
 @router.post("/download")
 async def initiate_download(request: DownloadRequest, req: Request):
-    import aiohttp
     import tempfile
+
     from .hooks import dispatch_event
 
     download_id = str(uuid.uuid4())
@@ -752,7 +746,7 @@ async def initiate_download(request: DownloadRequest, req: Request):
                             tmp.write(torrent_data)
                             tmp_path = tmp.name
                         try:
-                            with open(tmp_path, "rb") as f:
+                            with open(tmp_path, "rb") as f:  # noqa: ASYNC230
                                 form = aiohttp.FormData()
                                 form.add_field(
                                     "torrents",
@@ -837,8 +831,6 @@ async def initiate_download(request: DownloadRequest, req: Request):
 @router.post("/download/file")
 async def download_torrent_file(request: DownloadRequest, req: Request):
     """Download the first available .torrent file from the result's URLs."""
-    import tempfile
-    import aiohttp
 
     orch = _get_orchestrator(req)
 
@@ -848,8 +840,9 @@ async def download_torrent_file(request: DownloadRequest, req: Request):
             if tracker:
                 torrent_data = await orch.fetch_torrent(tracker, url)
                 if torrent_data:
-                    from fastapi.responses import StreamingResponse
                     from io import BytesIO
+
+                    from fastapi.responses import StreamingResponse
 
                     return StreamingResponse(
                         BytesIO(torrent_data),
@@ -861,6 +854,7 @@ async def download_torrent_file(request: DownloadRequest, req: Request):
             elif url.startswith("magnet:"):
                 # For magnet links, return as a .magnet text file
                 from fastapi.responses import PlainTextResponse
+
                 return PlainTextResponse(
                     url,
                     headers={
@@ -870,22 +864,23 @@ async def download_torrent_file(request: DownloadRequest, req: Request):
                 )
             else:
                 # Try to fetch direct URL
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                        if resp.status == 200:
-                            data = await resp.read()
-                            from fastapi.responses import StreamingResponse
-                            from io import BytesIO
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp,
+                ):
+                    if resp.status == 200:
+                        data = await resp.read()
+                        from io import BytesIO
 
-                            filename = url.split("/")[-1] or f"{request.result_id}.torrent"
-                            return StreamingResponse(
-                                BytesIO(data),
-                                media_type="application/x-bittorrent",
-                                headers={
-                                    "Content-Disposition": f'attachment; filename="{filename}"'
-                                },
-                            )
-        except Exception:
+                        from fastapi.responses import StreamingResponse
+
+                        filename = url.split("/")[-1] or f"{request.result_id}.torrent"
+                        return StreamingResponse(
+                            BytesIO(data),
+                            media_type="application/x-bittorrent",
+                            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                        )
+        except Exception:  # noqa: S112
             continue
 
     raise HTTPException(status_code=404, detail="No downloadable torrent file found")
@@ -897,7 +892,7 @@ async def generate_magnet(request: Request):
 
     class MagnetRequest(BaseModel):
         result_id: str
-        download_urls: List[str]
+        download_urls: list[str]
 
     try:
         data = await request.json()

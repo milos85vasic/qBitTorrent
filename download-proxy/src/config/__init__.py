@@ -7,9 +7,8 @@ Loads and validates environment variables for:
 - Service configuration
 """
 
-import os
 import logging
-from typing import Optional
+import os
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -30,18 +29,18 @@ class EnvConfig:
     log_level: str
 
     # Metadata APIs
-    omdb_api_key: Optional[str] = None
-    tmdb_api_key: Optional[str] = None
-    anilist_client_id: Optional[str] = None
+    omdb_api_key: str | None = None
+    tmdb_api_key: str | None = None
+    anilist_client_id: str | None = None
 
     # Private trackers
-    rutracker_username: Optional[str] = None
-    rutracker_password: Optional[str] = None
-    kinozal_username: Optional[str] = None
-    kinozal_password: Optional[str] = None
-    nnmclub_cookies: Optional[str] = None
-    iptorrents_username: Optional[str] = None
-    iptorrents_password: Optional[str] = None
+    rutracker_username: str | None = None
+    rutracker_password: str | None = None
+    kinozal_username: str | None = None
+    kinozal_password: str | None = None
+    nnmclub_cookies: str | None = None
+    iptorrents_username: str | None = None
+    iptorrents_password: str | None = None
 
 
 def load_env() -> EnvConfig:
@@ -96,7 +95,7 @@ def load_env() -> EnvConfig:
 
 
 # Global config instance
-_config: Optional[EnvConfig] = None
+_config: EnvConfig | None = None
 
 
 def get_config() -> EnvConfig:

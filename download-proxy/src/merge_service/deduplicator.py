@@ -9,7 +9,6 @@ Matching tiers (in order of priority):
 """
 
 import re
-from typing import List, Optional, Tuple
 from dataclasses import dataclass
 
 try:
@@ -20,11 +19,11 @@ except ImportError:
     LEV_AVAILABLE = False
 
 from .search import (
-    SearchResult,
-    MergedResult,
     CanonicalIdentity,
     ContentType,
+    MergedResult,
     QualityTier,
+    SearchResult,
 )
 
 
@@ -46,9 +45,9 @@ class Deduplicator:
     SIMILARITY_THRESHOLD = 0.85  # Minimum similarity for fuzzy match
 
     def __init__(self):
-        self._merged_groups: List[MergedResult] = []
+        self._merged_groups: list[MergedResult] = []
 
-    def merge_results(self, results: List[SearchResult]) -> List[MergedResult]:
+    def merge_results(self, results: list[SearchResult]) -> list[MergedResult]:
         """
         Merge duplicate results from multiple trackers.
 
@@ -249,7 +248,7 @@ class Deduplicator:
             return hash_a.lower() == hash_b.lower()
         return False
 
-    def _extract_infohash(self, link: str) -> Optional[str]:
+    def _extract_infohash(self, link: str) -> str | None:
         """Extract infohash from a magnet link or URL."""
         if not link:
             return None
@@ -291,7 +290,7 @@ class Deduplicator:
         normalized = re.sub(r"\s+", " ", normalized).strip().lower()
         return normalized
 
-    def _parse_size(self, size_str) -> Optional[float]:
+    def _parse_size(self, size_str) -> float | None:
         """Parse size → bytes.
 
         Accepts both pre-formatted strings (``"4.0 GB"``) and raw
@@ -364,10 +363,7 @@ class Deduplicator:
         if a.season is not None and b.season is not None and a.season != b.season:
             return False
 
-        if a.episode is not None and b.episode is not None and a.episode != b.episode:
-            return False
-
-        return True
+        return not (a.episode is not None and b.episode is not None and a.episode != b.episode)
 
     def _detect_content_type(self, identity: CanonicalIdentity, name: str) -> None:
         """Detect content type from torrent name using dynamic patterns only."""
@@ -429,12 +425,18 @@ class Deduplicator:
             return
 
         # Priority 6b: SOFTWARE - OS / distribution names
-        if re.search(r"\b(ubuntu|debian|fedora|arch linux|linux mint|opensuse|centos|redhat|gentoo|slackware|kali|manjaro|pop!_os|elementary)\b", n):
+        if re.search(
+            r"\b(ubuntu|debian|fedora|arch linux|linux mint|opensuse|centos|redhat|gentoo|slackware|kali|manjaro|pop!_os|elementary)\b",
+            n,
+        ):
             identity.content_type = ContentType.SOFTWARE
             return
 
         # Priority 6c: SOFTWARE - general software terms (when combined with version/year patterns)
-        if re.search(r"\b(workstation|browser|server|distro|distribution|ide|sdk|debugger|compiler|vm|virtual|emulator|antivirus|firewall|vpn|proxy|database|framework|library)\b", n):
+        if re.search(
+            r"\b(workstation|browser|server|distro|distribution|ide|sdk|debugger|compiler|vm|virtual|emulator|antivirus|firewall|vpn|proxy|database|framework|library)\b",
+            n,
+        ):
             identity.content_type = ContentType.SOFTWARE
             return
 
@@ -487,10 +489,6 @@ class Deduplicator:
 
     def _is_cross_tracker_freeleech_conflict(self, a: SearchResult, b: SearchResult) -> bool:
         """Prevent merging non-freeleech IPTorrents results with other trackers."""
-        if a.tracker == "iptorrents" and b.tracker != "iptorrents":
-            if not a.freeleech:
-                return True
-        if b.tracker == "iptorrents" and a.tracker != "iptorrents":
-            if not b.freeleech:
-                return True
-        return False
+        if a.tracker == "iptorrents" and b.tracker != "iptorrents" and not a.freeleech:
+            return True
+        return b.tracker == "iptorrents" and a.tracker != "iptorrents" and not b.freeleech

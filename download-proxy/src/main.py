@@ -7,10 +7,10 @@ Starts both:
 2. The FastAPI merge service (REST API)
 """
 
+import logging
 import os
 import sys
 import threading
-import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ def start_fastapi_server():
             sys.path.insert(0, src_dir)
 
         import uvicorn
+
         from api import app
 
         # Configure uvicorn. MERGE_SERVICE_HOST defaults to 0.0.0.0 because
@@ -48,7 +49,7 @@ def start_fastapi_server():
         # MERGE_SERVICE_HOST=127.0.0.1 in deployments where the merge
         # service should be localhost-only.
         merge_port = int(os.environ.get("MERGE_SERVICE_PORT", "7187"))
-        merge_host = os.environ.get("MERGE_SERVICE_HOST", "0.0.0.0")  # nosec B104 noqa: S104
+        merge_host = os.environ.get("MERGE_SERVICE_HOST", "0.0.0.0")  # nosec B104  # noqa: S104
         config = uvicorn.Config(
             app,
             host=merge_host,

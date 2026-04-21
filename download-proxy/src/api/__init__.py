@@ -2,8 +2,8 @@
 FastAPI application and router setup for the merge service.
 """
 
-import os
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 
@@ -11,9 +11,9 @@ _src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Request  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 
 _angular_dist_path = os.path.join(os.path.dirname(__file__), "..", "ui", "dist", "frontend", "browser")
 _angular_dist_path = os.path.normpath(_angular_dist_path)
@@ -31,10 +31,10 @@ async def lifespan(app: FastAPI):
 
     logger.info("Starting Merge Service API...")
 
-    from merge_service.search import SearchOrchestrator
-    from merge_service.validator import TrackerValidator
     from merge_service.enricher import MetadataEnricher
     from merge_service.scheduler import Scheduler
+    from merge_service.search import SearchOrchestrator
+    from merge_service.validator import TrackerValidator
 
     app.state.search_orchestrator = SearchOrchestrator()
     app.state.validator = TrackerValidator()
@@ -62,6 +62,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
 
 def _parse_allowed_origins(raw: str | None) -> list[str]:
     """Parse the ALLOWED_ORIGINS env var into a list.
@@ -113,20 +114,22 @@ async def bridge_health():
     bridge_url = os.getenv("BRIDGE_URL", "http://localhost:7188")
     bridge_port = int(os.getenv("BRIDGE_PORT", "7188"))
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(
                 bridge_url,
                 timeout=aiohttp.ClientTimeout(total=2),
                 allow_redirects=False,
-            ) as resp:
-                # Any 2xx / 3xx / 401 means something is listening.
-                healthy = resp.status < 500
-                return {
-                    "healthy": healthy,
-                    "status_code": resp.status,
-                    "bridge_url": bridge_url,
-                    "port": bridge_port,
-                }
+            ) as resp,
+        ):
+            # Any 2xx / 3xx / 401 means something is listening.
+            healthy = resp.status < 500
+            return {
+                "healthy": healthy,
+                "status_code": resp.status,
+                "bridge_url": bridge_url,
+                "port": bridge_port,
+            }
     except Exception as e:
         logger.debug(f"Bridge health probe failed: {e}")
         return {
@@ -172,7 +175,7 @@ async def stats():
     aborted = 0
     trackers = []
     if orch is not None:
-        for sid, meta in orch._active_searches.items():
+        for _sid, meta in orch._active_searches.items():
             if meta.status == "completed":
                 completed += 1
             elif meta.status == "aborted":
@@ -191,10 +194,10 @@ async def stats():
     }
 
 
-from .routes import router as api_router
-from .hooks import router as hooks_router
-from .auth import router as auth_router
-from .scheduler import router as scheduler_router
+from .auth import router as auth_router  # noqa: E402
+from .hooks import router as hooks_router  # noqa: E402
+from .routes import router as api_router  # noqa: E402
+from .scheduler import router as scheduler_router  # noqa: E402
 
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(hooks_router, prefix="/api/v1/hooks")
@@ -234,6 +237,6 @@ async def spa_catch_all(path: str):
     if path.startswith("api/") or path == "health":
         raise HTTPException(status_code=404)
     file_path = os.path.join(_angular_dist_path, path)
-    if os.path.isfile(file_path):
+    if os.path.isfile(file_path):  # noqa: ASYNC240
         return FileResponse(file_path)
     return _serve_index_html()

@@ -28,9 +28,8 @@ import logging
 import os
 import tempfile
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +55,7 @@ ALLOWED_MODES: frozenset[str] = frozenset({"light", "dark"})
 
 
 def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass(frozen=True)
@@ -115,21 +114,18 @@ class ThemeStore:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         # Atomic tmp-file + os.replace so partially-written files can't
         # poison the next boot.
-        tmp_fd, tmp_path = tempfile.mkstemp(
-            prefix=".theme-", suffix=".json", dir=str(self._path.parent)
-        )
+        tmp_fd, tmp_path = tempfile.mkstemp(prefix=".theme-", suffix=".json", dir=str(self._path.parent))
         try:
             with os.fdopen(tmp_fd, "w", encoding="utf-8") as fp:
                 json.dump(state.to_dict(), fp, indent=2, sort_keys=True)
                 fp.flush()
-                try:
+                try:  # noqa: SIM105
                     os.fsync(fp.fileno())
                 except OSError:
-                    # Best effort on filesystems that do not support fsync.
                     pass
             os.replace(tmp_path, self._path)
         except Exception:
-            try:
+            try:  # noqa: SIM105
                 os.unlink(tmp_path)
             except FileNotFoundError:
                 pass
@@ -141,9 +137,7 @@ class ThemeStore:
 
     def put(self, paletteId: str, mode: str) -> ThemeState:
         if paletteId not in ALLOWED_PALETTE_IDS:
-            raise ValueError(
-                f"unknown paletteId {paletteId!r}; allowed: {sorted(ALLOWED_PALETTE_IDS)}"
-            )
+            raise ValueError(f"unknown paletteId {paletteId!r}; allowed: {sorted(ALLOWED_PALETTE_IDS)}")
         if mode not in ALLOWED_MODES:
             raise ValueError(f"invalid mode {mode!r}; allowed: {sorted(ALLOWED_MODES)}")
         state = ThemeState(paletteId=paletteId, mode=mode, updatedAt=_utcnow_iso())
@@ -159,7 +153,7 @@ class ThemeStore:
         return queue
 
     def unsubscribe(self, queue: asyncio.Queue) -> None:
-        try:
+        try:  # noqa: SIM105
             self._subscribers.remove(queue)
         except ValueError:
             pass
@@ -186,7 +180,7 @@ class ThemeStore:
         return len(self._subscribers)
 
 
-_store: Optional[ThemeStore] = None
+_store: ThemeStore | None = None
 
 
 def _resolve_path() -> Path:
@@ -207,9 +201,9 @@ def get_store() -> ThemeStore:
 
 
 __all__ = [
-    "DEFAULT_THEME",
-    "ALLOWED_PALETTE_IDS",
     "ALLOWED_MODES",
+    "ALLOWED_PALETTE_IDS",
+    "DEFAULT_THEME",
     "ThemeState",
     "ThemeStore",
     "get_store",

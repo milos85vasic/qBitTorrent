@@ -10,8 +10,8 @@ Provides:
 import asyncio
 import json
 import logging
-from typing import AsyncGenerator, Optional, Any, Dict
-from datetime import datetime
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import Request
 from fastapi.responses import StreamingResponse
@@ -29,7 +29,7 @@ class SSEHandler:
     RETRY_FIELD = "retry"
 
     @staticmethod
-    def format_event(event: str, data: Dict[str, Any], event_id: Optional[str] = None) -> str:
+    def format_event(event: str, data: dict[str, Any], event_id: str | None = None) -> str:
         """Format a single SSE event."""
         lines = []
 
@@ -53,7 +53,7 @@ class SSEHandler:
         search_id: str,
         orchestrator: Any,
         poll_interval: float = 0.5,
-        request: Optional[Request] = None,
+        request: Request | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream search results as they come in.
@@ -82,7 +82,7 @@ class SSEHandler:
         # ``tracker_completed`` events whenever a stat flips between
         # poll iterations.  Keyed by tracker name; value is the last
         # observed status string.
-        last_tracker_status: Dict[str, str] = {}
+        last_tracker_status: dict[str, str] = {}
         _TERMINAL_STATUSES = {"success", "empty", "error", "timeout", "cancelled"}
 
         async def _client_gone() -> bool:
@@ -139,7 +139,7 @@ class SSEHandler:
                             event_id=search_id,
                         )
                     last_tracker_status[tname] = cur
-            except Exception as _e:  # noqa: BLE001
+            except Exception as _e:  # noqa: S110
                 # Never let a diagnostics-emit failure kill the stream.
                 pass
 
@@ -166,8 +166,8 @@ class SSEHandler:
                                 },
                                 event_id=search_id,
                             )
-                except Exception:
-                    pass  # Ignore errors
+                except Exception:  # noqa: S110
+                    pass
 
                 yield SSEHandler.format_event(event="search_complete", data=metadata.to_dict(), event_id=search_id)
                 break
@@ -192,8 +192,8 @@ class SSEHandler:
                             },
                             event_id=search_id,
                         )
-            except Exception as e:
-                pass  # Ignore errors getting live results
+            except Exception:  # noqa: S110
+                pass
 
             # Stream intermediate results if count changed
             if metadata.total_results != last_count:
@@ -217,7 +217,7 @@ class SSEHandler:
         download_id: str,
         get_progress: callable,
         poll_interval: float = 0.5,
-        request: Optional[Request] = None,
+        request: Request | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream download progress updates.

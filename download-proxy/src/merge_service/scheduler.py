@@ -8,12 +8,12 @@ Provides:
 """
 
 import asyncio
+import json
 import logging
 import os
-import json
-from typing import List, Optional, Dict, Any, Callable
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -38,11 +38,11 @@ class ScheduledSearch:
     category: str = "all"
     interval_minutes: int = 60
     enabled: bool = True
-    last_run: Optional[datetime] = None
-    next_run: Optional[datetime] = None
+    last_run: datetime | None = None
+    next_run: datetime | None = None
     status: ScheduleStatus = ScheduleStatus.ACTIVE
     results_count: int = 0
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 class Scheduler:
@@ -50,10 +50,10 @@ class Scheduler:
 
     def __init__(self, config_path: str = "/config/merge-service/scheduling.json"):
         self._config_path = config_path
-        self._scheduled_searches: Dict[str, ScheduledSearch] = {}
+        self._scheduled_searches: dict[str, ScheduledSearch] = {}
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._search_callback: Optional[Callable] = None
+        self._task: asyncio.Task | None = None
+        self._search_callback: Callable | None = None
 
     def set_search_callback(self, callback: Callable):
         """Set the callback function for executing searches."""
@@ -63,9 +63,9 @@ class Scheduler:
         """Load scheduled searches from persistent storage."""
         json_path = self._config_path
 
-        if os.path.exists(json_path):
+        if os.path.exists(json_path):  # noqa: ASYNC240
             try:
-                with open(json_path, "r") as f:
+                with open(json_path) as f:  # noqa: ASYNC230
                     data = json.load(f)
                     for item in data.get("scheduled_searches", []):
                         search = ScheduledSearch(
@@ -114,7 +114,7 @@ class Scheduler:
             # Ensure directory exists
             os.makedirs(os.path.dirname(json_path), exist_ok=True)
 
-            with open(json_path, "w") as f:
+            with open(json_path, "w") as f:  # noqa: ASYNC230
                 json.dump(data, f, indent=2)
 
             logger.info(f"Saved {len(self._scheduled_searches)} scheduled searches")
@@ -137,7 +137,7 @@ class Scheduler:
             query=query,
             category=category,
             interval_minutes=interval_minutes,
-            next_run=datetime.now(timezone.utc),
+            next_run=datetime.now(UTC),
         )
 
         self._scheduled_searches[search.id] = search
@@ -153,15 +153,15 @@ class Scheduler:
             return True
         return False
 
-    def get_scheduled_search(self, search_id: str) -> Optional[ScheduledSearch]:
+    def get_scheduled_search(self, search_id: str) -> ScheduledSearch | None:
         """Get a scheduled search by ID."""
         return self._scheduled_searches.get(search_id)
 
-    def get_all_scheduled_searches(self) -> List[ScheduledSearch]:
+    def get_all_scheduled_searches(self) -> list[ScheduledSearch]:
         """Get all scheduled searches."""
         return list(self._scheduled_searches.values())
 
-    def get_active_scheduled_searches(self) -> List[ScheduledSearch]:
+    def get_active_scheduled_searches(self) -> list[ScheduledSearch]:
         """Get all active scheduled searches."""
         return [s for s in self._scheduled_searches.values() if s.enabled and s.status == ScheduleStatus.ACTIVE]
 
@@ -180,7 +180,7 @@ class Scheduler:
 
         if self._task:
             self._task.cancel()
-            try:
+            try:  # noqa: SIM105
                 await self._task
             except asyncio.CancelledError:
                 pass
@@ -192,7 +192,7 @@ class Scheduler:
         """Main scheduler loop."""
         while self._running:
             try:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
 
                 # Check each active scheduled search
                 for search in self.get_active_scheduled_searches():
@@ -237,7 +237,7 @@ class Scheduler:
 
 
 # Global scheduler instance
-_scheduler: Optional[Scheduler] = None
+_scheduler: Scheduler | None = None
 
 
 def get_scheduler(
