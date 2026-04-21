@@ -1,543 +1,177 @@
 # AGENTS.md
 
-> **Project**: qBitTorrent-Fixed (v3.0.0)
-> **Language**: English (all code, docs, and comments)
-> **License**: Apache 2.0
+Compact instruction file for AI agents working in this repo.
+For deeper narrative docs see `CLAUDE.md`, `docs/USER_MANUAL.md`, `docs/PLUGINS.md`.
 
-## Project Overview
+## What This Project Is
 
-This is a **qBittorrent enhancement project** that adds unified multi-tracker search, a download proxy with authenticated tracker support, and a Merge Search Service built with FastAPI. It consists of:
-
-- **42 tracker plugins** (public, private, Russian, anime, specialized)
-- **Merge Search Service** — FastAPI app that searches multiple trackers simultaneously, deduplicates results, enriches metadata, and streams results in real-time via SSE
-- **Download proxy** — bridges qBittorrent WebUI with private trackers that require authentication
-- **WebUI bridge** — host process that intercepts private tracker download requests and handles them with proper cookies/session auth
-
-The project is **not a Python package** — there is no `pyproject.toml`, `setup.py`, or `setup.cfg`. Dependencies are managed via `requirements.txt` files, and the runtime is container-based.
-
----
+qBittorrent enhancement: multi-tracker search, authenticated download proxy, and a Merge Search Service (FastAPI). **Not a Python package** — no installable distribution. Runtime is container-based. Config is unified in `pyproject.toml`.
 
 ## Critical Constraints
 
-- **TDD is MANDATORY for all bug fixes and features**:
-  1. Write failing test first (**RED**)
-  2. Watch it fail
-  3. Write minimal code to pass (**GREEN**)
-  4. Verify tests pass
-  5. Then commit
-  6. See `tests/README.md` for detailed TDD workflow
-
-- **REBUILD AND REBOOT is MANDATORY after every successful round of changes**:
-  1. After all tests pass and fixes are committed, STOP all containers and services
-  2. DELETE all `__pycache__` directories inside containers to prevent stale bytecode from shadowing source changes
-  3. REBUILD containers (`./stop.sh -r && ./start.sh -p`) to pick up latest code
-  4. RESTART webui-bridge (`python3 webui-bridge.py` or via systemd)
-  5. VERIFY all services healthy AND served content matches committed code (curl check)
-  6. This ensures the running environment matches committed code exactly
-
-- **WebUI credentials `admin`/`admin` are hardcoded** in `start.sh` config generation, `docker-compose.yml`, and multiple scripts. **Do not change them.**
-- **Never commit `.env`** — it contains tracker credentials. `.env.example` is the template.
-- **Freeleech-only downloads from IPTorrents** — all automated testing must ONLY download freeleech torrents. Freeleech results are tagged `IPTorrents [free]` in tracker display name. Non-freeleech IPTorrents downloads cost ratio and must NEVER be triggered by automation or tests.
-- **No CI pipeline is auto-triggered**. `ci.sh` is manual-only. GitHub Actions workflow (`.github/workflows/test.yml`) is `workflow_dispatch` only — never runs on push/PR.
-
----
-
-## Technology Stack
-
-| Layer | Technology | Version/Notes |
-|-------|-----------|---------------|
-| Runtime | Python | 3.12 (container and host) |
-| Web Framework | FastAPI | ≥0.110.0 |
-| ASGI Server | uvicorn | ≥0.29.0 |
-| HTTP Client | aiohttp, requests | ≥3.9.0, ≥2.31.0 |
-| Validation | pydantic | ≥2.0.0 |
-| String Similarity | Levenshtein | ≥0.21.0 |
-| Containers | Docker or Podman | Auto-detected, Podman preferred |
-| Compose | docker-compose or podman-compose | Auto-detected |
-| qBittorrent | linuxserver/qbittorrent:latest | Port 7185 |
-| Linter | ruff | Config in `ruff.toml` |
-| Testing | pytest | With `responses`, `pytest-cov` |
-
-### Key Configuration Files
-
-| File | Purpose |
-|------|---------|
-| `docker-compose.yml` | Two-service compose: qbittorrent + qbittorrent-proxy |
-| `download-proxy/requirements.txt` | Runtime deps for proxy container |
-| `tests/requirements.txt` | Test deps: pytest, requests, responses, pytest-cov |
-| `ruff.toml` | Linter config: target py312, line-length 120, select E/F/W/I/UP/B/SIM/RUF |
-| `.env.example` | Template for all environment variables (293 lines, extensively documented) |
-| `.gitignore` | Excludes `.env`, `config/download-proxy/`, `tmp/`, `downloads/`, `__pycache__/`, `.ruff_cache/` |
-| `webui-bridge.service` | systemd user service unit for webui-bridge.py |
-
----
+- **TDD mandatory**: RED → watch fail → GREEN → verify → commit
+- **CI is manual — permanently**: `./ci.sh` only. Never add push/PR/schedule triggers to `.github/workflows/*.yml`. Only `workflow_dispatch` is acceptable.
+- **Never commit `.env`** — tracker credentials live there
+- **WebUI credentials `admin`/`admin` are hardcoded** — do not change
+- **IPTorrents freeleech only** — automated tests must never download non-freeleech. Tagged `IPTorrents [free]`
+- **No comments in merge service source** (`download-proxy/src/`) — project convention
 
 ## Architecture
 
-Two-container setup via `docker-compose.yml` (both `network_mode: host`):
+Two-container setup via `docker-compose.yml` (`network_mode: host`):
 
-| Container | Image | Ports | Purpose |
-|-----------|-------|-------|---------|
-| **qbittorrent** | `lscr.io/linuxserver/qbittorrent:latest` | 7185 | qBittorrent WebUI |
-| **qbittorrent-proxy** | `python:3.12-alpine` | 7186, 7187 | Download proxy + Merge Search Service |
+| Container | Image | Ports |
+|-----------|-------|-------|
+| qbittorrent | `lscr.io/linuxserver/qbittorrent:latest` | 7185 |
+| qbittorrent-proxy | `python:3.12-alpine` | 7186, 7187 |
 
-**Port map:**
+- **7185** qBittorrent WebUI (container-internal)
+- **7186** Download proxy → qBittorrent
+- **7187** Merge Search Service (FastAPI + dashboard)
+- **7188** webui-bridge (host process, not a container)
 
-| Port | Service | Where |
-|------|---------|-------|
-| 7185 | qBittorrent WebUI | qbittorrent container |
-| 7186 | Download proxy | qbittorrent-proxy container |
-| 7187 | Merge Search Service (FastAPI) | qbittorrent-proxy container |
-| 7188 | webui-bridge | Host process (run manually or via systemd) |
+Container runtime auto-detected (podman preferred) in all shell scripts.
 
-Users access `http://localhost:7186` (proxy → qBittorrent on 7185).
-Merge Search dashboard at `http://localhost:7187/`.
-`webui-bridge.py` is a **separate host process** — run manually: `python3 webui-bridge.py`, or install as systemd service with `./setup-webui-bridge-service.sh`.
+### Frontend (Angular 21)
 
-Container runtime is **auto-detected** (podman preferred over docker) in all shell scripts.
-
----
-
-## Code Organization
-
-```
-project-root/
-├── plugins/                          # 42+ tracker plugins + support files
-│   ├── *.py                          # Individual tracker plugins (rutracker, iptorrents, etc.)
-│   ├── helpers.py                    # Shared utilities (build_magnet_link, etc.)
-│   ├── nova2.py                      # Search engine core
-│   ├── novaprinter.py                # Output formatting for plugins
-│   ├── socks.py                      # Proxy support
-│   ├── download_proxy.py             # Original download proxy server
-│   ├── env_loader.py                 # Shared env file loader
-│   └── webui_compatible/             # WebUI variants for private trackers (rutracker, kinozal, nnmclub)
-│
-├── download-proxy/src/               # Merge Search Service source (16 Python files)
-│   ├── main.py                       # Entry point: starts both proxy + FastAPI in threads
-│   ├── api/                          # FastAPI application layer
-│   │   ├── __init__.py               # App factory, lifespan, health, stats, dashboard routes
-│   │   ├── routes.py                 # Search, download, streaming endpoints (612 lines)
-│   │   ├── hooks.py                  # Webhook CRUD with JSON file persistence
-│   │   ├── streaming.py              # SSE streaming for real-time results
-│   │   ├── auth.py                   # Tracker auth endpoints (RuTracker CAPTCHA proxy)
-│   │   └── scheduler.py              # Scheduler CRUD endpoints
-│   ├── merge_service/                # Core business logic
-│   │   ├── search.py                 # SearchOrchestrator, data models (976 lines)
-│   │   ├── deduplicator.py           # Tiered dedup: exact hash → name+size → fuzzy similarity
-│   │   ├── enricher.py               # Metadata enrichment (OMDb, TMDB, TVMaze, AniList, MusicBrainz, OpenLibrary)
-│   │   ├── validator.py              # Tracker validation via HTTP and UDP scrape
-│   │   ├── hooks.py                  # Hook execution engine
-│   │   └── scheduler.py              # Scheduled search with persistence
-│   ├── config/
-│   │   └── __init__.py               # EnvConfig dataclass, load_env(), get_config()
-│   └── ui/
-│       └── templates/
-│           ├── dashboard.html        # Dark theme search dashboard
-│           └── theme.css             # CSS custom properties (--theme-*)
-│
-├── tests/                            # 31 test files
-│   ├── conftest.py                   # pytest fixtures (mock_qbittorrent_api, sample_search_result, etc.)
-│   ├── unit/                         # Unit tests (no containers required)
-│   │   ├── merge_service/            # test_html_parsers, test_quality_detection, test_deduplicator, test_hooks, test_validator, test_enricher, test_scheduler
-│   │   ├── test_auth.py              # RuTracker CAPTCHA auth endpoint tests
-│   │   ├── test_ci_infra.py          # CI pipeline infrastructure tests
-│   │   ├── test_config.py            # Config env loading and fallback tests
-│   │   ├── test_dashboard.py         # Dashboard UI tests
-│   │   ├── test_freeleech.py         # IPTorrents freeleech logic tests
-│   │   ├── test_merge_trackers.py    # Tracker merge logic tests
-│   │   ├── test_routes.py            # API route tests
-│   │   ├── test_scheduler_api.py     # Scheduler CRUD API endpoint tests
-│   │   ├── test_streaming.py         # SSE streaming handler tests
-│   │   ├── test_ui_sorting.py        # Dashboard sorting tests
-│   │   └── test_webui_bridge.py      # WebUI bridge tests
-│   ├── integration/                  # Integration tests (may require mocks or running containers)
-│   │   ├── test_merge_api.py         # Full API endpoint integration tests
-│   │   ├── test_button_functions.py  # UI button tests: Magnet, qBit, Download, Abort search
-│   │   ├── test_buttons_api.py       # Button API integration tests
-│   │   ├── test_auth_state_ui.py     # Auth state UI tests
-│   │   ├── test_iptorrents.py        # IPTorrents-specific integration tests
-│   │   ├── test_live_containers.py   # Live container health tests
-│   │   ├── test_login_actions.py     # Login action tests
-│   │   ├── test_magnet_dialog.py     # Magnet dialog UI tests
-│   │   ├── test_realtime_streaming.py # Real-time SSE streaming tests
-│   │   ├── test_streaming_browser.py # Browser-side streaming tests
-│   │   ├── test_ui_comprehensive.py  # Comprehensive UI tests
-│   │   └── test_ui_quick.py          # Quick UI smoke tests
-│   └── e2e/
-│       └── test_full_pipeline.py     # End-to-end full pipeline test
-│
-├── config/                           # Runtime config (partially gitignored)
-│   ├── qBittorrent/                  # qBittorrent config + plugins
-│   │   ├── config/qBittorrent.conf   # Default config template (WebUI port 7185, admin/admin)
-│   │   └── nova3/engines/            # Plugin install destination inside container
-│   ├── download-proxy/               # Proxy runtime config
-│   │   ├── requirements.txt          # Copied from download-proxy/requirements.txt
-│   │   ├── qbittorrent_creds.json    # Saved qBittorrent credentials (gitignored)
-│   │   └── hooks.json                # Runtime hooks (gitignored)
-│   └── merge-service/                # Scheduler runtime data (gitignored)
-│       ├── scheduling.json
-│       ├── data-model.yaml
-│       └── hooks.yaml
-│
-├── docs/                             # Project documentation
-│   ├── USER_MANUAL.md                # Complete usage guide
-│   ├── PLUGINS.md                    # Plugin documentation
-│   ├── PLUGIN_TROUBLESHOOTING.md     # Debug guide
-│   ├── DOWNLOAD_FIX.md               # Download fix documentation
-│   ├── MAGNET_LINKS.md               # Magnet link handling
-│   ├── RELEASE_TORRENT_UPLOAD_FIX.md # Release fix notes
-│   └── TEST_RESULTS.md               # Test result documentation
-│
-├── tools/                            # Utility scripts
-│   └── plugin_update_automation.py   # Plugin update automation
-│
-├── *.sh                              # Shell scripts (see Key Commands below)
-├── webui-bridge.py                   # Host process bridge (port 7188)
-├── webui-bridge.service              # systemd unit file
-└── .env.example                      # Environment variable template
-```
-
----
-
-## Merge Search Service
-
-FastAPI application in `download-proxy/src/api/`. Runs inside the qbittorrent-proxy container on port 7187.
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `download-proxy/src/api/__init__.py` | FastAPI app, lifespan (init SearchOrchestrator + TrackerValidator + MetadataEnricher + Scheduler), health, stats, dashboard routes |
-| `download-proxy/src/api/routes.py` | `POST /search`, `GET /search/stream/{id}`, `POST /download`, `GET /downloads/active` |
-| `download-proxy/src/api/hooks.py` | `GET/POST/DELETE /hooks` — JSON file at `/config/download-proxy/hooks.json` |
-| `download-proxy/src/api/auth.py` | Tracker auth endpoints: RuTracker CAPTCHA fetch/login/cookie-login, multi-tracker auth status at `/auth/status` |
-| `download-proxy/src/api/scheduler.py` | Scheduler CRUD endpoints at `/api/v1/schedules` |
-| `download-proxy/src/api/streaming.py` | SSE streaming via `SSEHandler` class — `search_results_stream()`, `download_progress_stream()` |
-| `download-proxy/src/merge_service/search.py` | `SearchOrchestrator` class, `ContentType`/`QualityTier` enums, `TorrentResult` dataclass, `TrackerSource`, `CanonicalIdentity` |
-| `download-proxy/src/merge_service/deduplicator.py` | Tiered deduplication engine (hash → name+size → fuzzy similarity) |
-| `download-proxy/src/merge_service/enricher.py` | Multi-provider metadata enrichment |
-| `download-proxy/src/merge_service/validator.py` | `TrackerValidator` — HTTP and UDP scrape validation |
-| `download-proxy/src/merge_service/scheduler.py` | Scheduled search with JSON persistence |
-| `download-proxy/src/merge_service/hooks.py` | Hook execution engine |
-| `download-proxy/src/config/__init__.py` | `EnvConfig` dataclass, env loading with fallback chains |
-| `download-proxy/src/main.py` | Dual-thread entry point: original proxy + FastAPI server |
-
-### API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/search` | Search across multiple trackers |
-| `GET` | `/api/v1/search/stream/{id}` | SSE stream of real-time search results |
-| `POST` | `/api/v1/download` | Download via authenticated proxy |
-| `GET` | `/api/v1/downloads/active` | List active downloads |
-| `GET` | `/api/v1/hooks` | List configured hooks |
-| `POST` | `/api/v1/hooks` | Create a hook |
-| `DELETE` | `/api/v1/hooks` | Delete a hook |
-| `GET` | `/api/v1/schedules` | List scheduled searches |
-| `POST` | `/api/v1/schedules` | Create scheduled search |
-| `DELETE` | `/api/v1/schedules/{id}` | Delete scheduled search |
-| `GET` | `/api/v1/auth/status` | Multi-tracker auth status |
-| `GET` | `/health` | Health check |
-| `GET` | `/api/v1/stats` | Service statistics |
-| `GET` | `/api/v1/config` | qBittorrent connection config |
-| `GET` | `/` | Dashboard UI (dark theme) |
-| `GET` | `/theme.css` | Dashboard theme stylesheet |
-
-### Syncing Code to Container
-
-After editing `download-proxy/src/`, sync to the running container:
+`frontend/` is a separate Angular 21 dashboard (Vitest for unit tests). Distinct from the FastAPI Jinja2 dashboard on port 7187.
 
 ```bash
-podman cp download-proxy/src/. qbittorrent-proxy:/config/download-proxy/src/ && podman restart qbittorrent-proxy
+cd frontend && npm test               # Vitest unit tests
+cd frontend && npx ng build            # Production build
 ```
-
-The `download-proxy` volume mount (`./download-proxy:/config/download-proxy`) should pick up changes, but a restart is needed to reload the Python modules.
-
----
-
-## Plugin System
-
-**`plugins/` contains 48 Python files**, including 42 managed tracker plugins:
-
-`academictorrents`, `ali213`, `anilibra`, `audiobookbay`, `bitru`, `bt4g`, `btsow`, `extratorrent`, `eztv`, `gamestorrents`, `glotorrents`, `iptorrents`, `jackett`, `kickass`, `kinozal`, `limetorrents`, `linuxtracker`, `megapeer`, `nnmclub`, `nyaa`, `one337x`, `pctorrent`, `piratebay`, `pirateiro`, `rockbox`, `rutor`, `rutracker`, `snowfl`, `solidtorrents`, `therarbg`, `tokyotoshokan`, `torlock`, `torrentdownload`, `torrentfunk`, `torrentgalaxy`, `torrentkitty`, `torrentproject`, `torrentscsv`, `xfsub`, `yihua`, `yourbittorrent`, `yts`
-
-Plugin support files live alongside plugins: `helpers.py`, `nova2.py`, `novaprinter.py`, `socks.py`, `download_proxy.py`, `env_loader.py`.
-
-WebUI-compatible private tracker plugins are also in `plugins/webui_compatible/` (`rutracker.py`, `kinozal.py`, `nnmclub.py`).
-
-### Plugin Contract
-
-Each plugin is a Python class with:
-- Class attributes: `url`, `name`, `supported_categories` (dict mapping category name to ID string)
-- `search(self, what, cat='all')` — outputs results via `novaprinter.print()`
-- `download_torrent(self, url)` — returns magnet link or file path
-- Output format: `novaprinter.print(name, link, size, seeds, leech, engine_url, desc_link, pub_date)`
-
-Plugins are installed to `config/qBittorrent/nova3/engines/` inside the container.
-
----
-
-## Environment Variables
-
-Loaded in priority order (first wins): **shell env → `./.env` → `~/.qbit.env` → container env from compose**.
-
-Key variables:
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `RUTRACKER_USERNAME/PASSWORD` | — | RuTracker login |
-| `KINOZAL_USERNAME/PASSWORD` | falls back to IPTORRENTS | Kinozal login |
-| `NNMCLUB_COOKIES` | — | NNMClub session cookies |
-| `IPTORRENTS_USERNAME/PASSWORD` | — | IPTorrents login |
-| `QBITTORRENT_DATA_DIR` | `/mnt/DATA` | Download directory |
-| `PUID/PGID` | `1000` | Container user/group IDs |
-| `MERGE_SERVICE_PORT` | `7187` | FastAPI port |
-| `PROXY_PORT` | `7186` | Download proxy port |
-| `BRIDGE_PORT` | `7188` | webui-bridge port |
-| `LOG_LEVEL` | `INFO` | Logging level |
-| `OMDB_API_KEY` | — | OMDb metadata enrichment |
-| `TMDB_API_KEY` | — | TMDB metadata enrichment |
-| `ANILIST_CLIENT_ID` | — | AniList metadata enrichment |
-
-`KINOZAL_USERNAME/PASSWORD` and `NNMCLUB_COOKIES` must be in `.env` for the merge service to authenticate with those trackers. These are passed through from `docker-compose.yml` to the qbittorrent-proxy container.
-
----
 
 ## Key Commands
 
 ### Startup
 ```bash
-./setup.sh                    # One-time: creates dirs, config, installs plugins, starts containers
-./start.sh                    # Start containers (flags: -p pull, -s status, --no-plugins, -v verbose)
-./start.sh -p                 # Pull latest images and start
-./setup-webui-bridge-service.sh  # One-time: install webui-bridge as systemd user service
-./stop.sh                     # Stop (flags: -r remove containers, --purge also clean images)
-python3 webui-bridge.py       # Manual start of WebUI bridge (port 7188)
+./setup.sh                             # One-time: dirs, config, plugins, containers
+./start.sh                             # Start containers (-p pull, -s status, -v verbose)
+./start.sh -p && python3 webui-bridge.py  # Full start with bridge
+./stop.sh                              # Stop (-r remove, --purge clean images)
 ```
 
 ### Testing
 ```bash
-./ci.sh                       # Full manual CI pipeline (syntax + unit + integration + e2e + container health)
-./ci.sh --quick               # Quick check (syntax + unit tests only)
-./ci.sh --tests-only          # Skip syntax checks, run tests only
-./ci.sh --verbose             # Verbose output
-./run-all-tests.sh            # Full suite — requires running container, uses podman specifically
-./test.sh                     # Quick validation (flags: --all, --quick, --plugin, --full, --container)
-python3 -m py_compile plugins/*.py        # Syntax check all plugins
-bash -n start.sh stop.sh test.sh install-plugin.sh  # Bash syntax check
-python3 -m pytest tests/unit/merge_service/ tests/integration/test_merge_api.py -v --import-mode=importlib
+./ci.sh                                # Full CI: syntax + unit + integration + e2e + container health
+./ci.sh --quick                        # Syntax + unit only
+./ci.sh --tests-only                   # Skip syntax, run tests
+scripts/run-tests.sh                   # Full suite with coverage (hermetic | live | all)
+scripts/run-tests.sh hermetic          # Only hermetic suites (fast)
 ```
 
-### Plugin Management
+### Single test / subset
 ```bash
-./install-plugin.sh --all              # Install all managed plugins to container engines dir
-./install-plugin.sh rutracker rutor    # Install specific ones
-./install-plugin.sh --verify           # Verify installation
-./install-plugin.sh --local --all      # Install to local qBittorrent (~/.local/share/...)
-```
-
-### Linting
-```bash
-ruff check .                  # Lint all Python files
-ruff check --fix .            # Lint and auto-fix issues
-ruff format .                 # Format all Python files
-```
-
----
-
-## Testing Strategy
-
-### Test Structure
-- **31 test files** across `tests/unit/`, `tests/integration/`, `tests/e2e/`
-- **Unit tests**: Fast, no external dependencies, heavily mocked
-- **Integration tests**: May require running containers or mock servers
-- **E2E tests**: Full pipeline tests
-
-### Running Specific Test Suites
-```bash
-# Unit tests only
-python3 -m pytest tests/unit/ -v --import-mode=importlib
-
-# Merge service unit tests
-python3 -m pytest tests/unit/merge_service/ -v --import-mode=importlib
-
-# Integration tests
-python3 -m pytest tests/integration/ -v --import-mode=importlib
-
-# Specific test file
 python3 -m pytest tests/unit/test_freeleech.py -v --import-mode=importlib
+python3 -m pytest tests/unit/merge_service/ -v --import-mode=importlib
+python3 -m pytest tests/unit/ -k "search" -v --import-mode=importlib
 ```
 
-### Test Files Reference
+### Lint + Typecheck
+```bash
+ruff check .                           # Lint (config in pyproject.toml)
+ruff check --fix .
+ruff format .
+mypy download-proxy/src/               # Strict mypy (config in pyproject.toml)
+```
 
-| Test File | What It Tests |
-|-----------|---------------|
-| `tests/unit/merge_service/test_html_parsers.py` | RuTracker, Kinozal, NNMClub HTML parsing |
-| `tests/unit/merge_service/test_quality_detection.py` | UHD 4K, Full HD, HD, SD detection |
-| `tests/unit/merge_service/test_deduplicator.py` | Hash, name+size, fuzzy dedup tiers |
-| `tests/unit/merge_service/test_hooks.py` | Hook creation, persistence, execution |
-| `tests/unit/merge_service/test_validator.py` | Tracker HTTP and UDP scrape validation |
-| `tests/unit/merge_service/test_enricher.py` | Metadata enrichment from multiple providers |
-| `tests/unit/merge_service/test_scheduler.py` | Scheduled search persistence and execution |
-| `tests/unit/test_auth.py` | RuTracker CAPTCHA auth endpoint tests |
-| `tests/unit/test_scheduler_api.py` | Scheduler CRUD API endpoint tests |
-| `tests/unit/test_streaming.py` | SSE streaming handler tests |
-| `tests/unit/test_config.py` | Config env loading and fallback tests |
-| `tests/unit/test_ci_infra.py` | CI pipeline infrastructure tests |
-| `tests/unit/test_dashboard.py` | Dashboard rendering and UI tests |
-| `tests/unit/test_freeleech.py` | IPTorrents freeleech logic and tags |
-| `tests/unit/test_merge_trackers.py` | Tracker merge and dedup logic |
-| `tests/unit/test_routes.py` | FastAPI route handler tests |
-| `tests/unit/test_ui_sorting.py` | Dashboard result sorting tests |
-| `tests/unit/test_webui_bridge.py` | WebUI bridge request handling |
-| `tests/integration/test_merge_api.py` | Full API endpoint integration tests |
-| `tests/integration/test_button_functions.py` | UI button tests: Magnet, qBit, Download, Abort search |
-| `tests/integration/test_buttons_api.py` | Button API integration tests |
-| `tests/integration/test_auth_state_ui.py` | Auth state UI tests |
-| `tests/integration/test_iptorrents.py` | IPTorrents-specific integration tests |
-| `tests/integration/test_live_containers.py` | Live container health tests |
-| `tests/integration/test_login_actions.py` | Login action tests |
-| `tests/integration/test_magnet_dialog.py` | Magnet dialog UI tests |
-| `tests/integration/test_realtime_streaming.py` | Real-time SSE streaming tests |
-| `tests/integration/test_streaming_browser.py` | Browser-side streaming tests |
-| `tests/integration/test_ui_comprehensive.py` | Comprehensive UI tests |
-| `tests/integration/test_ui_quick.py` | Quick UI smoke tests |
-| `tests/e2e/test_full_pipeline.py` | End-to-end search→download pipeline |
+### Sync code to container after edits
+```bash
+podman exec qbittorrent-proxy find /config/download-proxy -name __pycache__ -type d -exec rm -rf {} +
+podman restart qbittorrent-proxy
+```
 
-### Fixtures (conftest.py)
-- `qbittorrent_host`, `qbittorrent_port`, `qbittorrent_url`
-- `mock_qbittorrent_api` — Mocked API client with `get_torrents`, `add_torrent`, `get_torrent_files`
-- `sample_search_result`, `sample_merged_result`
+For plugin edits: `./install-plugin.sh <name>` copies `plugins/X.py` → `config/qBittorrent/nova3/engines/X.py` (source of truth is `plugins/`). Direct edits to the engines dir get clobbered on next install.
 
----
+For compose/image changes: `podman compose down && podman compose up -d` (full recreate).
 
-## Code Style Guidelines
+**Always verify** after restart: curl the endpoint or `podman exec ... cat /config/...` to confirm running code matches committed code.
 
-### Bash
-- `set -euo pipefail` in every script
-- `[[ ]]` conditionals, quoted variables
-- `snake_case` functions, `UPPER_CASE` constants
-- 4-space indent
-- Shared color-print helpers: `print_info`, `print_success`, `print_warning`, `print_error`
-- Auto-detect container runtime (podman preferred)
-- Always provide `-h/--help` flags
+## Test Layout
 
-### Python
-- **PEP 8** compliant
-- **Type hints** on public methods
-- `try: import novaprinter` pattern for optional dependencies in plugins
-- No `requirements.txt` at root — only `download-proxy/requirements.txt` and `tests/requirements.txt`
-- **ruff** for linting and formatting (`ruff.toml`):
-  - Target Python 3.12
-  - Line length: 120
-  - Enabled: E, F, W, I, UP, B, SIM, RUF
-  - Ignored: E501 (line too long — handled by 120 char limit)
-  - Known first-party: `api`, `merge_service`, `config`, `plugins`
-  - Quote style: double, indent: space
+Tests live in `./tests/`, NOT in `download-proxy/tests/`.
 
-### Merge Service Python
-- FastAPI with async handlers
-- `aiohttp` for outbound HTTP requests
-- `sys.path` manipulation for imports in container environment
-- No comments in merge service source (project convention per CONTRIBUTING.md)
+| Directory | What | Requires |
+|-----------|------|----------|
+| `tests/unit/` | Unit tests (heavily mocked) | Nothing |
+| `tests/unit/merge_service/` | Core logic: dedup, search, hooks, validator, enricher, scheduler | Nothing |
+| `tests/unit/api_layer/` | API layer unit tests | Nothing |
+| `tests/contract/` | API contract tests (OpenAPI, cross-app theme) | Nothing |
+| `tests/property/` | Hypothesis property-based | Nothing |
+| `tests/concurrency/` | Semaphore/concurrency | Nothing |
+| `tests/memory/` | Memory leak (tracemalloc) | Nothing |
+| `tests/observability/` | Prometheus metric assertions | Nothing |
+| `tests/integration/` | Integration tests | Running containers or mocks |
+| `tests/e2e/` | End-to-end pipeline | Running containers |
+| `tests/fixtures/` | Shared live-service fixtures (`services.py`, `live_search.py`) | — |
 
----
+Key fixtures in `tests/conftest.py`: `mock_qbittorrent_api`, `sample_search_result`, `sample_merged_result`, `qbittorrent_host/port/url`.
+Live fixtures in `tests/fixtures/services.py`: `merge_service_live`, `qbittorrent_live`, `webui_bridge_live`, `all_services_live`.
 
-## Security Considerations
+### Unit test `sys.modules` isolation
 
-- `.env` is **gitignored** — never commit it
-- `ci.sh` Phase 1 scans for hardcoded secrets in tracked files
-- `*.key`, `*.pem`, `*credentials*`, `*secrets*` are gitignored
-- RuTracker CAPTCHA handling via browser-solved challenge, not credential bypass
-- Private tracker downloads authenticated via session cookies, not URL tokens
-- `webui-bridge.py` runs locally only (binds to all interfaces but intended for localhost)
-- qBittorrent WebUI auth subnet whitelist is `0.0.0.0/0` (development convenience)
+`conftest.py` has an autouse fixture `_isolate_download_proxy_modules` that isolates `sys.modules` for tests under `tests/unit/` only (stub packages for `api`/`merge_service` would pollute other tests). Integration/e2e tests are excluded because they import real modules with live async references.
 
----
+### pytest markers
+
+Defined in `pyproject.toml`: `requires_credentials`, `requires_compose`, `slow`, `stress`, `security`, `contract`, `property`, `memory`, `chaos`, `observability`.
+
+## Code Organization (high-signal only)
+
+```
+download-proxy/src/
+  main.py                # Entry: starts proxy + FastAPI in threads
+  api/                   # FastAPI app (routes, hooks, streaming, auth, scheduler)
+  merge_service/         # Core: search orchestration, dedup, enrichment, validation
+  config/__init__.py     # EnvConfig dataclass, env loading
+  ui/templates/          # Jinja2 dashboard + theme.css
+
+plugins/                 # 42 tracker plugins + support files (helpers.py, nova2.py, novaprinter.py)
+  webui_compatible/      # WebUI variants for private trackers
+
+frontend/                # Angular 21 dashboard (separate from FastAPI Jinja2 dashboard)
+tests/                   # All tests (unit, contract, property, concurrency, memory, observability, integration, e2e)
+scripts/                 # run-tests.sh, scan.sh, build-releases.sh, etc.
+```
+
+## Toolchain Config (all in `pyproject.toml`)
+
+- **ruff**: target py312, line-length 120, select `E F W I UP B SIM RUF ASYNC S PT C4 TID`, ignore `E501 S101 S603 S607`
+- **mypy**: strict, py312, excludes `plugins/` and `tests/`
+- **pytest**: `--import-mode=importlib`, `--timeout=60`, `--strict-markers`, asyncio_mode=auto
+- **coverage**: sources `download-proxy/src` and `plugins`, `fail_under=1` (baseline)
+- **mutmut**: paths `download-proxy/src/`
+
+## Environment Variables
+
+Priority: shell env → `./.env` → `~/.qbit.env` → container env.
+
+Key: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD` (falls back to `IPTORRENTS_*`), `NNMCLUB_COOKIES`, `IPTORRENTS_USERNAME/PASSWORD`, `QBITTORRENT_DATA_DIR` (default `/mnt/DATA`), `MERGE_SERVICE_PORT` (7187), `PROXY_PORT` (7186), `BRIDGE_PORT` (7188).
+
+## Plugin System
+
+`plugins/` has 42 managed tracker plugins. Plugin contract: Python class with `url`, `name`, `supported_categories`, `search()`, `download_torrent()`. Output via `novaprinter.print()`. Installed to `config/qBittorrent/nova3/engines/`.
+
+```bash
+./install-plugin.sh --all              # Install all
+./install-plugin.sh rutracker rutor    # Install specific
+./install-plugin.sh --verify           # Verify
+```
 
 ## Gotchas
 
-- `run-all-tests.sh` hardcodes **podman** commands — will fail on docker-only systems.
-- Private tracker tests need valid credentials in `.env` and sometimes a browser-solved CAPTCHA (RuTracker).
-- **RuTracker login may fail with CAPTCHA** — cookies expire periodically. Re-authenticate via browser if needed.
-- **Kinozal credentials fall back to IPTorrents** — if `KINOZAL_USERNAME/PASSWORD` are not set, `IPTORRENTS_USERNAME/PASSWORD` are used automatically.
-- **NNMClub needs cookies in `.env`** — `NNMCLUB_COOKIES` is required for live testing.
-- **IPTorrents non-freeleech results never merge** with other trackers. Only `[free]` tagged IPTorrents results merge with duplicates from other trackers.
-- **IPTorrents freeleech results get ` [free]` suffix** in the name — no confusion about which are safe to download.
-- `webui-bridge.py` auto-starts via systemd user service (port 7188). Install once with `./setup-webui-bridge-service.sh`.
-- The proxy container runs `start-proxy.sh` which installs all deps from `requirements.txt` at startup (including Levenshtein).
-- Plugin install destination: `config/qBittorrent/nova3/engines/` (not `plugins/`).
-- The merge service hooks file is at `/config/download-proxy/hooks.json` inside the container.
-- `start-proxy.sh` starts both the download proxy and the merge service (dual-thread via `main.py`).
-- `ci.sh` is **manual only** — never auto-triggered by Git hooks or remote CI. Run it yourself before releases.
-- GitHub Actions workflow (`.github/workflows/test.yml`) is `workflow_dispatch` only — no automatic CI.
-- `config/download-proxy/src/` is **gitignored** — do not commit copied source trees.
+- `run-all-tests.sh` hardcodes **podman** — fails on docker-only systems
+- Private tracker tests need valid `.env` credentials; RuTracker may require browser-solved CAPTCHA (cookies expire)
+- Kinozal credentials fall back to IPTorrents if unset
+- NNMClub needs `NNMCLUB_COOKIES` in `.env` for live testing
+- IPTorrents non-freeleech results never merge with other trackers; only `[free]` tagged ones merge
+- `config/download-proxy/src/` is **gitignored** — do not commit copied source trees
+- Plugin source of truth is `plugins/X.py`, not `config/qBittorrent/nova3/engines/X.py`
+- `webui-bridge.py` runs on port **7188** (not 7186)
+- Merge service tests live in `./tests/`, not `download-proxy/tests/`
+- Proxy container runs `start-proxy.sh` which installs deps from `requirements.txt` at startup (including Levenshtein)
+- Hooks file is at `/config/download-proxy/hooks.json` inside container
 
----
+## Commit Style
 
-## Dashboard Features
-
-### Theme System
-All colors defined in `theme.css` using CSS custom properties (`--theme-*`). Dashboard loads theme.css and uses `var(--theme-*)` variables for visual consistency.
-
-### Search/Abort Toggle
-The Search button toggles to an Abort button during active searches using `AbortController`. Clicking Abort cancels the in-flight fetch request and resets the button back to Search. The button also resets on search completion, error, or CAPTCHA redirect. CSS class `.btn-abort` turns the button red during search.
-
-### Content Type Detection
-`_detect_content_type()` in `deduplicator.py` detects: movie, tv, music, game, anime, software, audiobook, ebook. TV detection covers patterns like `S01E05`, `Season 1`, `Seasons 1-6`, `Seasons 1 - 6 Complete`, `Episode 3`. No hardcoded titles — only dynamic patterns (release groups, platforms, file formats, genre markers).
-
-### qBittorrent Authentication
-- Login modal accessible via "qBit" button click
-- "Remember me" checkbox saves credentials to `/config/download-proxy/qbittorrent_creds.json`
-- API routes load saved credentials first, fallback to env vars (`QBITTORRENT_USER`, `QBITTORRENT_PASS`)
-- First-time setup: use `init-qbit-password.sh` to set initial password
-
-### Magnet Dialog
-Click "Magnet" button to open a dialog with:
-- **Text area** showing the magnet link (click to select all)
-- **Copy button** — copies magnet link to clipboard using fallback method (works in Yandex browser)
-- **Open button** — triggers mobile torrent app via `href="magnet:..."` — works on mobile devices to open default torrent client
-- Uses `execCommand('copy')` fallback instead of `navigator.clipboard` for browser compatibility
-
----
-
-## Contributing & Commit Style
-
-- Branch naming: `feature/your-feature-name`
-- Commit format: `<type>: <subject>` where type is one of `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-- Always run tests before committing: `./test.sh --full` or `./ci.sh`
-- Update `README.md`, `USER_MANUAL.md`, and `AGENTS.md` for user/dev-facing changes
-- See `CONTRIBUTING.md` for full guidelines
-
-## Scanners & Quality Stack
-
-The project runs a seven-scanner security stack plus SonarQube and the
-Prometheus/Grafana observability stack. All of it is opt-in via the
-separate `docker-compose.quality.yml` (constitution Principle I is
-preserved — the product remains a two-container deploy).
-
-- `docs/SCANNING.md` — authoritative reference for the seven scanners
-  (`pip-audit`, `bandit`, `ruff`, `semgrep`, `trivy`, `gitleaks`,
-  `snyk`, plus SonarQube), local invocation via `scripts/scan.sh`, CI
-  wiring, waiver policy with mandatory expiry dates, and triage SLOs.
-- `docs/QUALITY_STACK.md` — why the quality compose file is separate,
-  profile table, environment variables, ports (`9000` SonarQube,
-  `9090` Prometheus, `3000` Grafana), lifecycle commands.
-- `docs/OBSERVABILITY.md` — metric names (`qbit_merge_active_searches`,
-  `qbit_merge_tracker_requests_total`,
-  `qbit_merge_search_duration_seconds_bucket`,
-  `qbit_merge_circuit_breaker_state`), pre-provisioned Grafana
-  dashboard at UID `qbit-merge-search`, and how
-  `tests/observability/` asserts metric existence.
-
-### Test Types
-
-`docs/TESTING.md` is the authoritative catalogue of the 30 test types
-used in this project (Unit, Integration, E2E, Contract, Property,
-Fuzz, Mutation, Security, Performance, Load, Stress, Chaos,
-Concurrency, Memory-leak, Smoke, Monitoring, Infra, A11y, Visual,
-Docs-link, Type-check, Lint, Dep-audit, SAST, Secret-scan, License,
-…). Each row lists framework, directory, how-to-run, and where
-coverage / reports land. The same document defines the TDD cadence
-(RED → watch fail → GREEN → rebuild-reboot → commit) required by
-`CLAUDE.md`.
+Format: `<type>: <subject>` where type is `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`. Branch naming: `feature/your-feature-name`.
