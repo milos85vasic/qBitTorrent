@@ -26,24 +26,21 @@ _POLLUTING_ROOTS = ("api", "merge_service", "config")
 def _isolate_download_proxy_modules(request):
     """Keep each test's ``sys.modules`` scribbles from leaking into the next.
 
-    Several pre-existing test files install throw-away stub packages for
-    ``api`` and ``merge_service`` (so they can import leaf modules without
-    executing ``api/__init__.py``, which boots FastAPI). If those stubs
-    leak into the next test, any subsequent ``from api.routes import X``
-    fails with ``'api' is not a package``. This autouse fixture snapshots
-    the relevant entries before the test runs and restores them after.
+    Several pre-existing UNIT-test files install throw-away stub packages
+    for ``api`` and ``merge_service`` (so they can import leaf modules
+    without executing ``api/__init__.py``, which boots FastAPI). If those
+    stubs leak into the next test, any subsequent ``from api.routes
+    import X`` fails with ``'api' is not a package``.
 
-    SKIPPED for ``tests/e2e/test_full_pipeline.py`` — that file imports
-    ``SearchMetadata`` / ``SearchOrchestrator`` etc. at module scope and
-    keeps live references. When the snapshot/restore wipes ``merge_service``
-    out from under it, pytest-asyncio's coroutine cleanup tries to resolve
-    those names against a module that no longer exists, producing
-    ``KeyError: '__import__'`` "Exception ignored" warnings and marking the
-    @pytest.mark.asyncio tests as failed.
+    The isolation is RESTRICTED to ``tests/unit/`` because those are the
+    only callers that install stubs. Integration + e2e tests import the
+    real modules and keep live references — wiping ``merge_service.*``
+    out from under them while pytest-asyncio still has scheduled
+    coroutines produced KeyError/Exception-ignored cascades that broke
+    ``tests/e2e/test_full_pipeline.py``.
     """
     test_path = str(request.node.fspath)
-    skip_isolation = "tests/e2e/test_full_pipeline.py" in test_path
-    if skip_isolation:
+    if "/tests/unit/" not in test_path.replace("\\", "/"):
         yield
         return
     saved = {
