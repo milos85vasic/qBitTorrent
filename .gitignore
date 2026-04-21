@@ -84,6 +84,10 @@ config/download-proxy/src/hooks.json
 # Ruff cache
 .ruff_cache/
 
+# Git worktrees (isolated workspaces)
+.worktrees/
+worktrees/
+
 # Coverage / mutation / pytest artifacts
 .coverage
 .coverage.*
