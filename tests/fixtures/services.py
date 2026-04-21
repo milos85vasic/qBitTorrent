@@ -39,10 +39,16 @@ can intercept — useful for running integration tests offline.
 
 from __future__ import annotations
 
+import atexit
+import contextlib
 import os
+import socket
+import subprocess
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 import pytest
@@ -97,6 +103,21 @@ def _mock_mode() -> bool:
     return os.environ.get("MODE", "").lower() == "mock"
 
 
+def _is_port_listening(port: int, host: str = "127.0.0.1") -> bool:
+    """Return True if a TCP connection can be made to the given port."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        sock.connect((host, port))
+        sock.close()
+        return True
+    except (TimeoutError, ConnectionRefusedError):
+        return False
+    finally:
+        with contextlib.suppress(Exception):
+            sock.close()
+
+
 # ---------------------------------------------------------------------------
 # Public fixtures
 # ---------------------------------------------------------------------------
@@ -130,6 +151,54 @@ def webui_bridge_endpoint() -> ServiceEndpoint:
     )
 
 
+@pytest.fixture(scope="session")
+def webui_bridge_process() -> str:
+    """Ensure the webui-bridge host process is running on port 7188.
+
+    If the port is already listening, assume the process is already up
+    (maybe started manually) and do nothing. Otherwise, start
+    ``webui-bridge.py`` as a subprocess and register an atexit handler
+    to terminate it when the test session ends.
+
+    Returns the base URL (e.g., ``http://localhost:7188``).
+    """
+
+    port = 7188
+    if _is_port_listening(port):
+        # Already running; nothing to do.
+        return f"http://localhost:{port}"
+
+    # Start the bridge script.
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "webui-bridge.py"
+    if not script.exists():
+        raise RuntimeError(f"webui-bridge script not found at {script}")
+    proc = subprocess.Popen(
+        [sys.executable, str(script)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    # Wait a moment for the server to bind.
+    time.sleep(1.5)
+    if not _is_port_listening(port):
+        proc.terminate()
+        stdout, _ = proc.communicate(timeout=2)
+        raise RuntimeError(
+            f"webui-bridge failed to start on port {port}. Output:\n{stdout}"
+        )
+    # Register cleanup.
+    def _cleanup():
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+    atexit.register(_cleanup)
+    return f"http://localhost:{port}"
+
+
 def _live_service_fixture(endpoint_fixture: str) -> Callable[..., str]:
     """Factory that builds a session-scoped live-URL fixture.
 
@@ -150,9 +219,44 @@ def _live_service_fixture(endpoint_fixture: str) -> Callable[..., str]:
     return _fixture
 
 
-merge_service_live = pytest.fixture(scope="session")(_live_service_fixture("merge_service_endpoint"))
-qbittorrent_live = pytest.fixture(scope="session")(_live_service_fixture("qbittorrent_endpoint"))
-webui_bridge_live = pytest.fixture(scope="session")(_live_service_fixture("webui_bridge_endpoint"))
+@pytest.fixture(scope="session")
+def merge_service_live(request):
+    """Live merge-service URL; starts the docker-compose stack if needed."""
+    if _mock_mode():
+        ep = request.getfixturevalue("merge_service_endpoint")
+        return ep.url
+    compose = request.getfixturevalue("compose_up")
+    url = compose["merge_service"]
+    # Ensure the service is healthy.
+    ep = ServiceEndpoint(name="merge-search", url=url, health_path="/health", expect_substring='"status"')
+    _probe(ep)
+    return url
+
+
+@pytest.fixture(scope="session")
+def qbittorrent_live(request):
+    """Live qBittorrent proxy URL; starts the docker-compose stack if needed."""
+    if _mock_mode():
+        ep = request.getfixturevalue("qbittorrent_endpoint")
+        return ep.url
+    compose = request.getfixturevalue("compose_up")
+    url = compose["qbittorrent_proxy"]
+    ep = ServiceEndpoint(name="qbittorrent-webui-proxy", url=url, health_path="/")
+    _probe(ep)
+    return url
+
+
+@pytest.fixture(scope="session")
+def webui_bridge_live(request):
+    """Live webui-bridge URL; starts the host process if needed."""
+    if _mock_mode():
+        ep = request.getfixturevalue("webui_bridge_endpoint")
+        return ep.url
+    # Ensure the host process is running.
+    url = request.getfixturevalue("webui_bridge_process")
+    ep = ServiceEndpoint(name="webui-bridge", url=url, health_path="/health")
+    _probe(ep)
+    return url
 
 
 @pytest.fixture(scope="session")
