@@ -14,13 +14,18 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 _SRC_PATH = os.path.join(_REPO_ROOT, "download-proxy", "src")
 sys.path.insert(0, _SRC_PATH)
 
-for _mod_name in list(sys.modules):
-    if _mod_name.startswith("merge_service"):
-        del sys.modules[_mod_name]
+# Previously this file ``del``'d every ``merge_service.*`` module from
+# ``sys.modules`` at import time. That wiped out the module objects
+# referenced by OTHER test files' module-level ``from merge_service
+# import ...`` captures — notably ``tests/e2e/test_full_pipeline.py``
+# — and produced "coroutine was never awaited" / KeyError cascades in
+# pytest-asyncio teardown. We now merely ensure the module is
+# importable + point __path__ at the download-proxy source tree.
+import merge_service as _ms  # noqa: E402
 
-import merge_service as _ms
-
-_ms.__path__.insert(0, os.path.join(_SRC_PATH, "merge_service"))
+_ms_path = os.path.join(_SRC_PATH, "merge_service")
+if _ms_path not in _ms.__path__:
+    _ms.__path__.insert(0, _ms_path)
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
