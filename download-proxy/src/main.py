@@ -12,7 +12,10 @@ import os
 import sys
 import threading
 
+from config.log_filter import CredentialScrubber
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.getLogger().addFilter(CredentialScrubber())
 logger = logging.getLogger(__name__)
 
 
