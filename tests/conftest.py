@@ -15,10 +15,10 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from typing import Any
 
 _POLLUTING_ROOTS = ("api", "merge_service", "config")
 
@@ -59,8 +59,7 @@ def _isolate_download_proxy_modules(request):
 
 # Re-export live-service fixtures so that tests can request them by name
 # from any conftest without an explicit import.
-from tests.fixtures.compose import compose_up  # noqa: E402, F401 -- re-exported
-from tests.fixtures.services import (  # noqa: E402, F401 -- re-exported
+from tests.fixtures.services import (  # noqa: F401 -- re-exported
     all_services_live,
     merge_service_endpoint,
     merge_service_live,
@@ -70,6 +69,7 @@ from tests.fixtures.services import (  # noqa: E402, F401 -- re-exported
     webui_bridge_live,
     webui_bridge_process,
 )
+from tests.fixtures.compose import compose_up  # noqa: F401 -- re-exported
 
 
 @pytest.fixture(scope="session")
@@ -80,7 +80,7 @@ def docker_compose_command() -> str:
 
 @pytest.fixture(scope="session")
 def docker_compose_file(pytestconfig: Any) -> str:
-    """Use the root docker-compose.yml, not tests/docker-compose.yml."""
+    """Use the root docker‑compose.yml, not tests/docker‑compose.yml."""
     return os.path.join(str(pytestconfig.rootdir), "docker-compose.yml")
 
 
@@ -93,7 +93,7 @@ def docker_setup() -> list[str]:
     """Skip automatic compose up; we'll handle startup manually."""
     return []
 
-from tests.fixtures.live_search import (  # noqa: E402, F401 -- re-exported
+from tests.fixtures.live_search import (  # noqa: F401 -- re-exported
     _live_search_cache,
     fresh_magnet_hash,
     fresh_magnet_uri,

@@ -65,6 +65,7 @@ class TestIssue1DownloadButton:
         assert "t1" in magnet or "t2" in magnet or "opentrackr" in magnet
 
 
+@pytest.mark.timeout(300)
 class TestIssue2TypeColumn:
     """Issue 2: Type column shows Unknown for too many results."""
 
@@ -116,6 +117,7 @@ class TestIssue2TypeColumn:
             assert ct != "", "content_type must not be empty string"
 
 
+@pytest.mark.timeout(300)
 class TestIssue3SeedsLeechers:
     """Issue 3: Seeds/Leechers showing 0 for most results."""
 

@@ -39,13 +39,13 @@ can intercept — useful for running integration tests offline.
 
 from __future__ import annotations
 
-import atexit
-import contextlib
 import os
+import signal
 import socket
 import subprocess
 import sys
 import time
+import atexit
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -111,11 +111,13 @@ def _is_port_listening(port: int, host: str = "127.0.0.1") -> bool:
         sock.connect((host, port))
         sock.close()
         return True
-    except (TimeoutError, ConnectionRefusedError):
+    except (socket.timeout, ConnectionRefusedError):
         return False
     finally:
-        with contextlib.suppress(Exception):
+        try:
             sock.close()
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -153,15 +155,20 @@ def webui_bridge_endpoint() -> ServiceEndpoint:
 
 @pytest.fixture(scope="session")
 def webui_bridge_process() -> str:
-    """Ensure the webui-bridge host process is running on port 7188.
+    """Ensure the webui‑bridge host process is running on port 7188.
 
     If the port is already listening, assume the process is already up
     (maybe started manually) and do nothing. Otherwise, start
-    ``webui-bridge.py`` as a subprocess and register an atexit handler
+    ``webui‑bridge.py`` as a subprocess and register an atexit handler
     to terminate it when the test session ends.
 
     Returns the base URL (e.g., ``http://localhost:7188``).
     """
+    import atexit
+    import signal
+    import subprocess
+    import sys
+    from pathlib import Path
 
     port = 7188
     if _is_port_listening(port):
@@ -172,7 +179,7 @@ def webui_bridge_process() -> str:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "webui-bridge.py"
     if not script.exists():
-        raise RuntimeError(f"webui-bridge script not found at {script}")
+        raise RuntimeError(f"webui‑bridge script not found at {script}")
     proc = subprocess.Popen(
         [sys.executable, str(script)],
         stdout=subprocess.PIPE,
@@ -185,7 +192,7 @@ def webui_bridge_process() -> str:
         proc.terminate()
         stdout, _ = proc.communicate(timeout=2)
         raise RuntimeError(
-            f"webui-bridge failed to start on port {port}. Output:\n{stdout}"
+            f"webui‑bridge failed to start on port {port}. Output:\n{stdout}"
         )
     # Register cleanup.
     def _cleanup():
@@ -221,7 +228,7 @@ def _live_service_fixture(endpoint_fixture: str) -> Callable[..., str]:
 
 @pytest.fixture(scope="session")
 def merge_service_live(request):
-    """Live merge-service URL; starts the docker-compose stack if needed."""
+    """Live merge‑service URL; starts the docker‑compose stack if needed."""
     if _mock_mode():
         ep = request.getfixturevalue("merge_service_endpoint")
         return ep.url
@@ -235,7 +242,7 @@ def merge_service_live(request):
 
 @pytest.fixture(scope="session")
 def qbittorrent_live(request):
-    """Live qBittorrent proxy URL; starts the docker-compose stack if needed."""
+    """Live qBittorrent proxy URL; starts the docker‑compose stack if needed."""
     if _mock_mode():
         ep = request.getfixturevalue("qbittorrent_endpoint")
         return ep.url
@@ -248,7 +255,7 @@ def qbittorrent_live(request):
 
 @pytest.fixture(scope="session")
 def webui_bridge_live(request):
-    """Live webui-bridge URL; starts the host process if needed."""
+    """Live webui‑bridge URL; starts the host process if needed."""
     if _mock_mode():
         ep = request.getfixturevalue("webui_bridge_endpoint")
         return ep.url
