@@ -2,12 +2,21 @@
 Core data models for the merge service.
 """
 
+import re as _re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
 from cachetools import TTLCache
+
+_TRACKER_NAME_RE = _re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+def validate_tracker_name(name: str) -> str:
+    if not name or not _TRACKER_NAME_RE.match(name):
+        raise ValueError(f"Invalid tracker name: {name!r}")
+    return name
 
 
 class ContentType(Enum):
@@ -764,6 +773,7 @@ class SearchOrchestrator:
         return results
 
     async def _search_public_tracker(self, tracker_name: str, query: str, category: str) -> list[SearchResult]:
+        validate_tracker_name(tracker_name)
         import asyncio
         import json
         import logging
