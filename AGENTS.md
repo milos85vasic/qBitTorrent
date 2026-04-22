@@ -104,6 +104,7 @@ Tests live in `./tests/`, NOT in `download-proxy/tests/`.
 | `tests/integration/` | Integration tests | Running containers or mocks |
 | `tests/e2e/` | End-to-end pipeline | Running containers |
 | `tests/fixtures/` | Shared live-service fixtures (`services.py`, `live_search.py`) | — |
+| `tests/docs/` | Documentation integrity (broken links) | Nothing |
 
 Key fixtures in `tests/conftest.py`: `mock_qbittorrent_api`, `sample_search_result`, `sample_merged_result`, `qbittorrent_host/port/url`.
 Live fixtures in `tests/fixtures/services.py`: `merge_service_live`, `qbittorrent_live`, `webui_bridge_live`, `all_services_live`.
@@ -142,11 +143,32 @@ scripts/                 # run-tests.sh, scan.sh, build-releases.sh, etc.
 - **coverage**: sources `download-proxy/src` and `plugins`, `fail_under=1` (baseline)
 - **mutmut**: paths `download-proxy/src/`
 
+## Quality Stack (opt-in)
+
+`docker-compose.quality.yml` adds scanners and observability — never started by `./start.sh`.
+
+```bash
+podman compose -f docker-compose.yml -f docker-compose.quality.yml --profile quality up -d
+scripts/scan.sh --all
+```
+
+| Tool | Config File | Purpose |
+|------|-------------|---------|
+| SonarQube | `sonar-project.properties` | Code quality + coverage |
+| Snyk | `.snyk` | Dependency vulnerability scan |
+| Semgrep | `.semgrep.yml` | Static analysis rules |
+| Trivy | `.trivyignore` | Container image scanning |
+| Gitleaks | `.gitleaks.toml` | Secret detection |
+| Prometheus | `observability/prometheus.yml` | Metrics collection |
+| Grafana | `observability/dashboards/` | Dashboard visualization |
+
+All scanner reports land in `artifacts/scans/<timestamp>/` as SARIF. Mandatory waiver format: Finding ID / reason / expiry.
+
 ## Environment Variables
 
 Priority: shell env → `./.env` → `~/.qbit.env` → container env.
 
-Key: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD` (falls back to `IPTORRENTS_*`), `NNMCLUB_COOKIES`, `IPTORRENTS_USERNAME/PASSWORD`, `QBITTORRENT_DATA_DIR` (default `/mnt/DATA`), `MERGE_SERVICE_PORT` (7187), `PROXY_PORT` (7186), `BRIDGE_PORT` (7188).
+Key: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD` (falls back to `IPTORRENTS_*`), `NNMCLUB_COOKIES`, `IPTORRENTS_USERNAME/PASSWORD`, `QBITTORRENT_DATA_DIR` (default `/mnt/DATA`), `MERGE_SERVICE_PORT` (7187), `MERGE_SERVICE_HOST` (0.0.0.0), `PROXY_PORT` (7186), `BRIDGE_PORT` (7188), `ALLOWED_ORIGINS` (CORS, comma-separated), `MAX_CONCURRENT_SEARCHES` (default 5), `DISABLE_THEME_INJECTION` (set to `1` to disable cross-app dark mode), `LOG_LEVEL` (default INFO), `OMDB_API_KEY`, `TMDB_API_KEY`, `ANILIST_CLIENT_ID`.
 
 ## Plugin System
 

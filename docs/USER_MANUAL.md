@@ -119,10 +119,64 @@ NNMCLUB_COOKIES="uid=123456; pass=abcdef1234567890abcdef1234567890"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `QBITTORRENT_DATA_DIR` | `/mnt/DATA` | Download directory |
-| `WEBUI_PORT` | `7186` | WebUI port |
-| `WEBUI_USERNAME` | `admin` | WebUI login |
-| `WEBUI_PASSWORD` | `admin` | WebUI password |
+| `QBITTORRENT_HOST` | `localhost` | qBittorrent host |
+| `QBITTORRENT_PORT` | `7185` | qBittorrent WebUI port |
+| `MERGE_SERVICE_PORT` | `7187` | Merge Search Service port |
+| `MERGE_SERVICE_HOST` | `0.0.0.0` | Merge service bind address |
+| `PROXY_PORT` | `7186` | Download proxy port |
 | `BRIDGE_PORT` | `7188` | WebUI Bridge port |
+| `LOG_LEVEL` | `INFO` | Logging level |
+| `ALLOWED_ORIGINS` | — | CORS origins (comma-separated, no wildcards in prod) |
+| `MAX_CONCURRENT_SEARCHES` | `5` | Concurrent tracker search cap |
+| `DISABLE_THEME_INJECTION` | — | Set to `1` to disable cross-app theme |
+| `OMDB_API_KEY` | — | OMDb metadata API key |
+| `TMDB_API_KEY` | — | TMDB metadata API key |
+| `ANILIST_CLIENT_ID` | — | AniList API client ID |
+
+### Install Paths
+
+| Path | Purpose |
+|------|---------|
+| `config/qBittorrent/` | qBittorrent configuration (auto-created by container) |
+| `config/qBittorrent/nova3/engines/` | Search plugin engine files |
+| `config/download-proxy/` | Download proxy config + hooks |
+| `config/merge-service/` | Scheduler persistence (`scheduling.json`) |
+| `plugins/` | Plugin source of truth (canonical) |
+| `plugins/community/` | Non-canonical/community plugins |
+| `frontend/` | Angular 21 dashboard source |
+
+### CLI Flags
+
+```bash
+./start.sh -p       # Pull images before starting
+./start.sh -s       # Show container status after starting
+./start.sh -v       # Verbose output
+
+./stop.sh -r        # Remove containers after stopping
+./stop.sh --purge   # Remove containers AND images
+
+./ci.sh             # Full CI pipeline
+./ci.sh --quick     # Syntax + unit tests only
+./ci.sh --tests-only # Skip syntax checks
+
+scripts/run-tests.sh hermetic  # Fast tests (no services)
+scripts/run-tests.sh live      # Tests requiring running containers
+scripts/run-tests.sh all       # Everything
+
+scripts/scan.sh --all          # Run all security scanners
+scripts/scan.sh pip-audit ruff # Run specific scanners
+```
+
+### Plugin Installation
+
+```bash
+./install-plugin.sh --all              # Install all plugins
+./install-plugin.sh rutracker rutor    # Install specific plugins
+./install-plugin.sh --verify           # Verify all plugins installed
+./install-plugin.sh --local --all      # Install for desktop app
+```
+
+Plugins are copied from `plugins/X.py` → `config/qBittorrent/nova3/engines/X.py`. Always edit the source in `plugins/` — the engines directory is clobbered on reinstall.
 
 ---
 
@@ -324,9 +378,8 @@ Results are tagged and can be filtered by quality in the dashboard.
 
 **Solution:**
 ```bash
-# Restart container
-./restart.sh
-
+./install-plugin.sh --all
+podman restart qbittorrent
 # Hard refresh browser (Ctrl+Shift+R)
 ```
 
@@ -357,15 +410,32 @@ Results are tagged and can be filtered by quality in the dashboard.
 
 **Check:**
 1. Internet connection
-2. Plugin is enabled
+2. Plugin is enabled in Search tab
 3. Try different search terms
 4. Check container logs: `podman logs qbittorrent`
+5. Check proxy logs: `podman logs qbittorrent-proxy`
+6. Verify tracker credentials: `curl http://localhost:7187/health`
+
+### Issue: Merge Service Returns 503
+
+**Cause:** Service shutting down or not started
+
+**Check:**
+```bash
+podman logs qbittorrent-proxy | tail -20
+curl http://localhost:7187/health
+```
+
+### Issue: CORS Errors in Browser Console
+
+**Fix:** Set `ALLOWED_ORIGINS` in `.env`:
+```bash
+ALLOWED_ORIGINS=http://localhost:4200,http://localhost:7187
+```
 
 ### Issue: Column Data Shows Zeros
 
-**Status:** Fixed in this version
-
-All plugins now return real data for seeds, leech, and size.
+**Status:** Fixed in this version. All plugins return real data for seeds, leech, and size.
 
 ### Issue: Container Won't Start
 
@@ -375,6 +445,18 @@ All plugins now return real data for seeds, leech, and size.
 ./stop.sh -r
 podman system prune -f
 ./start.sh
+```
+
+### Issue: RuTracker Login Fails (CAPTCHA)
+
+**Fix:** Solve the CAPTCHA in a browser first, then retry. Cookies expire periodically.
+
+### Issue: Security Scan Failures
+
+**Fix:** Run scanners individually to identify the issue:
+```bash
+scripts/scan.sh pip-audit ruff
+# Check artifacts/scans/ for SARIF reports
 ```
 
 ---

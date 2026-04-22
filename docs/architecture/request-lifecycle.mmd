@@ -1,0 +1,41 @@
+%% Request lifecycle: search → merge → stream → download
+%% Covers the full user-visible flow from query to torrent download.
+sequenceDiagram
+    autonumber
+    actor User
+    participant Dashboard as Dashboard (:7187)
+    participant API as FastAPI API
+    participant Orch as SearchOrchestrator
+    participant Trackers as Trackers (subprocess + aiohttp)
+    participant Dedup as Deduplicator
+    participant Enrich as Enricher
+    participant Proxy as Download Proxy (:7186)
+    participant QBit as qBittorrent (:7185)
+
+    User->>Dashboard: type query, click Search
+    Dashboard->>API: POST /api/v1/search {query, category}
+    API->>Orch: search(query, category)
+    Orch->>Orch: create SearchMetadata(search_id)
+    
+    par fan-out concurrent searches
+        Orch->>Trackers: _search_tracker(name) × N
+        Trackers-->>Orch: List[SearchResult] per tracker
+    end
+
+    Orch->>Dedup: merge_results(all_results)
+    Note over Dedup: Tier 1: infohash match<br/>Tier 2: name+size match<br/>Tier 3: Levenshtein fuzzy
+    Dedup-->>Orch: List[MergedResult]
+
+    opt metadata enabled
+        Orch->>Enrich: fill best_quality, CanonicalIdentity
+        Enrich-->>Orch: enriched results
+    end
+
+    Orch-->>API: SearchMetadata(completed)
+    API-->>Dashboard: SearchResponse JSON
+
+    User->>Dashboard: clicks Download on result
+    Dashboard->>API: POST /api/v1/download {download_urls}
+    API->>Proxy: fetch .torrent with auth cookies
+    Proxy->>QBit: POST /api/v2/torrents/add
+    QBit-->>Dashboard: torrent added to transfer list

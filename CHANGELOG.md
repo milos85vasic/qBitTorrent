@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Phase 0 + Phase 1 (completion-initiative)
 
+### Phase 2 — Security hardening
+
+#### Added
+- **`ALLOWED_ORIGINS` env var** — CORS no longer uses wildcard; origins are env-driven and validated at startup. Commit `b8e9e98`.
+- **`CredentialScrubber` log filter** (`config/log_filter.py`) — redacts passwords, cookies, and API keys from all log output. Commit `6c5a801`.
+- **`asyncio.Semaphore`** caps concurrent tracker searches (`MAX_CONCURRENT_SEARCHES`, default 5). Commit `311dae1`.
+- **`filelock`** around credential file writes to prevent race conditions. Commit `18f9450`.
+- **Shell injection hardening** — tracker name validation rejects names containing shell metacharacters. Commit `a84e4cf`.
+- **`TTLCache` for CAPTCHA dict** — replaced unbounded `_pending_captchas` with `TTLCache(maxsize=1024, ttl=900)`. Commit `8d4a429`.
+
+### Phase 3 — Concurrency & stability
+
+#### Fixed
+- **Unbounded caches replaced with `TTLCache`** in `search.py` and `hooks.py` — `_active_searches` and hook state are now size-bounded. Commit `0b44162`.
+- **`asyncio.Lock` guards** around all shared mutable state in hooks and streaming modules. Commit `d369879`.
+- **Graceful shutdown** — `main.py` now handles SIGTERM/SIGINT, sets a shutdown event, joins daemon threads with 5s timeout. Commit `49a99d0`.
+
+### Phase 4 — Resilience
+
+#### Added
+- **Tenacity retry policy** (`merge_service/retry.py`) — outbound HTTP calls to trackers and metadata APIs use exponential backoff with jitter. Commit `f43ad5e`.
+- **SSE disconnect handling** — server stops polling when client disconnects, preventing leaked connections. Commit `1447d0f`.
+
+#### Changed
+- **Non-canonical plugins moved to `plugins/community/`** — canonical plugins remain in `plugins/`, community variants separated. Commit `e130e2f`.
+
+### Phase 7 — Documentation rewrite & extension
+
+#### Added
+- **README.md** in `download-proxy/src/`, `download-proxy/src/api/`, `download-proxy/src/merge_service/`, `download-proxy/src/config/`, `scripts/` — purpose, entry points, conventions, how to test.
+- **`docs/architecture/request-lifecycle.mmd`** — Mermaid sequence diagram for search → merge → stream → download flow.
+- **`tests/unit/test_openapi_frozen.py`** — compares frozen `docs/api/openapi.json` with live FastAPI spec, fails on drift.
+- **`tests/docs/test_no_broken_links.py`** — validates internal markdown links in `docs/` resolve to existing files.
+- **Expanded `docs/USER_MANUAL.md`** — install paths, CLI flags, plugin install instructions, expanded env vars, additional troubleshooting.
+- **Updated `AGENTS.md`** — quality stack section, new env vars, new test types, scanner tooling table.
+
+#### Already existing (verified, not duplicated)
+- `docs/DATA_MODEL.md` — comprehensive data model with Pydantic schemas and Mermaid ERD.
+- `docs/OBSERVABILITY.md`, `docs/SECURITY.md`, `docs/SCANNING.md`, `docs/CONCURRENCY.md`, `docs/PERFORMANCE.md`, `docs/TESTING.md` — all pre-existing nano-detail docs.
+- `docs/architecture/container-topology.mmd`, `plugin-execution.mmd`, `shutdown-sequence.mmd` — pre-existing architecture diagrams.
+- `scripts/freeze-openapi.sh` — pre-existing OpenAPI export script.
+
 ### Added
 
 #### Phase 0 — Safety net & baseline
