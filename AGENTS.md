@@ -5,7 +5,7 @@ For deeper narrative docs see `CLAUDE.md`, `docs/USER_MANUAL.md`, `docs/PLUGINS.
 
 ## What This Project Is
 
-qBittorrent enhancement: multi-tracker search, authenticated download proxy, and a Merge Search Service (FastAPI). **Not a Python package** — no installable distribution. Runtime is container-based. Config is unified in `pyproject.toml`.
+qBittorrent enhancement: multi-tracker search, authenticated download proxy, and a Merge Search Service. **Not a Python package** — no installable distribution. Runtime is container-based. Config is unified in `pyproject.toml`. A Go/Gin backend is available as an opt-in replacement (`--profile go`).
 
 ## Critical Constraints
 
@@ -18,12 +18,13 @@ qBittorrent enhancement: multi-tracker search, authenticated download proxy, and
 
 ## Architecture
 
-Two-container setup via `docker-compose.yml` (`network_mode: host`):
+Two-container setup via `docker-compose.yml` (`network_mode: host`), with optional Go backend:
 
 | Container | Image | Ports |
 |-----------|-------|-------|
 | qbittorrent | `lscr.io/linuxserver/qbittorrent:latest` | 7185 |
 | qbittorrent-proxy | `python:3.12-alpine` | 7186, 7187 |
+| qbittorrent-proxy-go | Go/Gin (opt-in, `--profile go`) | 7186, 7187, 7188 |
 
 - **7185** qBittorrent WebUI (container-internal)
 - **7186** Download proxy → qBittorrent
@@ -51,6 +52,14 @@ cd frontend && npx ng build            # Production build
 ./stop.sh                              # Stop (-r remove, --purge clean images)
 ```
 
+### Go Backend (opt-in)
+```bash
+podman compose --profile go up -d      # Start Go backend instead of Python
+cd qBitTorrent-go && ./scripts/build.sh   # Build Go binaries locally
+cd qBitTorrent-go && go test -race ./...  # Go tests with race detection
+cd qBitTorrent-go && go vet ./...         # Go static analysis
+```
+
 ### Testing
 ```bash
 ./ci.sh                                # Full CI: syntax + unit + integration + e2e + container health
@@ -65,6 +74,13 @@ scripts/run-tests.sh hermetic          # Only hermetic suites (fast)
 python3 -m pytest tests/unit/test_freeleech.py -v --import-mode=importlib
 python3 -m pytest tests/unit/merge_service/ -v --import-mode=importlib
 python3 -m pytest tests/unit/ -k "search" -v --import-mode=importlib
+```
+
+### Go Backend Tests
+```bash
+cd qBitTorrent-go && go test -race -count=1 ./...  # Full suite with race detection
+cd qBitTorrent-go && go test ./internal/api/ -v     # Single package
+cd qBitTorrent-go && go vet ./...                   # Static analysis
 ```
 
 ### Lint + Typecheck
@@ -126,6 +142,20 @@ download-proxy/src/
   merge_service/         # Core: search orchestration, dedup, enrichment, validation
   config/__init__.py     # EnvConfig dataclass, env loading
   ui/templates/          # Jinja2 dashboard + theme.css
+
+qBitTorrent-go/          # Go/Gin backend (opt-in replacement)
+  cmd/
+    qbittorrent-proxy/   # Main API binary (port 7187)
+    webui-bridge/        # Bridge binary (port 7188)
+  internal/
+    api/                 # HTTP handlers (health, search, hooks, download, scheduler, theme)
+    service/             # Merge search orchestrator + SSE broker
+    client/              # qBittorrent Web API client
+    models/              # Data types
+    config/              # Env config
+    middleware/           # CORS + logging
+  Dockerfile             # Multi-stage Go build
+  scripts/build.sh       # Local build script
 
 plugins/                 # 42 tracker plugins + support files (helpers.py, nova2.py, novaprinter.py)
   webui_compatible/      # WebUI variants for private trackers
@@ -193,6 +223,8 @@ Key: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD` (falls back to `
 - Merge service tests live in `./tests/`, not `download-proxy/tests/`
 - Proxy container runs `start-proxy.sh` which installs deps from `requirements.txt` at startup (including Levenshtein)
 - Hooks file is at `/config/download-proxy/hooks.json` inside container
+- Go backend is opt-in via `--profile go` — does not replace Python by default
+- Go `qbittorrent-proxy` binary serves on 7187 (same as Python merge service); both cannot run simultaneously
 
 ## Commit Style
 

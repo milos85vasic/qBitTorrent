@@ -147,3 +147,7 @@ releases/*
 
 # Test-run transcripts captured during triage
 artifacts/
+
+# Go build artifacts
+qBitTorrent-go/qbittorrent-proxy
+qBitTorrent-go/webui-bridge

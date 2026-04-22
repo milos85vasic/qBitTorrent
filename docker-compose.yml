@@ -25,6 +25,56 @@ services:
       retries: 5
       start_period: 30s
 
+  qbittorrent-proxy-go:
+    build:
+      context: ./qBitTorrent-go
+      dockerfile: Dockerfile
+    container_name: qbittorrent-proxy-go
+    environment:
+      - QBITTORRENT_HOST=localhost
+      - QBITTORRENT_PORT=7185
+      - QBITTORRENT_URL=http://localhost:7185
+      - QBITTORRENT_USER=${QBITTORRENT_USER:-admin}
+      - QBITTORRENT_PASS=${QBITTORRENT_PASS:-admin}
+      - QBITTORRENT_USERNAME=${QBITTORRENT_USERNAME:-admin}
+      - QBITTORRENT_PASSWORD=${QBITTORRENT_PASSWORD:-admin}
+      - MERGE_SERVICE_PORT=7187
+      - MERGE_SERVICE_HOST=0.0.0.0
+      - PROXY_PORT=7186
+      - BRIDGE_PORT=7188
+      - TMPDIR=/shared-tmp
+      - RUTRACKER_USERNAME=${RUTRACKER_USERNAME}
+      - RUTRACKER_PASSWORD=${RUTRACKER_PASSWORD}
+      - KINOZAL_USERNAME=${KINOZAL_USERNAME}
+      - KINOZAL_PASSWORD=${KINOZAL_PASSWORD}
+      - NNMCLUB_COOKIES=${NNMCLUB_COOKIES}
+      - NNMCLUB_USERNAME=${NNMCLUB_USERNAME}
+      - NNMCLUB_PASSWORD=${NNMCLUB_PASSWORD}
+      - IPTORRENTS_USERNAME=${IPTORRENTS_USERNAME}
+      - IPTORRENTS_PASSWORD=${IPTORRENTS_PASSWORD}
+      - MAX_CONCURRENT_SEARCHES=5
+      - MAX_CONCURRENT_TRACKERS=10
+      - PUBLIC_TRACKER_DEADLINE_SECONDS=15
+      - LOG_LEVEL=INFO
+      - ALLOWED_ORIGINS=*
+    volumes:
+      - ./config:/config
+      - ${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/downloads
+      - ./tmp:/shared-tmp
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      qbittorrent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7187/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - go
+
   download-proxy:
     image: python:3.12-alpine
     container_name: qbittorrent-proxy

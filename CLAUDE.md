@@ -51,14 +51,15 @@ For deeper reference (technology stack, per-test-file mapping, full gotchas), se
 
 ## Architecture
 
-Two-container setup via `docker-compose.yml`:
+Two-container setup via `docker-compose.yml` (Python), with an optional Go backend:
 
 - **qbittorrent** (lscr.io/linuxserver/qbittorrent:latest) — port **7185**
 - **qbittorrent-proxy** (python:3.12-alpine) — ports **7186** (proxy), **7187** (merge service)
+- **qbittorrent-proxy-go** (Go/Gin, opt-in via `--profile go`) — ports **7187** (merge service), **7188** (bridge)
 
-`webui-bridge.py` is a host process on port **7188** for private tracker downloads. Not a container. Auto-starts via systemd user service after `./setup-webui-bridge-service.sh` (one-time install); run manually with `python3 webui-bridge.py`.
+`webui-bridge.py` is a host process on port **7188** for private tracker downloads. The Go `webui-bridge` binary replaces this when using the Go profile.
 
-`frontend/` contains an **Angular 19** dashboard (CLI-generated, Vitest for unit tests). Separate from the FastAPI dashboard served by the merge service on port 7187.
+`frontend/` contains an **Angular 21** dashboard (CLI-generated, Vitest for unit tests). Separate from the FastAPI dashboard served by the merge service on port 7187.
 
 Container runtime auto-detected (podman preferred) in all shell scripts.
 
@@ -66,10 +67,10 @@ Container runtime auto-detected (podman preferred) in all shell scripts.
 
 | Port | Service | Access |
 |------|---------|--------|
-| 7186 | Download proxy → qBittorrent WebUI | `http://localhost:7186` |
-| 7187 | Merge Search Service (FastAPI) | `http://localhost:7187/` |
 | 7185 | qBittorrent WebUI (container-internal) | proxied via 7186 |
-| 7188 | webui-bridge.py (host process) | manual start |
+| 7186 | Download proxy → qBittorrent WebUI | `http://localhost:7186` |
+| 7187 | Merge Search Service (FastAPI or Go/Gin) | `http://localhost:7187/` |
+| 7188 | webui-bridge (host process or Go binary) | manual start |
 
 ## Key Commands
 
@@ -79,6 +80,13 @@ Container runtime auto-detected (podman preferred) in all shell scripts.
 ./start.sh                                         # Start containers (-p pull, -s status, -v verbose)
 ./start.sh -p && python3 webui-bridge.py           # Full start with bridge
 ./stop.sh                                          # Stop (-r remove, --purge clean images)
+```
+
+### Go Backend (opt-in)
+```bash
+podman compose --profile go up -d                  # Start Go backend instead of Python
+cd qBitTorrent-go && ./scripts/build.sh            # Build Go binaries locally
+cd qBitTorrent-go && go test -race ./...           # Run Go tests with race detection
 ```
 
 ### Testing
@@ -120,18 +128,32 @@ podman cp download-proxy/src/ qbittorrent-proxy:/app/src/
 
 ## Merge Search Service
 
-FastAPI app running **inside** `qbittorrent-proxy` on port **7187**.
+Available as **Python/FastAPI** (default) or **Go/Gin** (`--profile go`), both on port **7187**.
 
 - Searches **RuTracker**, **Kinozal**, **NNMClub** in parallel with deduplication
 - Download proxy intercepts tracker URLs, fetches with auth cookies
 - Dashboard at `http://localhost:7187/`
 
+### Python (FastAPI)
 Key files:
 - `download-proxy/src/api/__init__.py` — FastAPI app setup
 - `download-proxy/src/api/routes.py` — REST endpoints
 - `download-proxy/src/merge_service/search.py` — search orchestration
 - `download-proxy/src/merge_service/deduplicator.py` — result dedup
 - `download-proxy/src/merge_service/enricher.py` — quality detection
+
+### Go (Gin)
+Key files (in `qBitTorrent-go/`):
+- `cmd/qbittorrent-proxy/main.go` — main binary entry point
+- `cmd/webui-bridge/main.go` — bridge binary entry point
+- `internal/api/` — all HTTP handlers
+- `internal/service/merge_search.go` — search orchestrator with goroutines
+- `internal/service/sse_broker.go` — SSE pub/sub broker
+- `internal/client/` — qBittorrent Web API client
+- `internal/models/` — data types
+- `internal/config/` — env config loading
+- `internal/middleware/` — CORS and logging
+- Migration spec: `docs/migration/Migration_Python_Codebase_To_Go.md`
 
 ## Plugin System
 

@@ -48,6 +48,20 @@ http://localhost:7186
 # Login: admin / admin
 ```
 
+#### Go Backend (Optional)
+
+The Go/Gin backend replaces the Python FastAPI merge service and webui-bridge:
+
+```bash
+# Start with Go backend instead of Python
+podman compose --profile go up -d
+
+# Or build and run locally
+cd qBitTorrent-go && ./scripts/build.sh
+./qbittorrent-proxy   # Starts merge service on port 7187
+./webui-bridge        # Starts bridge on port 7188
+```
+
 ### 3. Verify Installation
 
 ```bash
@@ -313,7 +327,7 @@ Open your browser to:
 http://localhost:7187/
 ```
 
-The dashboard runs inside the `qbittorrent-proxy` container and is available whenever containers are running.
+The dashboard runs inside the `qbittorrent-proxy` container and is available whenever containers are running. With the Go backend (`--profile go`), the same dashboard is served by the Go binary.
 
 ### Dashboard Usage
 
