@@ -22,10 +22,19 @@ import types
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 REPO = Path(__file__).resolve().parents[2]
 PLUGINS = REPO / "plugins"
+COMMUNITY = PLUGINS / "community"
+
+
+def _plugin_path(name: str) -> Path:
+    p = PLUGINS / f"{name}.py"
+    if p.exists():
+        return p
+    cp = COMMUNITY / f"{name}.py"
+    if cp.exists():
+        return cp
+    raise FileNotFoundError(f"Plugin {name} not found in plugins/ or plugins/community/")
 
 
 def _load_plugin(name: str):
@@ -55,7 +64,7 @@ def _load_plugin(name: str):
     helpers_mod.download_file = lambda url: url  # type: ignore[attr-defined]
     sys.modules["helpers"] = helpers_mod
 
-    spec = importlib.util.spec_from_file_location(f"plugin_{name}", PLUGINS / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(f"plugin_{name}", _plugin_path(name))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)  # type: ignore[union-attr]
     return mod, captured
@@ -64,7 +73,7 @@ def _load_plugin(name: str):
 def test_anilibra_handles_data_null_upstream_response() -> None:
     """Upstream returning ``{"data": null}`` must NOT crash."""
     mod, captured = _load_plugin("anilibra")
-    cls = getattr(mod, "anilibra")
+    cls = mod.anilibra
     instance = cls()
 
     with patch.object(
@@ -76,7 +85,7 @@ def test_anilibra_handles_data_null_upstream_response() -> None:
 
 def test_anilibra_handles_completely_missing_data_key() -> None:
     mod, captured = _load_plugin("anilibra")
-    cls = getattr(mod, "anilibra")
+    cls = mod.anilibra
     instance = cls()
     with patch.object(
         sys.modules["helpers"], "retrieve_url", return_value='{"meta": "no data here"}'
@@ -87,7 +96,7 @@ def test_anilibra_handles_completely_missing_data_key() -> None:
 
 def test_anilibra_handles_non_dict_upstream_response() -> None:
     mod, captured = _load_plugin("anilibra")
-    cls = getattr(mod, "anilibra")
+    cls = mod.anilibra
     instance = cls()
     with patch.object(
         sys.modules["helpers"], "retrieve_url", return_value='["unexpected", "array"]'
@@ -102,7 +111,7 @@ def test_yourbittorrent_handles_missing_results_table() -> None:
     IndexError. Now it must return [] cleanly.
     """
     mod, captured = _load_plugin("yourbittorrent")
-    cls = getattr(mod, "yourbittorrent")
+    cls = mod.yourbittorrent
     instance = cls()
     # The auth-wall response: only ONE table-responsive wrapper on the
     # login page, never a second one for the results.
@@ -123,7 +132,7 @@ def test_yourbittorrent_handles_missing_results_table() -> None:
 def test_yourbittorrent_handles_html_with_no_tables_at_all() -> None:
     """Complete garbage / empty response — no IndexError."""
     mod, captured = _load_plugin("yourbittorrent")
-    cls = getattr(mod, "yourbittorrent")
+    cls = mod.yourbittorrent
     instance = cls()
     with patch.object(sys.modules["helpers"], "retrieve_url", return_value=""):
         instance.search("linux")
