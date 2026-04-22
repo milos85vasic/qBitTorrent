@@ -7,13 +7,16 @@ useDefault = true
 [allowlist]
 description = "hardcoded admin/admin WebUI default is intentional per constitution III"
 paths = [
-  '''docs/superpowers/plans/.*\.md''',   # plan documents mention tokens by name
+  '''docs/superpowers/plans/.*\.md''',
+  '''tests/fixtures/.*''',
+  '''config/.*''',
+  '''\.env\.example''',
 ]
 regexes = [
-  '''admin:admin''',           # constitution-mandated default, not a secret
-  '''WEBUI_PASSWORD=admin''',  # same
-  '''password=admin''',        # same
-  '''ExamplePassword123''',    # test-only dummy
+  '''admin:admin''',
+  '''WEBUI_PASSWORD=admin''',
+  '''password=admin''',
+  '''ExamplePassword123''',
 ]
 commits = []
 

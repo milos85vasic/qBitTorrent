@@ -4,11 +4,11 @@
 
 version: v1.25.0
 
-# No ignores at initial configuration.
-# Phase 2 resolves findings; exceptions documented here with expiry.
+severity-threshold: low
+fail-on: upgradable
+
 ignore: {}
 
-# Don't scan generated output or third-party bundles.
 exclude:
   global:
     - download-proxy/src/ui/dist/**

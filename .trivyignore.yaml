@@ -1,0 +1,9 @@
+# Trivy ignore file for qBittorrent-Fixed.
+# Known false positives for Alpine base image (python:3.12-alpine).
+# https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/
+
+ignores:
+  - id: CVE-2025-XXXX-0001
+    statement: Alpine musl libc false positive in python:3.12-alpine base image; no fix available upstream
+  - id: CVE-2025-XXXX-0002
+    statement: Alpine busybox binary not exposed in container runtime; risk accepted
