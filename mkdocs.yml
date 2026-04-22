@@ -2,7 +2,7 @@
 # Source of truth for the documentation website.
 # Content is NOT duplicated — include-markdown pulls from docs/ and top-level markdowns.
 
-site_name: qBittorrent-Fixed
+site_name: qBitTorrent Enhancement
 site_description: >-
   qBittorrent with unified multi-tracker search, 42 plugins, and a download
   proxy with authenticated tracker support.

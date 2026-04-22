@@ -1,4 +1,4 @@
-# qBittorrent-Fixed
+# qBitTorrent Enhancement
 
 Multi-tracker meta-search for qBittorrent — self-hosted, containerised,
 private-tracker-aware.
@@ -23,7 +23,7 @@ private-tracker-aware.
 | Scanning stack             | Yes    | Ruff, Semgrep, Trivy, Gitleaks, Snyk, SonarQube, OWASP                |
 | Observability stack        | Yes    | Structured logging, metrics, tracing hooks                            |
 | Container runtime          | Yes    | Podman preferred, Docker supported, auto-detected                     |
-| Angular 19 dashboard       | Yes    | Enterprise UX dashboard in `frontend/` (CLI + Vitest)                 |
+| Angular 21 dashboard       | Yes    | Enterprise UX dashboard in `frontend/` (CLI + Vitest)                 |
 | Test catalogue             | Yes    | 331 tests across 30 categories (unit, integration, e2e, perf, stress) |
 | Manual CI                  | Yes    | `./ci.sh` entry point, per-job workflow files                         |
 
