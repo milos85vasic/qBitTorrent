@@ -422,9 +422,9 @@ class SearchOrchestrator:
         _max_searches = max(1, int(_os_ttl.getenv("MAX_ACTIVE_SEARCHES", "256")))
         _ttl = max(1, int(_os_ttl.getenv("ACTIVE_SEARCH_TTL_SECONDS", "3600")))
         self._active_searches: TTLCache[str, SearchMetadata] = _TTLCache(maxsize=_max_searches, ttl=_ttl)
-        self._tracker_sessions: dict[str, Any] = {}
+        self._tracker_sessions: TTLCache[str, Any] = _TTLCache(maxsize=_max_searches, ttl=_ttl)
         self._last_merged_results: TTLCache[str, tuple] = _TTLCache(maxsize=_max_searches, ttl=_ttl)
-        self._tracker_results: dict[str, dict[str, list[Any]]] = {}
+        self._tracker_results: TTLCache[str, dict[str, list[Any]]] = _TTLCache(maxsize=_max_searches, ttl=_ttl)
         # Side-channel: `_search_public_tracker` writes a diagnostic
         # dict here keyed by tracker name so the orchestrator can thread
         # error info into TrackerSearchStat without changing the return

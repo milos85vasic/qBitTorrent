@@ -31,7 +31,7 @@ def _fresh_orchestrator():
     # Re-import so MAX_ACTIVE_SEARCHES env override sticks per-test.
     for mod_name in [k for k in list(sys.modules) if k.startswith("merge_service")]:
         del sys.modules[mod_name]
-    from merge_service.search import SearchOrchestrator  # noqa: WPS433
+    from merge_service.search import SearchOrchestrator
 
     return SearchOrchestrator()
 
@@ -62,16 +62,36 @@ def test_last_merged_results_cache_bounded(monkeypatch):
 
 def test_pending_captchas_cache_bounded(monkeypatch):
     monkeypatch.setenv("PENDING_CAPTCHAS_MAX", "8")
-    from api import auth as auth_mod
-
     # Reload the module to pick up the new env var.
     import importlib
+
+    from api import auth as auth_mod
     importlib.reload(auth_mod)
 
     for i in range(64):
         auth_mod._pending_captchas[f"sess-{i}"] = {"answer": None}
 
     assert len(auth_mod._pending_captchas) <= 8
+
+
+def test_tracker_sessions_cache_bounded_by_maxsize(monkeypatch):
+    monkeypatch.setenv("MAX_ACTIVE_SEARCHES", "16")
+    orch = _fresh_orchestrator()
+
+    for i in range(500):
+        orch._tracker_sessions[f"session-{i}"] = {"cookies": {}, "base_url": "https://example.com"}
+
+    assert len(orch._tracker_sessions) <= 16
+
+
+def test_tracker_results_cache_bounded_by_maxsize(monkeypatch):
+    monkeypatch.setenv("MAX_ACTIVE_SEARCHES", "16")
+    orch = _fresh_orchestrator()
+
+    for i in range(500):
+        orch._tracker_results[f"search-{i}"] = {"tracker": []}
+
+    assert len(orch._tracker_results) <= 16
 
 
 def test_tracemalloc_orchestrator_insert_does_not_grow_unbounded(monkeypatch):
