@@ -9,6 +9,7 @@ Starts both:
 
 import logging
 import os
+import signal
 import sys
 import threading
 
@@ -17,6 +18,12 @@ from config.log_filter import CredentialScrubber
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logging.getLogger().addFilter(CredentialScrubber())
 logger = logging.getLogger(__name__)
+
+_shutdown_event = threading.Event()
+
+
+def _signal_handler(signum: int, frame: object) -> None:
+    _shutdown_event.set()
 
 
 def start_original_proxy():
@@ -71,11 +78,13 @@ def start_fastapi_server():
 
 def main():
     """Main entry point."""
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
+
     logger.info("=" * 60)
     logger.info("Merge Search Service Starting")
     logger.info("=" * 60)
 
-    # Start both servers in separate threads
     proxy_thread = threading.Thread(target=start_original_proxy, daemon=True)
     fastapi_thread = threading.Thread(target=start_fastapi_server, daemon=True)
 
@@ -85,14 +94,13 @@ def main():
     fastapi_thread.start()
     logger.info("FastAPI thread started")
 
-    # Keep main thread alive
-    try:
-        while True:
-            import time
+    while not _shutdown_event.is_set():
+        _shutdown_event.wait(60)
 
-            time.sleep(60)
-    except KeyboardInterrupt:
-        logger.info("Shutting down...")
+    logger.info("Shutting down...")
+    proxy_thread.join(timeout=5)
+    fastapi_thread.join(timeout=5)
+    logger.info("Shutdown complete")
 
 
 if __name__ == "__main__":

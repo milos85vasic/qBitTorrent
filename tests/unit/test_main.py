@@ -57,13 +57,13 @@ class TestMainStartup:
     def test_main_starts_both_services_mocked(self):
         """main() should attempt to start both services (mocked)."""
         import main
-        with patch('threading.Thread') as mock_thread, patch('time.sleep', side_effect=KeyboardInterrupt()):
-            try:
+        main._shutdown_event.set()
+        try:
+            with patch('threading.Thread') as mock_thread:
                 main.main()
-            except KeyboardInterrupt:
-                pass
-            # Should have created threads for both services
             assert mock_thread.call_count >= 1
+        finally:
+            main._shutdown_event.clear()
 
     def test_port_env_vars(self):
         """Port should be configurable via environment."""
