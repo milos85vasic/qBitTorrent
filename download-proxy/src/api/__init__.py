@@ -64,24 +64,18 @@ app = FastAPI(
 )
 
 
-def _parse_allowed_origins(raw: str | None) -> list[str]:
-    """Parse the ALLOWED_ORIGINS env var into a list.
+_DEFAULT_ORIGINS = ["http://localhost:7186", "http://localhost:7187"]
 
-    Whitespace around each entry is stripped and empty entries are dropped.
-    When the variable is unset or yields no entries we fall back to the
-    wildcard (``"*"``) so existing deployments keep their current behaviour,
-    but we emit a WARNING so operators know to lock it down.
-    """
+
+def _parse_allowed_origins(raw: str | None) -> list[str]:
     if raw is None:
-        return ["*"]
+        return list(_DEFAULT_ORIGINS)
     parts = [p.strip() for p in raw.split(",")]
     parts = [p for p in parts if p]
-    return parts or ["*"]
+    return parts or list(_DEFAULT_ORIGINS)
 
 
 _allowed_origins = _parse_allowed_origins(os.getenv("ALLOWED_ORIGINS"))
-if _allowed_origins == ["*"]:
-    logger.warning("CORS wildcard in use; set ALLOWED_ORIGINS to lock down")
 
 app.add_middleware(
     CORSMiddleware,

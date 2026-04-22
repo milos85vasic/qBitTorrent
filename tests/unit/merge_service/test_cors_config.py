@@ -1,11 +1,9 @@
 """
 Unit tests for env-driven CORS configuration in the merge-service API.
 
-The production default must remain wildcard (`*`) for backwards compatibility,
-but operators can lock down origins via the `ALLOWED_ORIGINS` environment
-variable (comma-separated list).  When the wildcard is active a WARNING-level
-log record must be emitted at module import time so operators see it during
-rollout.
+The production default is ``["http://localhost:7186", "http://localhost:7187"]``.
+Operators can override origins via the ``ALLOWED_ORIGINS`` environment variable
+(comma-separated list).
 """
 
 from __future__ import annotations
@@ -39,7 +37,7 @@ def _cors_middleware_origins(app) -> list[str]:
     raise AssertionError("CORSMiddleware not registered on app")
 
 
-def test_default_uses_wildcard_and_warns(monkeypatch, caplog):
+def test_default_uses_localhost_origins(monkeypatch, caplog):
     monkeypatch.delenv("ALLOWED_ORIGINS", raising=False)
     _purge_api_module()
 
@@ -47,17 +45,17 @@ def test_default_uses_wildcard_and_warns(monkeypatch, caplog):
 
     import api
 
-    assert _cors_middleware_origins(api.app) == ["*"]
+    assert _cors_middleware_origins(api.app) == [
+        "http://localhost:7186",
+        "http://localhost:7187",
+    ]
 
-    warnings = [
+    wildcards = [
         rec
         for rec in caplog.records
-        if rec.levelno == logging.WARNING and "ALLOWED_ORIGINS" in rec.getMessage()
+        if rec.levelno == logging.WARNING and "CORS wildcard" in rec.getMessage()
     ]
-    assert warnings, (
-        "Expected a WARNING mentioning ALLOWED_ORIGINS when CORS defaults to wildcard; "
-        f"captured: {[r.getMessage() for r in caplog.records]}"
-    )
+    assert not wildcards
 
 
 def test_explicit_origins_are_respected(monkeypatch, caplog):
