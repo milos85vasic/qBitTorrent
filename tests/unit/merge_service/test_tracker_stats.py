@@ -9,7 +9,6 @@ the observable transitions.
 
 from __future__ import annotations
 
-import asyncio
 import importlib.util
 import os
 import sys
@@ -153,7 +152,7 @@ async def test_tracker_stat_transitions_to_timeout(search_mod):
     orch._get_enabled_trackers = lambda: _fake_trackers(search_mod, ["alpha"])
 
     async def fake_search_tracker(tracker, query, category):
-        raise asyncio.TimeoutError("too slow")
+        raise TimeoutError("too slow")
 
     orch._search_tracker = fake_search_tracker
     metadata = await orch.search(query="q", enable_metadata=False, validate_trackers=False)

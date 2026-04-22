@@ -5,7 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — Phase 0 + Phase 1 (completion-initiative)
+## [Unreleased] — Completion Initiative (Phases 0–10)
+
+### Phase 0 — Safety net & baseline
+
+#### Added
+- **`pyproject.toml`** consolidates all Python tool config (pytest, coverage, ruff, mypy, bandit). Migrates ruff settings out of `ruff.toml` (removed) into `[tool.ruff]`. Declares the marker taxonomy, 30 s `pytest-timeout`, asyncio auto mode, and branch-coverage reports. Coverage `fail_under` starts at 1%. Commit `106bf8a`.
+- **Service-availability fixtures** (`merge_service_live`, `qbittorrent_live`, `webui_bridge_live`, `all_services_live`) in `tests/fixtures/services.py`, wired via `tests/conftest.py`. Fixtures **error** when stack is unreachable instead of silently skipping. Commits `726bf8e`, `17005d3`.
+- **71 runtime service-availability skips** converted into fixture dependencies across 17 integration/security/performance/stress test files. `tests/unit/test_no_runtime_service_skips.py` guards the invariant. Commit `55d29ce`.
+- **Coverage baseline** captured at `docs/COVERAGE_BASELINE.md`. Commit `df18c8d`.
+
+### Phase 1 — Scanning & observability infrastructure
+
+#### Added
+- **`docker-compose.quality.yml`** — opt-in compose file adding SonarQube + sonar-db (profile `quality`), four one-shot scanners (`snyk`, `semgrep`, `trivy`, `gitleaks` — profile `run-once`), and Prometheus + Grafana (profile `observability`). All quality ports bound to `127.0.0.1` only. Commit `84d1355`.
+- **Scanner tooling config** — `.semgrep.yml`, `.gitleaks.toml`, `.trivyignore`, `.snyk`, `sonar-project.properties`. Commit `e3bebb6`.
+- **`scripts/scan.sh`** — single entry point that runs every scanner locally (`--all`) or a subset. Reports land in `artifacts/scans/<UTC timestamp>/` as SARIF. Commit `106f63f`.
+- **Observability assets** — `observability/prometheus.yml`, `observability/dashboards/merge-search.json`, `observability/datasources/prometheus.yml`.
+- **Supporting docs** — `docs/SCANNING.md`, `docs/QUALITY_STACK.md`.
 
 ### Phase 2 — Security hardening
 
@@ -22,91 +39,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Fixed
 - **Unbounded caches replaced with `TTLCache`** in `search.py` and `hooks.py` — `_active_searches` and hook state are now size-bounded. Commit `0b44162`.
 - **`asyncio.Lock` guards** around all shared mutable state in hooks and streaming modules. Commit `d369879`.
-- **Graceful shutdown** — `main.py` now handles SIGTERM/SIGINT, sets a shutdown event, joins daemon threads with 5s timeout. Commit `49a99d0`.
+- **Graceful shutdown** — `main.py` handles SIGTERM/SIGINT, sets a shutdown event, joins daemon threads with 5s timeout. Commit `49a99d0`.
+- **Tenacity retry policy** (`merge_service/retry.py`) — outbound HTTP calls use exponential backoff with jitter. Commit `f43ad5e`.
+- **SSE disconnect handling** — server stops polling when client disconnects. Commit `1447d0f`.
 
-### Phase 4 — Resilience
-
-#### Added
-- **Tenacity retry policy** (`merge_service/retry.py`) — outbound HTTP calls to trackers and metadata APIs use exponential backoff with jitter. Commit `f43ad5e`.
-- **SSE disconnect handling** — server stops polling when client disconnects, preventing leaked connections. Commit `1447d0f`.
+### Phase 4 — Dead code audit
 
 #### Changed
-- **Non-canonical plugins moved to `plugins/community/`** — canonical plugins remain in `plugins/`, community variants separated. Commit `e130e2f`.
+- **Non-canonical plugins moved to `plugins/community/`** — canonical plugins remain in `plugins/`. Commit `e130e2f`.
+- **Plugin audit matrix** at `docs/PLUGIN_AUDIT.md`. Commit `6c75db6`.
+- **`socks.py` documented** as UDP-fragmentation-unsupported (will-not-fix). Commit `2a64686`.
+- **`ui/` module documented** as static assets directory. Commit `1407ed2`.
+
+### Phase 5 — Coverage ramp
+
+#### Added
+- **+243 unit tests** across `tests/unit/`, `tests/unit/merge_service/`, `tests/unit/api_layer/`. Total unit tests: 1,118 (from 823 baseline). Commits `2696c20`, `3f63a8a`, `ddda22f`.
+- **Smoke tests for canonical plugins** — 84 tests verifying each plugin is importable and has required attributes. Commit `ddda22f`.
+
+### Phase 6 — Load/stress/chaos scaffolding
+
+#### Added
+- **Test scaffolds** for load (`tests/integration/` stress markers), stress (`@pytest.mark.stress`), chaos (`@pytest.mark.chaos`), and observability (`tests/observability/`). Commit `1c1f23d`.
+- **Property-based tests** (`tests/property/`) using Hypothesis. Commit `972b9ca`.
+- **Memory leak tests** (`tests/memory/`) using tracemalloc. Commit `972b9ca`.
+- **Concurrency tests** (`tests/concurrency/`) verifying semaphore and lock behavior. Commit `972b9ca`.
 
 ### Phase 7 — Documentation rewrite & extension
 
 #### Added
-- **README.md** in `download-proxy/src/`, `download-proxy/src/api/`, `download-proxy/src/merge_service/`, `download-proxy/src/config/`, `scripts/` — purpose, entry points, conventions, how to test.
-- **`docs/architecture/request-lifecycle.mmd`** — Mermaid sequence diagram for search → merge → stream → download flow.
-- **`tests/unit/test_openapi_frozen.py`** — compares frozen `docs/api/openapi.json` with live FastAPI spec, fails on drift.
-- **`tests/docs/test_no_broken_links.py`** — validates internal markdown links in `docs/` resolve to existing files.
-- **Expanded `docs/USER_MANUAL.md`** — install paths, CLI flags, plugin install instructions, expanded env vars, additional troubleshooting.
-- **Updated `AGENTS.md`** — quality stack section, new env vars, new test types, scanner tooling table.
+- **Per-module READMEs** in `download-proxy/src/`, `download-proxy/src/api/`, `download-proxy/src/merge_service/`, `download-proxy/src/config/`, `scripts/`.
+- **Architecture diagrams** — `docs/architecture/request-lifecycle.mmd` (Mermaid sequence diagram).
+- **OpenAPI freeze test** — `tests/unit/test_openapi_frozen.py` compares frozen spec with live FastAPI.
+- **Docs link integrity** — `tests/docs/test_no_broken_links.py`.
+- **Expanded `docs/USER_MANUAL.md`** — install paths, CLI flags, plugin install, env vars, troubleshooting.
+- **Updated `AGENTS.md`** — quality stack section, new env vars, scanner tooling table.
+- Commit `7808ff1`.
 
-#### Already existing (verified, not duplicated)
-- `docs/DATA_MODEL.md` — comprehensive data model with Pydantic schemas and Mermaid ERD.
-- `docs/OBSERVABILITY.md`, `docs/SECURITY.md`, `docs/SCANNING.md`, `docs/CONCURRENCY.md`, `docs/PERFORMANCE.md`, `docs/TESTING.md` — all pre-existing nano-detail docs.
-- `docs/architecture/container-topology.mmd`, `plugin-execution.mmd`, `shutdown-sequence.mmd` — pre-existing architecture diagrams.
-- `scripts/freeze-openapi.sh` — pre-existing OpenAPI export script.
+### Phase 8 — MkDocs website
 
-### Added
+#### Added
+- **MkDocs Material website** in `website/` with GitHub Pages workflow (`.github/workflows/pages.yml`). Full nav structure covering all docs, architecture, and guides. Commits `2dde156`, `ee87eba`.
 
-#### Phase 0 — Safety net & baseline
-- **`pyproject.toml`** consolidates all Python tool config (pytest,
-  coverage, ruff, mypy, bandit). Migrates ruff settings out of
-  `ruff.toml` (removed) into `[tool.ruff]`. Declares the marker
-  taxonomy used by later phases, 30 s `pytest-timeout`, asyncio auto
-  mode, and branch-coverage reports (HTML + XML + term-missing).
-  Coverage `fail_under` starts low and will be raised module-by-module
-  by Phase 5. Commit `106bf8a`.
-- **Service-availability fixtures** (`merge_service_live`,
-  `qbittorrent_live`, `webui_bridge_live`, `all_services_live`) in
-  `tests/fixtures/services.py`, wired via `tests/conftest.py`. These
-  fixtures **error** when the stack is unreachable instead of silently
-  skipping — integration tests now fail loud on a broken stack.
-  Commit `726bf8e`.
-- **71 runtime service-availability skips** converted into fixture
-  dependencies across 17 integration/security/performance/stress test
-  files. `tests/unit/test_no_runtime_service_skips.py` guards the
-  invariant so the pattern cannot come back. Removed
-  `--ignore=tests/integration/test_ui_{comprehensive,quick}.py` lines
-  from `run-all-tests.sh`. Commit `55d29ce`.
-- **Split CI workflow** — single manual-only `test.yml` replaced with
-  five auto-triggered workflows under `.github/workflows/`:
-  `syntax.yml` (push + PR — bash, py_compile, ruff, yamllint,
-  hadolint, shellcheck), `unit.yml` (push + PR), `integration.yml`
-  (push + PR, with compose bring-up), `nightly.yml` (full suite, cron),
-  `security.yml` (weekly scan + push on dep changes). Commit `c3878ba`.
+### Phase 9 — Course content scaffolding
 
-#### Phase 1 — Scanning & observability infrastructure
-- **`docker-compose.quality.yml`** — opt-in compose file adding
-  SonarQube + sonar-db (profile `quality`), four one-shot scanners
-  (`snyk`, `semgrep`, `trivy`, `gitleaks` — profile `run-once`), and
-  Prometheus + Grafana (profile `observability`). All quality ports
-  bind to `127.0.0.1` only. The product remains a two-container deploy
-  so constitution Principle I is preserved. Commit `00164db`.
-- **Scanner tooling config** — `.semgrep.yml`, `.gitleaks.toml`,
-  `.trivyignore`, `.snyk`, `sonar-project.properties`. Mandatory
-  waiver format (Finding ID / reason / expiry). Non-interactive
-  invariant guarded by `tests/unit/test_scan_script_non_interactive.py`.
-- **`scripts/scan.sh`** — single entry point that runs every scanner
-  locally (`--all`) or a subset (`pip-audit bandit ruff ...`). Reports
-  land in `artifacts/scans/<UTC timestamp>/` as SARIF.
-- **Observability assets** — `observability/prometheus.yml`,
-  `observability/dashboards/merge-search.json` (UID
-  `qbit-merge-search`), `observability/datasources/prometheus.yml`.
-  Dashboard panels chart `qbit_merge_active_searches`,
-  `qbit_merge_tracker_requests_total`, p95 search duration, and
-  per-tracker circuit-breaker state (metrics are surfaced by the
-  merge service in Phase 6).
-- **Supporting docs** — `docs/SCANNING.md`, `docs/QUALITY_STACK.md`
-  pinning the rationale and usage of the opt-in stack.
+#### Added
+- **Course scaffolding** in `courses/` with demo scripts. Commit `da7da4a`.
 
-### Notes
-- No product code path changed in either phase. The quality compose
-  stack is additive and never started by `./start.sh`.
-- Existing manual CI (`./ci.sh`) still works unchanged; the new
-  GitHub Actions workflows run in addition to it.
+### Phase 10 — Continuous verification & hand-off
+
+#### Changed
+- **Coverage gate raised** from 1% to 49% (actual measured coverage). `docs/COVERAGE_BASELINE.md` updated.
+- **Plugin smoke test isolation** fixed — `helpers`/`novaprinter`/`nova2` modules properly cleaned up between tests to prevent cross-contamination.
+- **`docs/COMPLETION_STATUS.md`** — cross-checks each §A finding to its resolution commit.
+- **`docs/CONSTITUTION_ADDENDUM_QUALITY.md`** reviewed — all principles remain satisfied.
 
 ## [Unreleased] - 2026-04-18
 

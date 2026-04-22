@@ -17,11 +17,8 @@ enough to warrant investigation.
 
 from __future__ import annotations
 
-from typing import Dict, List
-
 import pytest
 import requests
-
 
 QUERY = "linux"
 LIMIT = 50
@@ -34,7 +31,7 @@ pytestmark = pytest.mark.timeout(420)
 
 
 @pytest.fixture(scope="module")
-def linux_search(merge_service_live: str) -> Dict:
+def linux_search(merge_service_live: str) -> dict:
     resp = requests.post(
         f"{merge_service_live}/api/v1/search/sync",
         json={"query": QUERY, "limit": LIMIT},
@@ -44,11 +41,11 @@ def linux_search(merge_service_live: str) -> Dict:
     return resp.json()
 
 
-def _nonzero_stats(payload: Dict) -> List[Dict]:
+def _nonzero_stats(payload: dict) -> list[dict]:
     return [t for t in payload.get("tracker_stats", []) if t.get("results_count", 0) > 0]
 
 
-def test_linux_search_hits_enough_trackers(linux_search: Dict) -> None:
+def test_linux_search_hits_enough_trackers(linux_search: dict) -> None:
     stats = linux_search.get("tracker_stats", [])
     assert stats, "merge service returned no tracker_stats — API contract broken"
     nonzero = _nonzero_stats(linux_search)
@@ -62,7 +59,7 @@ def test_linux_search_hits_enough_trackers(linux_search: Dict) -> None:
     )
 
 
-def test_linux_search_has_meaningful_total(linux_search: Dict) -> None:
+def test_linux_search_has_meaningful_total(linux_search: dict) -> None:
     total = linux_search.get("total_results", 0)
     assert total >= MIN_TOTAL_RESULTS, (
         f"total_results={total} (floor={MIN_TOTAL_RESULTS}). Before the "
@@ -72,7 +69,7 @@ def test_linux_search_has_meaningful_total(linux_search: Dict) -> None:
     )
 
 
-def test_piratebay_specifically_returns_results(linux_search: Dict) -> None:
+def test_piratebay_specifically_returns_results(linux_search: dict) -> None:
     """piratebay is a canary: it's the largest, fastest-responding public
     tracker in the set. If piratebay returns 0 for 'linux' but was fine
     before, something is broken in OUR code — not in piratebay."""
@@ -90,7 +87,7 @@ def test_piratebay_specifically_returns_results(linux_search: Dict) -> None:
     )
 
 
-def test_query_roundtrip_matches(linux_search: Dict) -> None:
+def test_query_roundtrip_matches(linux_search: dict) -> None:
     """Each tracker_stats entry must echo the query we issued — proves
     the merge service wired the right query into every fan-out task."""
     for t in linux_search.get("tracker_stats", []):
@@ -100,7 +97,7 @@ def test_query_roundtrip_matches(linux_search: Dict) -> None:
         )
 
 
-def test_deadline_hit_is_surfaced_on_slow_trackers(linux_search: Dict) -> None:
+def test_deadline_hit_is_surfaced_on_slow_trackers(linux_search: dict) -> None:
     """Slow plugins (limetorrents, linuxtracker, torrentdownload…) get
     truncated at the per-tracker deadline. When that happens the API
     must carry ``notes["deadline_hit"] == True`` so the dashboard can
@@ -128,7 +125,7 @@ def test_deadline_hit_is_surfaced_on_slow_trackers(linux_search: Dict) -> None:
         )
 
 
-def test_dead_trackers_excluded_from_fan_out(linux_search: Dict) -> None:
+def test_dead_trackers_excluded_from_fan_out(linux_search: dict) -> None:
     """The 16 known-dead public trackers must NOT appear in
     tracker_stats by default. Otherwise the dashboard drowns in
     permanently-red chips that can never go green.
@@ -151,7 +148,7 @@ def test_dead_trackers_excluded_from_fan_out(linux_search: Dict) -> None:
     )
 
 
-def test_empty_trackers_surface_a_reason(linux_search: Dict) -> None:
+def test_empty_trackers_surface_a_reason(linux_search: dict) -> None:
     """Every empty tracker should tell us WHY.
 
     Before the diagnostic plumb-through, `error` and `error_type` were

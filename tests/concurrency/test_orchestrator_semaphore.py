@@ -38,7 +38,7 @@ async def test_semaphore_caps_inflight_at_3():
     peak = 0
     gate = asyncio.Event()
 
-    async def _slow_search(_t, _q, _c):  # noqa: ARG001
+    async def _slow_search(_t, _q, _c):
         nonlocal peak
         peak = max(peak, orch._inflight_count)
         await gate.wait()

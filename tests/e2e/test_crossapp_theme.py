@@ -20,14 +20,13 @@ from __future__ import annotations
 
 import os
 import urllib.request
-from pathlib import Path
 
 import pytest
 
 # playwright is a hard requirement for these e2e tests. If the import
 # fails, the tests legitimately cannot run and the failure is visible
 # rather than hidden behind a skip.
-from playwright.sync_api import sync_playwright  # noqa: E402
+from playwright.sync_api import sync_playwright
 
 DASHBOARD_URL = os.environ.get("MERGE_SERVICE_URL", "http://localhost:7187").rstrip("/")
 PROXY_URL = os.environ.get("PROXY_URL", "http://localhost:7186").rstrip("/")

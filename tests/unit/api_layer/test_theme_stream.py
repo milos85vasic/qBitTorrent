@@ -138,7 +138,7 @@ async def test_sse_endpoint_serves_initial_event(tmp_path, monkeypatch):
         # Give the generator a chance to notice disconnect and exit.
         try:
             await asyncio.wait_for(task, timeout=2.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             task.cancel()
             try:
                 await task

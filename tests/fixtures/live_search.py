@@ -32,8 +32,8 @@ import fcntl
 import os
 import secrets
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
 
 import pytest
 import requests
@@ -74,7 +74,7 @@ def fresh_magnet_uri(fresh_magnet_hash: str) -> str:
 
 
 @pytest.fixture(scope="session")
-def _live_search_cache() -> Dict[tuple, dict]:
+def _live_search_cache() -> dict[tuple, dict]:
     """Session-wide memo of search results keyed by (query, limit)."""
     return {}
 
@@ -82,7 +82,7 @@ def _live_search_cache() -> Dict[tuple, dict]:
 @pytest.fixture
 def live_search_result(
     merge_service_live: str,
-    _live_search_cache: Dict[tuple, dict],
+    _live_search_cache: dict[tuple, dict],
 ) -> Callable[..., dict]:
     """Return a callable ``search(query, limit=5)`` that caches results.
 
@@ -101,7 +101,7 @@ def live_search_result(
         if key in _live_search_cache:
             return _live_search_cache[key]
         attempts = 3
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
         for attempt in range(attempts):
             try:
                 resp = requests.post(

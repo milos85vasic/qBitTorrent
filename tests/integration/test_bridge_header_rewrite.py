@@ -128,8 +128,8 @@ def test_bridge_live_login_round_trip(webui_bridge_live: str) -> None:
     cookie-bearing request must succeed.
     """
     import http.cookiejar
-    import urllib.request
     import urllib.parse
+    import urllib.request
 
     jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))

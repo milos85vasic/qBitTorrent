@@ -14,9 +14,6 @@ from __future__ import annotations
 import os
 import urllib.request
 
-import pytest
-
-
 PROXY_URL = os.environ.get("PROXY_URL", "http://localhost:7186")
 BRIDGE_CSS = "/__qbit_theme__/skin.css"
 BRIDGE_JS = "/__qbit_theme__/bootstrap.js"

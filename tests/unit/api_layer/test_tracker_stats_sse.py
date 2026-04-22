@@ -17,8 +17,6 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
-from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
 

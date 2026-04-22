@@ -23,8 +23,7 @@ import pytest
 
 # playwright is a hard requirement; import directly so a missing
 # install surfaces as a clear ImportError instead of a silent skip.
-from playwright.sync_api import sync_playwright  # noqa: E402
-
+from playwright.sync_api import sync_playwright
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PALETTE_TS = REPO_ROOT / "frontend" / "src" / "app" / "models" / "palette.model.ts"
@@ -128,7 +127,6 @@ def test_theme_switching_applies_tokens_and_persists(palettes: dict[str, dict[st
     # component is defined inside the compiled main-*.js bundle. To
     # check whether the served bundle actually has the feature we
     # must grep the bundle, not the shell.
-    import re
     m = re.search(r'main-[A-Z0-9]+\.js', body)
     assert m, (
         "Could not locate main-*.js in the index HTML — "

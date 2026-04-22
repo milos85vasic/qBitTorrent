@@ -25,8 +25,8 @@ def _purge_qbittorrent_torrents(qbit_url: str = "http://localhost:7186") -> None
     """
     try:
         import http.cookiejar
-        import urllib.request
         import urllib.parse
+        import urllib.request
 
         jar = http.cookiejar.CookieJar()
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))

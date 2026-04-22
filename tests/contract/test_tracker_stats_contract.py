@@ -52,11 +52,11 @@ def client(monkeypatch):
     # Cleanly drop any cached api.* modules so we rebuild the app fresh.
     for k in [k for k in list(sys.modules) if k == "api" or k.startswith("api.")]:
         del sys.modules[k]
-    from api import app  # noqa: WPS433 — re-import is intentional
+    from api import app
 
     # Patch the orchestrator class methods to short-circuit network
     # traffic.  Two public trackers, no real HTTP.
-    from merge_service.search import TrackerSource, SearchResult, SearchOrchestrator
+    from merge_service.search import SearchOrchestrator, SearchResult, TrackerSource
 
     def _fake_trackers(self):
         return [

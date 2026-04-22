@@ -89,7 +89,7 @@ def test_docs_dir_points_at_website_docs() -> None:
 
 
 def test_site_name_is_set() -> None:
-    assert _load_config().get("site_name") == "qBittorrent-Fixed"
+    assert _load_config().get("site_name") == "qBitTorrent Enhancement"
 
 
 # --------------------------------------------------------------------------- #

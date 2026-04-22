@@ -18,7 +18,6 @@ isolated from each other (and from the production file at
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -42,7 +41,7 @@ def theme_client(tmp_path, monkeypatch):
     theme_path = tmp_path / "theme.json"
     monkeypatch.setenv("THEME_STATE_PATH", str(theme_path))
     _purge_api_module()
-    import api  # noqa: F401 — side-effect: wires routes against this env
+    import api
 
     # Reset the module-level singleton so every test starts fresh.
     from api import theme_state as ts
@@ -126,7 +125,7 @@ def test_theme_state_seed_file_corrupted_reverts_to_default(tmp_path, monkeypatc
     theme_path.write_text("{this is not json}")
     monkeypatch.setenv("THEME_STATE_PATH", str(theme_path))
     _purge_api_module()
-    import api  # noqa: F401
+    import api
     from api import theme_state as ts
 
     ts._store = None  # type: ignore[attr-defined]

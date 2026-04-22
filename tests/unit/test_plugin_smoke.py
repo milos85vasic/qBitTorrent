@@ -33,6 +33,9 @@ CANONICAL_PLUGINS = [
 REQUIRED_ATTRS = ["url", "name", "supported_categories", "search", "download_torrent"]
 
 
+_PLUGIN_DEPS = ("helpers", "novaprinter", "nova2")
+
+
 def _import_plugin(name: str):
     path = os.path.join(_PLUGINS_DIR, f"{name}.py")
     if not os.path.isfile(path):
@@ -41,11 +44,17 @@ def _import_plugin(name: str):
     mod = importlib.util.module_from_spec(spec)
     saved_path = sys.path[:]
     sys.path.insert(0, _PLUGINS_DIR)
-    saved_modules = {k: v for k, v in sys.modules.items() if k in ("helpers", "novaprinter", "nova2")}
+    saved_modules = {k: v for k, v in sys.modules.items() if k in _PLUGIN_DEPS}
+    for k in _PLUGIN_DEPS:
+        sys.modules.pop(k, None)
     try:
         spec.loader.exec_module(mod)
     finally:
         sys.path[:] = saved_path
+        for k in list(sys.modules):
+            if k in _PLUGIN_DEPS:
+                del sys.modules[k]
+        sys.modules.update(saved_modules)
     return mod
 
 

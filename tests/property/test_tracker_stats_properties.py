@@ -11,7 +11,6 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import List
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -37,7 +36,7 @@ _TERMINAL = {"success", "empty", "error", "timeout", "cancelled"}
 @st.composite
 def _tracker_payloads(draw):
     n_trackers = draw(st.integers(min_value=1, max_value=6))
-    payloads: List[tuple[str, int, bool]] = []
+    payloads: list[tuple[str, int, bool]] = []
     for i in range(n_trackers):
         name = f"t{i}"
         count = draw(st.integers(min_value=0, max_value=8))

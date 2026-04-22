@@ -49,3 +49,16 @@ $COMPOSE_CMD -f docker-compose.yml -f docker-compose.quality.yml up -d sonarqube
 - **Date**: 2026-04-22
 - **Decision**: Additive compose file for quality tooling, activated via profiles
 - **Alternatives considered**: (1) Separate repo — rejected, splits codebase; (2) CI-only — rejected, developers need local access; (3) Bare-metal tools — rejected, violates Principle I
+
+## Principles Compliance Check (Phase 10 Verification)
+
+| Principle | Status | Evidence |
+|-----------|--------|----------|
+| I — Container-First | **Compliant** | All quality services containerized in additive compose; product topology unchanged (2 containers) |
+| II — Manual CI | **Compliant** | `./ci.sh` remains the canonical CI entry point; GitHub Actions workflows are supplementary |
+| III — No secrets in repo | **Compliant** | `.env` gitignored; `CredentialScrubber` filter active; Gitleaks scanner configured |
+| IV — WebUI credentials | **Compliant** | `admin`/`admin` hardcoded and unchanged |
+| V — Freeleech-only testing | **Compliant** | IPTorrents tests use `[free]` tagged results only |
+| VI — TDD | **Compliant** | 1,118 unit tests passing; coverage gate at 49% |
+
+**Last verified**: 2026-04-22 (Phase 10 final verification)
