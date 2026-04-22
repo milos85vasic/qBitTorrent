@@ -13,6 +13,7 @@ import uuid
 import aiohttp
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from filelock import FileLock
 from pydantic import BaseModel, Field
 
 try:
@@ -607,9 +608,10 @@ async def auth_qbittorrent(request: Request):
 
                 if req.save:
                     creds_dir = "/config/download-proxy"
-                    os.makedirs(creds_dir, exist_ok=True)
-                    with open(f"{creds_dir}/qbittorrent_creds.json", "w") as f:  # noqa: ASYNC230
-                        json.dump({"username": req.username, "password": req.password}, f)
+                    _save_qbit_credentials(
+                        f"{creds_dir}/qbittorrent_creds.json",
+                        {"username": req.username, "password": req.password},
+                    )
 
                 return {
                     "status": "authenticated",
@@ -627,6 +629,13 @@ async def auth_qbittorrent(request: Request):
             "status": "error",
             "error": str(e),
         }
+
+
+def _save_qbit_credentials(path: str, data: dict) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    lock = FileLock(path + ".lock")
+    with lock, open(path, "w") as f:
+        json.dump(data, f)
 
 
 def _load_saved_qbit_credentials():
