@@ -10,6 +10,8 @@ from typing import Any
 
 from cachetools import TTLCache
 
+from .retry import retry_policy
+
 _TRACKER_NAME_RE = _re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
@@ -1347,6 +1349,7 @@ class SearchOrchestrator:
 
         return results
 
+    @retry_policy
     async def fetch_torrent(self, tracker: str, url: str) -> bytes | None:
         import logging
 
@@ -1398,6 +1401,8 @@ class SearchOrchestrator:
                         return await self._fetch_kinozal_torrent(session, url, cookies, base_url)
                     logger.error(f"fetch_torrent {tracker}: response not a torrent file ({content_type})")
                     return None
+        except aiohttp.ClientError:
+            raise
         except Exception as e:
             logger.error(f"fetch_torrent {tracker}: {e}")
             return None
