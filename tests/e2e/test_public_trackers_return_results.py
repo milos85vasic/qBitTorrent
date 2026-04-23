@@ -126,18 +126,18 @@ def test_deadline_hit_is_surfaced_on_slow_trackers(linux_search: dict) -> None:
 
 
 def test_dead_trackers_excluded_from_fan_out(linux_search: dict) -> None:
-    """The 16 known-dead public trackers must NOT appear in
+    """The 20 known-dead public trackers must NOT appear in
     tracker_stats by default. Otherwise the dashboard drowns in
     permanently-red chips that can never go green.
     """
     stat_names = {t["name"] for t in linux_search.get("tracker_stats", [])}
     dead = {
         "eztv", "kickass", "bt4g", "extratorrent", "one337x",
-        "bitru", "megapeer", "yts",
-        "nyaa",
-        "glotorrents", "pctorrent", "yihua", "torrentgalaxy",
+        "bitru", "megapeer",
+        "nyaa", "audiobookbay", "torlock",
+        "pctorrent", "yihua", "torrentgalaxy",
         "xfsub",
-        "yourbittorrent", "anilibra",
+        "anilibra",
         "solidtorrents", "therarbg", "torrentfunk",
         "ali213", "btsow", "gamestorrents", "torrentkitty",
     }
@@ -184,7 +184,7 @@ def test_empty_trackers_surface_a_reason(linux_search: dict) -> None:
     # upstream-dead 403/404/DNS trackers are now filtered out via
     # `DEAD_PUBLIC_TRACKERS`, the usual classifications left after
     # filtering are `deadline_timeout` (audiobookbay, torlock) and
-    # occasional `plugin_crashed` (snowfl). If *no* classification
+    # occasional `plugin_crashed` (torrentgalaxy). If *no* classification
     # lands, the subprocess-stderr plumb-through is broken.
     assert len(classified) >= 1, (
         f"Zero of {len(empty)} empty trackers had a classified "

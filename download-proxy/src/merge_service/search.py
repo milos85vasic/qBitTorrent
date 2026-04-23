@@ -343,16 +343,19 @@ PUBLIC_TRACKERS = {
     "yts": "https://movies-api.accel.li",
 }
 
-# Known-dead public trackers as of 2026-04-19. Categorised by the
-# classifier during the 37-empty-trackers investigation:
+# Known-dead public trackers as of 2026-04-23. Categorised by the
+# classifier during the comprehensive tracker audit:
 #
-#   upstream_http_403:  eztv, kickass, bt4g, extratorrent, one337x
-#   upstream_http_404:  bitru, megapeer, yts
-#   upstream_timeout:   nyaa
-#   dns_failure:        glotorrents, pctorrent, yihua, torrentgalaxy
+#   upstream_http_403:  eztv, kickass, bt4g, extratorrent, one337x, bitru
+#   upstream_http_404:  megapeer, ali213
+#   upstream_timeout:   nyaa, audiobookbay, torlock
+#   dns_failure:        pctorrent, yihua, torrentgalaxy
 #   tls_failure:        xfsub
-#   plugin_parse_bug:   yourbittorrent   (stale regex on site whose HTML rotated)
-#   plugin_crash:       anilibra         (NoneType iteration on empty upstream response)
+#   plugin_crash:       torrentgalaxy (site down → empty HTML → index error)
+#   site_rebrand:       solidtorrents (redirects to bitsearch.to)
+#   site_redesign:      therarbg, gamestorrents, btsow (JS challenge)
+#   upstream_dead:      torrentfunk (redirects to rakix), torrentkitty
+#   api_changed:        anilibra (returns 400 Unknown query)
 #
 # They stay in `PUBLIC_TRACKERS` so the classifier keeps reporting the
 # real reason (useful when an upstream comes back), but by default
@@ -370,23 +373,14 @@ DEAD_PUBLIC_TRACKERS = frozenset(
         "one337x",
         "bitru",
         "megapeer",
-        "yts",
         "nyaa",
-        "glotorrents",
         "pctorrent",
         "yihua",
         "torrentgalaxy",
         "xfsub",
-        "yourbittorrent",
         "anilibra",
-        # "Silently empty" — plugin runs cleanly but returns 0 for every
-        # query (verified on ubuntu / game / movie / 2024 via direct
-        # subprocess invocation on 2026-04-20). Direct curl shows each
-        # upstream responds with HTTP 403; the plugin catches the error
-        # without printing anything to stderr, so the classifier can't
-        # tag it. Bucketing them here stops the dashboard from showing
-        # permanently-green-empty chips that confuse operators into
-        # thinking these trackers simply had no hits.
+        "audiobookbay",
+        "torlock",
         "solidtorrents",
         "therarbg",
         "torrentfunk",
@@ -734,7 +728,7 @@ class SearchOrchestrator:
         if os.getenv("IPTORRENTS_USERNAME") and os.getenv("IPTORRENTS_PASSWORD"):
             trackers.append(TrackerSource(name="iptorrents", url="https://iptorrents.com", enabled=True))
 
-        include_dead = os.getenv("ENABLE_DEAD_TRACKERS", "0") == "1"
+        include_dead = os.getenv("ENABLE_DEAD_TRACKERS", "1") == "1"
         for name, url in sorted(PUBLIC_TRACKERS.items()):
             if name in DEAD_PUBLIC_TRACKERS and not include_dead:
                 continue
@@ -816,9 +810,9 @@ class SearchOrchestrator:
         import os as _os_timeout
 
         try:
-            _raw_deadline = float(_os_timeout.getenv("PUBLIC_TRACKER_DEADLINE_SECONDS", "25"))
+            _raw_deadline = float(_os_timeout.getenv("PUBLIC_TRACKER_DEADLINE_SECONDS", "60"))
         except ValueError:
-            _raw_deadline = 25.0
+            _raw_deadline = 60.0
         deadline_seconds = max(5.0, min(120.0, _raw_deadline))
         proc = None
         deadline = asyncio.get_event_loop().time() + deadline_seconds

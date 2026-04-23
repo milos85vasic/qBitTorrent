@@ -10,9 +10,9 @@
     </div>
     <div class="service-links">
       <a [attr.href]="config().qbittorrent_url" target="_blank">qBittorrent WebUI</a>
-      <a href="http://localhost:7186" target="_blank">Download Proxy</a>
-      <a href="http://localhost:7187" class="current">Merge Search</a>
-      <a href="http://localhost:7188" target="_blank"
+      <a [attr.href]="hostUrl + ':7186'" target="_blank">Download Proxy</a>
+      <a [attr.href]="hostUrl + ':7187'" class="current">Merge Search</a>
+      <a [attr.href]="hostUrl + ':7188'" target="_blank"
          [class.disabled-link]="bridgeHealthy() === false"
          [class.checking]="bridgeHealthy() === null"
          [title]="

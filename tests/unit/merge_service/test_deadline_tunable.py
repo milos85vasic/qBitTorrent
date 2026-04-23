@@ -55,12 +55,12 @@ def _proc_mock(rows_then_eof: list[bytes], *, returncode: int = 0) -> AsyncMock:
 @pytest.mark.parametrize(
     "env_val,expected",
     [
-        (None, 25.0),
+        (None, 60.0),
         ("10", 10.0),
         ("60", 60.0),
         ("3", 5.0),      # clamped up
         ("999", 120.0),  # clamped down
-        ("not-a-number", 25.0),  # invalid falls back to default
+        ("not-a-number", 60.0),  # invalid falls back to default
     ],
 )
 def test_deadline_env_clamping(env_val, expected) -> None:

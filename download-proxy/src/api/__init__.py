@@ -135,7 +135,7 @@ async def bridge_health():
 
 
 @app.get("/api/v1/config")
-async def get_config():
+async def get_config(request: Request):
     """Return the dashboard's user-facing service URLs.
 
     ``qbittorrent_url`` points to the authenticated download proxy
@@ -143,13 +143,15 @@ async def get_config():
     (port 7185) answers 401 Unauthorized without the proxy shim.
     ``qbittorrent_internal_url`` is still exposed for tooling that
     needs the direct container endpoint.
+
+    The hostname is taken from the incoming request's ``Host`` header
+    so the URLs match whatever address the browser used to reach us.
     """
     from config import get_config as load_config
 
     cfg = load_config()
-    # Externally accessible URL — browser goes through the auth proxy
-    # so the "qBittorrent WebUI" link does not land on a 401.
-    proxy_host = os.getenv("PROXY_HOST", cfg.qbittorrent_host)
+    req_host = request.headers.get("host", "localhost")
+    proxy_host = req_host.split(":")[0]
     proxy_port = int(os.getenv("PROXY_PORT", "7186"))
     qbittorrent_webui_url = f"http://{proxy_host}:{proxy_port}"
     return {

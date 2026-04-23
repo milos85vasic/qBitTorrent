@@ -2,7 +2,7 @@
 in permanently-red chips.
 
 Every entry in ``DEAD_PUBLIC_TRACKERS`` has been observed returning
-consistent failures in the diagnostic pass run on 2026-04-19 (403/404,
+consistent failures in the diagnostic pass run on 2026-04-23 (403/404,
 DNS failures, TLS handshake breaks, or plugin-level crashes on stale
 regex). They remain in ``PUBLIC_TRACKERS`` so the classifier still
 reports the real reason — but ``_get_enabled_trackers`` filters them
@@ -54,8 +54,7 @@ def test_dead_set_is_subset_of_public_registry() -> None:
 
 def test_default_fan_out_excludes_dead_trackers() -> None:
     orch = _search.SearchOrchestrator()
-    with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("ENABLE_DEAD_TRACKERS", None)
+    with patch.dict(os.environ, {"ENABLE_DEAD_TRACKERS": "0"}, clear=True):
         enabled = {t.name for t in orch._get_enabled_trackers()}
     leaked = enabled & set(_search.DEAD_PUBLIC_TRACKERS)
     assert not leaked, (
@@ -77,7 +76,10 @@ def test_env_flag_forces_dead_trackers_back_in() -> None:
 
 @pytest.mark.parametrize(
     "canary",
-    ["piratebay", "linuxtracker", "rutor", "torrentscsv", "academictorrents"],
+    [
+        "piratebay", "linuxtracker", "rutor", "torrentscsv",
+        "academictorrents", "yts", "glotorrents", "yourbittorrent",
+    ],
 )
 def test_canary_trackers_stay_in_default_fan_out(canary: str) -> None:
     """Canaries are trackers known to return results for common queries

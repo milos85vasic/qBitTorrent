@@ -82,9 +82,13 @@ class TestGetConfig:
     @pytest.mark.asyncio
     async def test_get_config_default(self):
         from api import get_config
+        from fastapi import Request
+
+        mock_request = MagicMock(spec=Request)
+        mock_request.headers = {"host": "localhost:7187"}
 
         with patch.dict(os.environ, {"PROXY_PORT": "7186"}, clear=False):
-            result = await get_config()
+            result = await get_config(mock_request)
             assert "qbittorrent_url" in result
             assert "7186" in result["qbittorrent_url"]
             assert "proxy_port" in result

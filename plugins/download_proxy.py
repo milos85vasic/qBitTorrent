@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Download Proxy for qBittorrent WebUI - Fixed version
+Download Proxy for Боба WebUI - Fixed version
 Intercepts RuTracker URLs and downloads via nova2dl.py with authentication
 Passes through all other requests (including magnet links).
 
 Also injects a two-file theme bridge
 (``/__qbit_theme__/skin.css`` + ``/__qbit_theme__/bootstrap.js``)
-into every HTML response so the qBittorrent WebUI picks up the
+into every HTML response so the Боба WebUI picks up the
 palette chosen in the Angular dashboard at :7187. See
 docs/CROSS_APP_THEME_PLAN.md.
 """
@@ -88,7 +88,7 @@ def download_via_nova2dl(plugin, url):
 
 # ---------------------------------------------------------------------- theme
 #
-# The qBittorrent WebUI is qBittorrent's own code — it ignores our
+# The Боба WebUI is qBittorrent's own code — it ignores our
 # design system. To keep the two ports visually consistent, every HTML
 # response flowing through this proxy is rewritten so a tiny CSS + JS
 # pair is loaded from ``/__qbit_theme__/``. The bridge pulls the active
@@ -393,7 +393,7 @@ THEME_PALETTES: dict[str, dict[str, dict[str, str]]] = {
 
 
 THEME_SKIN_CSS = """\
-/* qBittorrent WebUI theme bridge.
+/* Боба WebUI theme bridge.
  * Populated with the Darcula-dark fallback; bootstrap.js overrides
  * these with the live palette (and reacts to SSE theme events).
  */
@@ -415,7 +415,7 @@ THEME_SKIN_CSS = """\
   --color-shadow:         rgba(0,0,0,0.55);
 }
 
-/* qBittorrent WebUI overrides — target its actual class/id names. */
+/* Боба WebUI overrides — target its actual class/id names. */
 html, body {
   background: var(--color-bg-primary) !important;
   color: var(--color-text-primary) !important;
@@ -457,16 +457,15 @@ def _build_theme_bootstrap_js() -> str:
     CORS round-trip from the :7186 origin.
     """
     catalog_json = json.dumps(THEME_PALETTES, indent=2)
-    merge_url = MERGE_SERVICE_URL
     js = f"""\
-// qBittorrent WebUI theme bridge — loaded on every HTML page served by
+// Боба WebUI theme bridge — loaded on every HTML page served by
 // the download-proxy on :7186. Fetches the active palette from the
 // merge service and subscribes to live updates via SSE so palette swaps
 // made in the Angular dashboard mirror here without a manual refresh.
 
 (function () {{
   "use strict";
-  var MERGE = (window.__MERGE_SERVICE_URL__ || {merge_url!r});
+  var MERGE = (window.__MERGE_SERVICE_URL__ || ('http://' + window.location.hostname + ':7187'));
   var CATALOG = {catalog_json};
   window.__QBIT_PALETTE_CATALOG__ = CATALOG;
 
@@ -542,7 +541,7 @@ _HEAD_CLOSE_RE = re.compile(rb"</head\s*>", re.IGNORECASE)
 def _merge_service_origin() -> str:
     """Return the origin of the merge service for CSP whitelisting.
 
-    qBittorrent ships a strict CSP header (``default-src 'self'; ...``)
+    Боба ships a strict CSP header (``default-src 'self'; ...``)
     that, without the ``connect-src`` directive, blocks the bridge's
     ``fetch('/api/v1/theme')`` + ``EventSource(...)`` calls cross-origin.
     We whitelist the merge-service origin in the CSP the browser sees.
@@ -563,7 +562,7 @@ _CSP_DIRECTIVE_RE = re.compile(r"\s*([^;\s]+)(?:\s+([^;]*))?\s*;?", re.I)
 
 
 def rewrite_csp(header_value: str) -> str:
-    """Relax qBittorrent's Content-Security-Policy so the theme bridge
+    """Relax Боба's Content-Security-Policy so the theme bridge
     can talk to the merge service.
 
     Adds the merge-service origin to ``connect-src`` (creating the
@@ -679,6 +678,78 @@ def serve_theme_asset(path: str) -> tuple[int, dict[str, str], bytes]:
     }, payload
 
 
+# ---------------------------------------------------------------------------
+# Re-branding: qBittorrent → Боба (duplicated from theme_injector.py so
+# download_proxy.py stays self-contained)
+# ---------------------------------------------------------------------------
+
+_BOBA_LOGO_PATH = "/images/boba-logo.jpeg"
+
+_REBRAND_PATTERNS = [
+    (re.compile(r'src="images/qbittorrent-tray\.svg"', re.IGNORECASE), 'src="/images/boba-logo.jpeg"'),
+    (re.compile(r"src='images/qbittorrent-tray\.svg'", re.IGNORECASE), 'src="/images/boba-logo.jpeg"'),
+    (re.compile(r'src="images/qbittorrent32\.png"', re.IGNORECASE), 'src="/images/boba-logo.jpeg"'),
+    (re.compile(r"src='images/qbittorrent32\.png'", re.IGNORECASE), 'src="/images/boba-logo.jpeg"'),
+    (re.compile(r'href="images/qbittorrent-tray\.svg"', re.IGNORECASE), 'href="/images/boba-logo.jpeg"'),
+    (re.compile(r"href='images/qbittorrent-tray\.svg'", re.IGNORECASE), 'href="/images/boba-logo.jpeg"'),
+    (re.compile(r'href="images/qbittorrent32\.png"', re.IGNORECASE), 'href="/images/boba-logo.jpeg"'),
+    (re.compile(r"href='images/qbittorrent32\.png'", re.IGNORECASE), 'href="/images/boba-logo.jpeg"'),
+    (re.compile(r'alt="qBittorrent logo"', re.IGNORECASE), 'alt="Боба logo"'),
+    (re.compile(r"alt='qBittorrent logo'", re.IGNORECASE), 'alt="Боба logo"'),
+    (re.compile(r'<title>qBittorrent', re.IGNORECASE), '<title>Боба'),
+    (re.compile(r'content="qBittorrent WebUI"', re.IGNORECASE), 'content="Боба WebUI"'),
+    (re.compile(r"content='qBittorrent WebUI'", re.IGNORECASE), 'content="Боба WebUI"'),
+    (re.compile(r'qBittorrent', re.IGNORECASE), 'Боба'),
+]
+
+_BOBA_LOGO_BYTES: bytes | None = None
+_BOBA_LOGO_PATH_ON_DISK = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "static", "boba-logo.jpeg",
+)
+
+
+def _load_boba_logo() -> bytes:
+    global _BOBA_LOGO_BYTES
+    if _BOBA_LOGO_BYTES is None:
+        try:
+            with open(_BOBA_LOGO_PATH_ON_DISK, "rb") as f:
+                _BOBA_LOGO_BYTES = f.read()
+        except Exception:
+            _BOBA_LOGO_BYTES = b""
+    return _BOBA_LOGO_BYTES
+
+
+def is_boba_logo_request(path: str) -> bool:
+    return path == _BOBA_LOGO_PATH
+
+
+def serve_boba_logo() -> tuple[int, dict[str, str], bytes]:
+    payload = _load_boba_logo()
+    if not payload:
+        payload = b"Not Found"
+        return 404, {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Content-Length": str(len(payload)),
+        }, payload
+    return 200, {
+        "Content-Type": "image/jpeg",
+        "Cache-Control": "public, max-age=604800",
+        "Content-Length": str(len(payload)),
+    }, payload
+
+
+def rebrand_html(body: bytes, content_type: str) -> bytes:
+    if not content_type or not content_type.lower().startswith("text/html"):
+        return body
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return body
+    for pattern, replacement in _REBRAND_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text.encode("utf-8")
+
+
 class DownloadHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -687,6 +758,8 @@ class DownloadHandler(BaseHTTPRequestHandler):
             logger.info(f"{self.address_string()} - {format % args}")
 
     def do_GET(self):
+        if self._serve_boba_logo():
+            return
         if self._serve_theme_bridge():
             return
         self.handle_request(None)
@@ -695,6 +768,25 @@ class DownloadHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length) if content_length > 0 else None
         self.handle_request(body)
+
+    def _serve_boba_logo(self) -> bool:
+        """Short-circuit Boba logo requests so they never hit qBittorrent."""
+        try:
+            path = urllib.parse.urlparse(self.path).path
+        except Exception:
+            return False
+        if not is_boba_logo_request(path):
+            return False
+        status, headers, payload = serve_boba_logo()
+        self.send_response(status)
+        for k, v in headers.items():
+            self.send_header(k, v)
+        self.end_headers()
+        try:
+            self.wfile.write(payload)
+        except BrokenPipeError:
+            pass
+        return True
 
     def _serve_theme_bridge(self) -> bool:
         """Short-circuit the two proxy-local theme routes."""
@@ -796,12 +888,14 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
                 # Inject the theme bridge into HTML responses so the
                 # qBittorrent WebUI picks up the dashboard's palette.
+                # Also rebrand qBittorrent → Боба and swap the logo.
                 is_html = content_type.lower().startswith("text/html")
                 decoded_for_injection = False
                 if is_html:
                     decoded, decoded_for_injection = _maybe_decode_body(content, content_encoding)
                     if decoded_for_injection:
                         new_decoded = inject_theme_assets(decoded, content_type)
+                        new_decoded = rebrand_html(new_decoded, content_type)
                         if new_decoded is not decoded:
                             # Serve the response un-encoded so the browser
                             # doesn't misinterpret our plain-text insertion.
@@ -809,6 +903,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
                             content_encoding = ""
                     else:
                         content = inject_theme_assets(content, content_type)
+                        content = rebrand_html(content, content_type)
 
                 self.send_response(response.status)
                 for header, value in response.headers.items():
@@ -850,7 +945,7 @@ def run_server():
     logger.info("=" * 60)
     logger.info("Download Proxy Server Started")
     logger.info(f"Proxy Port: {PROXY_PORT}")
-    logger.info(f"qBittorrent: http://{QBITTORRENT_HOST}:{QBITTORRENT_PORT}")
+    logger.info(f"qBittorrent backend: http://{QBITTORRENT_HOST}:{QBITTORRENT_PORT}")
     logger.info(f"Supported trackers: {list(PLUGIN_PATTERNS.keys())}")
     logger.info(f"Theme bridge -> {MERGE_SERVICE_URL}")
     logger.info("=" * 60)

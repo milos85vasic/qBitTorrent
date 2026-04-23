@@ -82,7 +82,7 @@ class TestGetEnabledTrackers:
         be enabled by default. Dead trackers are filtered out unless
         ``ENABLE_DEAD_TRACKERS=1`` is set.
         """
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"ENABLE_DEAD_TRACKERS": "0"}, clear=True):
             trackers = self.orch._get_enabled_trackers()
             names = [t.name for t in trackers]
             for name in LIVE_PUBLIC_TRACKERS:
@@ -143,6 +143,7 @@ class TestGetEnabledTrackers:
             "NNMCLUB_COOKIES": "phpbb2mysql_4_sid=abc",
             "IPTORRENTS_USERNAME": "u",
             "IPTORRENTS_PASSWORD": "p",
+            "ENABLE_DEAD_TRACKERS": "0",
         }
         with patch.dict(os.environ, env, clear=True):
             trackers = self.orch._get_enabled_trackers()
@@ -405,7 +406,11 @@ class TestConcurrentSearch:
                 ]
             return []
 
-        with patch.dict(os.environ, {"RUTRACKER_USERNAME": "u", "RUTRACKER_PASSWORD": "p"}, clear=True):
+        with patch.dict(
+            os.environ,
+            {"RUTRACKER_USERNAME": "u", "RUTRACKER_PASSWORD": "p", "ENABLE_DEAD_TRACKERS": "0"},
+            clear=True,
+        ):
             with patch.object(self.orch, "_search_tracker", side_effect=mock_search):
                 metadata = await self.orch.search("ubuntu", "all", enable_metadata=False, validate_trackers=False)
                 assert metadata.total_results == 1

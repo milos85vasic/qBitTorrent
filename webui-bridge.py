@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-WebUI Bridge for qBittorrent Private Tracker Support
+WebUI Bridge for Боба Private Tracker Support
 
 This module solves the WebUI download issue by creating a bridge between
 WebUI and nova2dl.py. It intercepts download requests and handles them
@@ -108,6 +108,17 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
             # download-proxy at :7186 serves. Must come BEFORE the
             # qBittorrent passthrough — these paths do not exist on the
             # qBittorrent WebUI side.
+            # Serve the Boba logo locally so it replaces qBittorrent's
+            # default SVG/PNG logos on both :7186 and :7188.
+            if theme_injector is not None and theme_injector.is_boba_logo_request(path):
+                status, headers, payload = theme_injector.serve_boba_logo()
+                self.send_response(status)
+                for k, v in headers.items():
+                    self.send_header(k, v)
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+
             if path.startswith("/__qbit_theme__/") and theme_injector is not None:
                 status, headers, payload = theme_injector.serve_theme_asset(path)
                 self.send_response(status)
@@ -275,9 +286,9 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
                 content_encoding = resp.headers.get("Content-Encoding") or ""
 
                 # Theme bridge: on text/html, decompress (if gzipped),
-                # inject the two bridge tags, drop the encoding header,
-                # rewrite CSP so bootstrap.js can reach the merge
-                # service, and update Content-Length.
+                # inject the two bridge tags, rebrand qBittorrent → Боба,
+                # drop the encoding header, rewrite CSP so bootstrap.js
+                # can reach the merge service, and update Content-Length.
                 body = raw_body
                 mutated = False
                 stripped_encoding = False
@@ -285,6 +296,7 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
                     decoded, ok = theme_injector.maybe_decode_body(raw_body, content_encoding)
                     if ok:
                         new_body = theme_injector.inject_theme_assets(decoded, content_type)
+                        new_body = theme_injector.rebrand_html(new_body, content_type)
                         if new_body is not decoded and new_body != decoded:
                             body = new_body
                             mutated = True
@@ -337,10 +349,10 @@ def run_bridge():
     server = ThreadingHTTPServer(("", BRIDGE_PORT), WebUIBridgeHandler)
 
     print("=" * 70)
-    print("qBittorrent WebUI Bridge Server")
+    print("Боба WebUI Bridge Server")
     print("=" * 70)
     print(f"Bridge Port: {BRIDGE_PORT}")
-    print(f"qBittorrent: http://{QBITTORRENT_HOST}:{QBITTORRENT_PORT}")
+    print(f"qBittorrent backend: http://{QBITTORRENT_HOST}:{QBITTORRENT_PORT}")
     print("=" * 70)
     print("This bridge enables private tracker downloads in WebUI")
     print("=" * 70)

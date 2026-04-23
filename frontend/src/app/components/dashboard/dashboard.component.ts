@@ -132,12 +132,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
   bridgeChecking = signal(false);
 
   // Config
-  config = signal({ qbittorrent_url: 'http://localhost:7186' });
+  config = signal({ qbittorrent_url: `http://${window.location.hostname}:7186` });
 
   private sseSub?: any;
   private pollInterval?: any;
   private statsInterval?: any;
   private bridgeInterval?: any;
+
+  get hostUrl(): string {
+    return `http://${window.location.hostname}`;
+  }
 
   ngOnInit(): void {
     this.loadStats();

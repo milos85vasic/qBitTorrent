@@ -117,7 +117,7 @@ except Exception:  # pragma: no cover
 # ---------------------------------------------------------------------------
 
 THEME_SKIN_CSS = """\
-/* qBittorrent WebUI theme bridge.
+/* Боба WebUI theme bridge.
  * Populated with the Darcula-dark fallback; bootstrap.js overrides
  * these with the live palette (and reacts to SSE theme events).
  */
@@ -173,16 +173,15 @@ button:hover, input[type="button"]:hover, input[type="submit"]:hover {
 
 def _build_theme_bootstrap_js() -> str:
     catalog_json = json.dumps(THEME_PALETTES, indent=2)
-    merge_url = MERGE_SERVICE_URL
     return f"""\
-// qBittorrent WebUI theme bridge. Fetches the active palette from the
+// Боба WebUI theme bridge. Fetches the active palette from the
 // merge service and subscribes to live updates via SSE so palette
 // swaps made in the Angular dashboard mirror here without a manual
 // refresh. Shipped by BOTH :7186 (download-proxy) and :7188 (bridge).
 
 (function () {{
   "use strict";
-  var MERGE = (window.__MERGE_SERVICE_URL__ || {merge_url!r});
+  var MERGE = (window.__MERGE_SERVICE_URL__ || ('http://' + window.location.hostname + ':7187'));
   var CATALOG = {catalog_json};
   window.__QBIT_PALETTE_CATALOG__ = CATALOG;
 
@@ -249,6 +248,93 @@ _THEME_HEAD_TAGS = (
     '<script src="/__qbit_theme__/bootstrap.js" defer></script>\n'
 )
 _HEAD_CLOSE_RE = re.compile(rb"</head\s*>", re.IGNORECASE)
+
+# ---------------------------------------------------------------------------
+# Re-branding: qBittorrent → Боба
+# ---------------------------------------------------------------------------
+
+_BOBA_LOGO_PATH = "/images/boba-logo.jpeg"
+_QBIT_LOGO_SVG_PATH = "images/qbittorrent-tray.svg"
+_QBIT_LOGO_PNG_PATH = "images/qbittorrent32.png"
+
+# Pre-compiled regexes for fast HTML rewriting (string-based).
+_REBRAND_PATTERNS = [
+    # Logo image src (img tag)
+    (re.compile(r'src="images/qbittorrent-tray\.svg"', re.IGNORECASE), 'src="/images/boba-logo.jpeg"'),
+    (re.compile(r"src='images/qbittorrent-tray\.svg'", re.IGNORECASE), 'src="/images/boba-logo.jpeg"'),
+    # Logo image src (png fallback)
+    (re.compile(r'src="images/qbittorrent32\.png"', re.IGNORECASE), 'src="/images/boba-logo.jpeg"'),
+    (re.compile(r"src='images/qbittorrent32\.png'", re.IGNORECASE), 'src="/images/boba-logo.jpeg"'),
+    # Favicon links
+    (re.compile(r'href="images/qbittorrent-tray\.svg"', re.IGNORECASE), 'href="/images/boba-logo.jpeg"'),
+    (re.compile(r"href='images/qbittorrent-tray\.svg'", re.IGNORECASE), 'href="/images/boba-logo.jpeg"'),
+    (re.compile(r'href="images/qbittorrent32\.png"', re.IGNORECASE), 'href="/images/boba-logo.jpeg"'),
+    (re.compile(r"href='images/qbittorrent32\.png'", re.IGNORECASE), 'href="/images/boba-logo.jpeg"'),
+    # Alt text
+    (re.compile(r'alt="qBittorrent logo"', re.IGNORECASE), 'alt="Боба logo"'),
+    (re.compile(r"alt='qBittorrent logo'", re.IGNORECASE), 'alt="Боба logo"'),
+    # Title
+    (re.compile(r'<title>qBittorrent', re.IGNORECASE), '<title>Боба'),
+    # Meta description
+    (re.compile(r'content="qBittorrent WebUI"', re.IGNORECASE), 'content="Боба WebUI"'),
+    (re.compile(r"content='qBittorrent WebUI'", re.IGNORECASE), 'content="Боба WebUI"'),
+    # Headings and visible text (catch remaining "qBittorrent" occurrences)
+    (re.compile(r'qBittorrent', re.IGNORECASE), 'Боба'),
+]
+
+# Load the Boba logo bytes once at import time.
+_BOBA_LOGO_BYTES: bytes | None = None
+_BOBA_LOGO_PATH_ON_DISK = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "download-proxy", "src", "ui", "static", "boba-logo.jpeg",
+)
+
+
+def _load_boba_logo() -> bytes:
+    global _BOBA_LOGO_BYTES
+    if _BOBA_LOGO_BYTES is None:
+        try:
+            with open(_BOBA_LOGO_PATH_ON_DISK, "rb") as f:
+                _BOBA_LOGO_BYTES = f.read()
+        except Exception:
+            _BOBA_LOGO_BYTES = b""
+    return _BOBA_LOGO_BYTES
+
+
+def is_boba_logo_request(path: str) -> bool:
+    return path == _BOBA_LOGO_PATH
+
+
+def serve_boba_logo() -> Tuple[int, dict, bytes]:
+    payload = _load_boba_logo()
+    if not payload:
+        payload = b"Not Found"
+        return 404, {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Content-Length": str(len(payload)),
+        }, payload
+    return 200, {
+        "Content-Type": "image/jpeg",
+        "Cache-Control": "public, max-age=604800",
+        "Content-Length": str(len(payload)),
+    }, payload
+
+
+def rebrand_html(body: bytes, content_type: str) -> bytes:
+    """Rewrite qBittorrent branding to Боба in HTML responses.
+
+    Replaces logo references, title, meta description, and visible text.
+    Passes through unchanged when ``body`` is not HTML.
+    """
+    if not content_type or not content_type.lower().startswith("text/html"):
+        return body
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return body
+    for pattern, replacement in _REBRAND_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text.encode("utf-8")
 
 
 def theme_injection_disabled() -> bool:

@@ -4,7 +4,7 @@ This document explains how the merge service reports per-tracker failures
 so operators can distinguish "nothing wrong, niche board has no hits for
 this query" from "upstream is dead" from "plugin is crashing."
 
-Context: prior to 2026-04-19 a search for `linux` returned 137 total
+Context: prior to 2026-04-23 a search for `linux` returned 137 total
 hits and 37 of 40 trackers returned zero with **no explanation**. The
 root cause was a monkeypatch targeting the wrong `novaprinter` module
 (see commit `e8b904d`), but the deeper problem was visibility:
@@ -67,7 +67,7 @@ anime-only tracker.
 
 ### `PUBLIC_TRACKER_DEADLINE_SECONDS`
 
-Default: `25`. Clamped to `[5, 120]`.
+Default: `60`. Clamped to `[5, 120]`.
 
 How long each public-tracker subprocess may run before it is
 SIGKILLed. Because `_search_public_tracker` streams results as NDJSON
@@ -83,31 +83,30 @@ latency grows with `deadline × ceil(trackers / max_concurrent)`.
 
 ### `ENABLE_DEAD_TRACKERS`
 
-Default: `0` (dead trackers excluded from fan-out).
+Default: `1` (all trackers exposed; dead ones filtered by
+`DEAD_PUBLIC_TRACKERS`).
 
-Public trackers that are empirically known-dead as of 2026-04-19 live
+Public trackers that are empirically known-dead as of 2026-04-23 live
 in `DEAD_PUBLIC_TRACKERS` in `search.py` and are excluded from the
-fan-out by default so the dashboard isn't dominated by permanently-red
-chips. Set `ENABLE_DEAD_TRACKERS=1` to force them back in — useful
-when testing whether an upstream has recovered, or when operating
-through a proxy/VPN that bypasses the geoblock.
+fan-out. Set `ENABLE_DEAD_TRACKERS=0` to hide them. Set
+`ENABLE_DEAD_TRACKERS=1` (default) to include them for testing
+whether an upstream has recovered, or when operating through a
+proxy/VPN that bypasses geoblocks.
 
 The known-dead list:
 
-* HTTP 403: `eztv`, `kickass`, `bt4g`, `extratorrent`, `one337x`
-* HTTP 404: `bitru`, `megapeer`, `yts`
-* Gateway timeout: `nyaa`
-* DNS failure: `glotorrents`, `pctorrent`, `yihua`, `torrentgalaxy`
+* HTTP 403 (Cloudflare/geoblock): `eztv`, `kickass`, `bt4g`,
+  `extratorrent`, `one337x`, `bitru`
+* HTTP 404 (site down): `megapeer`, `ali213`
+* Gateway timeout: `nyaa`, `audiobookbay`, `torlock`
+* DNS failure (domain dead): `pctorrent`, `yihua`, `torrentgalaxy`
 * TLS failure: `xfsub`
-* Plugin bugs: `yourbittorrent` (stale regex), `anilibra` (NoneType crash)
-* Silently empty (plugin swallows upstream 403): `solidtorrents`,
-  `therarbg`, `torrentfunk`, `ali213`, `btsow`, `gamestorrents`,
-  `torrentkitty`. These plugins catch the HTTPError internally and
-  never print to stderr, so the classifier can't tag them — probing
-  each upstream with `curl` confirms they all serve `403 Forbidden`
-  to anonymous visitors. Fixing requires either patching every
-  plugin to re-raise or changing its User-Agent; shelved until
-  someone cares enough to debug each one.
+* Plugin crash (site down): `torrentgalaxy`
+* API changed: `anilibra` (returns 400 Unknown query)
+* Site rebrand/redesign: `solidtorrents` (→ bitsearch.to), `therarbg`
+  (new HTML), `gamestorrents` (WordPress redesign), `btsow`
+  (JS redirect challenge)
+* Upstream dead: `torrentfunk` (redirects to rakix), `torrentkitty`
 
 These plugins are still installed and the classifier still reports
 their real reasons when `ENABLE_DEAD_TRACKERS=1`, so it's easy to

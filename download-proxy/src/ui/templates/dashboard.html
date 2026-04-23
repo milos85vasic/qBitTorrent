@@ -341,7 +341,7 @@
             try {
                 var r = await fetch('/api/v1/config');
                 _config = await r.json();
-            } catch(e) { _config = { qbittorrent_url: 'http://localhost:7185' }; }
+            } catch(e) { _config = { qbittorrent_url: 'http://' + window.location.hostname + ':7185' }; }
         }
         loadConfig();
 
