@@ -41,6 +41,7 @@ jobs:
           python -m pytest tests/unit/ tests/contract/ tests/property/ tests/concurrency/ tests/memory/ tests/observability/ \
             -v --import-mode=importlib \
             -p no:cacheprovider \
+            -m "not requires_compose" \
             --cov=download-proxy/src \
             --cov=plugins \
             --cov-report=xml \

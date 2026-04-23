@@ -103,7 +103,7 @@ class TestStatsEndpoint:
     async def test_stats_no_orchestrator(self):
         from api import app, stats
 
-        with patch.object(app.state, "__dict__", {}):
+        with patch.object(app.state, "_state", {}):
             result = await stats()
             assert result["active_searches"] == 0
             assert result["completed_searches"] == 0

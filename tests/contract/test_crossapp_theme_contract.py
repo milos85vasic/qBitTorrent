@@ -14,6 +14,8 @@ from __future__ import annotations
 import os
 import urllib.request
 
+import pytest
+
 PROXY_URL = os.environ.get("PROXY_URL", "http://localhost:7186")
 BRIDGE_CSS = "/__qbit_theme__/skin.css"
 BRIDGE_JS = "/__qbit_theme__/bootstrap.js"
@@ -24,6 +26,7 @@ def _fetch(url: str) -> tuple[int, str, bytes]:
         return resp.status, resp.headers.get("Content-Type", ""), resp.read()
 
 
+@pytest.mark.requires_compose
 def test_proxy_root_injects_theme_bridge():
     status, ctype, body = _fetch(PROXY_URL + "/")
     assert status == 200, f"proxy GET / returned {status}"
@@ -40,6 +43,7 @@ def test_proxy_root_injects_theme_bridge():
     )
 
 
+@pytest.mark.requires_compose
 def test_bridge_css_is_served_with_no_cache():
     status, ctype, body = _fetch(PROXY_URL + BRIDGE_CSS)
     assert status == 200, f"bridge CSS returned {status}"
@@ -49,6 +53,7 @@ def test_bridge_css_is_served_with_no_cache():
     assert "--color-accent" in text
 
 
+@pytest.mark.requires_compose
 def test_bridge_js_is_served_with_catalog_inlined():
     status, ctype, body = _fetch(PROXY_URL + BRIDGE_JS)
     assert status == 200, f"bridge JS returned {status}"

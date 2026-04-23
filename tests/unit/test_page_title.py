@@ -46,6 +46,7 @@ def test_dashboard_template_has_no_qbittorrent_fixed_leak() -> None:
     assert "qBittorrent-Fixed" not in tpl
 
 
+@pytest.mark.requires_compose
 def test_served_bundle_title_matches(merge_service_live: str) -> None:
     """Live probe — merge-search must be running and serving the
     renamed title. The ``merge_service_live`` fixture guarantees the

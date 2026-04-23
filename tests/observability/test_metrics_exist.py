@@ -2,6 +2,7 @@ import pytest
 
 
 @pytest.mark.observability
+@pytest.mark.requires_compose
 def test_prometheus_metrics_endpoint_exists():
     """The merge service should expose /metrics."""
     import httpx

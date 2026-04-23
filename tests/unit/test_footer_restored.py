@@ -101,6 +101,7 @@ def test_footer_styles_use_design_system_tokens(footer_source: str) -> None:
     assert "#e94560" not in footer_source
 
 
+@pytest.mark.requires_compose
 def test_footer_appears_in_served_bundle(merge_service_live: str) -> None:
     """The compiled dashboard bundle must carry the footer footprint.
 
