@@ -448,8 +448,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       tracker: data.tracker || 'unknown',
       download_urls: [data.link || ''],
       sources: [{ tracker: data.tracker || 'unknown', seeds: data.seeds || 0, leechers: data.leechers || 0 }],
-      quality: 'unknown',
-      content_type: 'unknown',
+      quality: data.quality || 'unknown',
+      content_type: data.content_type || 'unknown',
       metadata: null,
       freeleech: false
     };

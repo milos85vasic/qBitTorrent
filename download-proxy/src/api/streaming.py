@@ -163,6 +163,8 @@ class SSEHandler:
                                     "tracker": getattr(result, "tracker", ""),
                                     "size": getattr(result, "size", 0),
                                     "link": getattr(result, "link", ""),
+                                    "content_type": getattr(result, "content_type", None),
+                                    "quality": getattr(result, "quality", None),
                                 },
                                 event_id=search_id,
                             )
@@ -189,6 +191,8 @@ class SSEHandler:
                                 "tracker": getattr(result, "tracker", ""),
                                 "size": getattr(result, "size", 0),
                                 "link": getattr(result, "link", ""),
+                                "content_type": getattr(result, "content_type", None),
+                                "quality": getattr(result, "quality", None),
                             },
                             event_id=search_id,
                         )

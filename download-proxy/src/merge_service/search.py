@@ -104,6 +104,8 @@ class SearchResult:
     tracker: str | None = None
     category: str | None = None
     freeleech: bool = False
+    content_type: str | None = None
+    quality: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d = {
@@ -118,6 +120,8 @@ class SearchResult:
             "tracker": self.tracker,
             "category": self.category,
             "freeleech": self.freeleech,
+            "content_type": self.content_type,
+            "quality": self.quality,
         }
         if self.freeleech and self.tracker:
             d["tracker_display"] = f"{self.tracker} [free]"
@@ -126,6 +130,77 @@ class SearchResult:
         else:
             d["tracker_display"] = None
         return d
+
+
+def _detect_result_metadata(name: str, size: str) -> tuple[str | None, str | None]:
+    """Infer content_type and quality from a raw torrent name and size."""
+    n = name.lower() if name else ""
+
+    # --- content_type ---
+    content_type = None
+    if _re.search(r"\[anime\]", n):
+        content_type = "anime"
+    elif _re.search(r"[sS]\d+[eE]\d+|\b(seasons?)\s*[\d\-]+\b|\b(episode)\s*[\d\-]+\b", n):
+        content_type = "tv"
+    elif _re.search(r"\baudiobook\b", n):
+        content_type = "audiobook"
+    elif any(p in n for p in ["codex", "tenoke", "fitgirl", "masquerade", "xbox", "playstation", "ps3", "ps4", "ps5", "nintendo", "switch", "steam", "epic", "vr"]):
+        content_type = "game"
+    elif _re.search(r"\b(x86|x64|portable|\.exe|installer|iso|dmg|appimage|snap|flatpak|pkg|deb|rpm|msi)\b", n):
+        content_type = "software"
+    elif _re.search(r"\b(ubuntu|debian|fedora|arch linux|linux mint|opensuse|centos|redhat|gentoo|slackware|kali|manjaro|pop!_os|elementary)\b", n):
+        content_type = "software"
+    elif _re.search(r"\b(bluray|blu-ray|bdremux|web-?dl|webrip|h?drip|dvdrip|bdrip|x264|x265|hevc|hdr)\b", n):
+        content_type = "movie"
+    elif _re.search(r"\b(720p|1080p|2160p|4k)\b", n):
+        content_type = "movie"
+    elif _re.search(r"\b(epub|pdf|mobi|azw3|cbz|cbr|djvu)\b", n):
+        content_type = "ebook"
+    elif _re.search(r"\b(mp3|flac|ogg|opus|aac|wav|aiff|alac|m4a|wma)\b", n) or _re.search(r"\b(lossless|320kbps|256kbps|128kbps|v0|vbr|cbr|v2)\b", n):
+        content_type = "music"
+    elif _re.search(r"\b(ost|soundtrack|score)\b", n):
+        content_type = "music"
+
+    # --- quality ---
+    quality = None
+    if _re.search(r"2160p|4k|uhd", n):
+        quality = "uhd_4k"
+    elif _re.search(r"1080p|fullhd|fhd", n):
+        quality = "full_hd"
+    elif _re.search(r"720p|hdrip", n):
+        quality = "hd"
+    elif _re.search(r"480p|sd|camrip", n):
+        quality = "sd"
+    elif "bluray" in n or "blu-ray" in n or "bdrip" in n or "bd-remux" in n:
+        quality = "full_hd"
+    elif "web-dl" in n or "webrip" in n or "web.dl" in n or "webdl" in n:
+        quality = "hd"
+    elif "hdtv" in n:
+        quality = "hd"
+    elif "dvd" in n:
+        quality = "sd"
+    else:
+        # Size-based fallback
+        try:
+            sb = float(size)
+        except (ValueError, TypeError):
+            sb = 0
+            m = _re.search(r"([\d.]+)\s*(TB|GB|MB|KB|B)", str(size), _re.I)
+            if m:
+                value = float(m.group(1))
+                unit = m.group(2).upper()
+                mult = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
+                sb = value * mult.get(unit, 1)
+        if sb >= 40 * 1024**3:
+            quality = "uhd_4k"
+        elif sb >= 8 * 1024**3:
+            quality = "full_hd"
+        elif sb >= 2 * 1024**3:
+            quality = "hd"
+        elif sb >= 300 * 1024**2:
+            quality = "sd"
+
+    return content_type, quality
 
 
 @dataclass
@@ -447,6 +522,7 @@ class SearchOrchestrator:
         # so clients back off instead of piling more work on top.
         self._max_concurrent_searches: int = max(1, int(_os.getenv("MAX_CONCURRENT_SEARCHES", "8")))
         self._active_search_count: int = 0
+        self._search_tasks: dict[str, Any] = {}
 
     def _load_env(self):
         import logging
@@ -533,6 +609,17 @@ class SearchOrchestrator:
         self._last_merged_results[search_id] = ([], [])
         return metadata
 
+    def cancel_search(self, search_id: str) -> bool:
+        """Cancel a running search and its background task."""
+        metadata = self._active_searches.get(search_id)
+        if metadata is None:
+            return False
+        metadata.status = "aborted"
+        task = self._search_tasks.pop(search_id, None)
+        if task and not task.done():
+            task.cancel()
+        return True
+
     async def _run_search(
         self,
         search_id: str,
@@ -582,6 +669,8 @@ class SearchOrchestrator:
                     )
 
             async def _search_one(tracker):
+                if metadata.status == "aborted":
+                    return tracker.name, [], "aborted"
                 stat = metadata.tracker_stats.get(tracker.name)
                 if stat is None:
                     # Defensive: always have a stat to mutate.
@@ -649,7 +738,15 @@ class SearchOrchestrator:
                     finally:
                         self._inflight_count -= 1
 
+            if metadata.status == "aborted":
+                metadata.completed_at = datetime.now(UTC)
+                return
+
             search_results = await asyncio.gather(*[_bounded(t) for t in trackers])
+
+            if metadata.status == "aborted":
+                metadata.completed_at = datetime.now(UTC)
+                return
 
             all_results = []
             for name, results, error in search_results:
@@ -662,12 +759,17 @@ class SearchOrchestrator:
             self._last_merged_results[search_id] = (merged, all_results)
             metadata.status = "completed"
             metadata.completed_at = datetime.now(UTC)
+        except asyncio.CancelledError:
+            metadata.status = "aborted"
+            metadata.completed_at = datetime.now(UTC)
+            raise
         except Exception as e:
             metadata.status = "failed"
             metadata.errors.append(str(e))
             metadata.completed_at = datetime.now(UTC)
         finally:
             self._active_search_count = max(0, self._active_search_count - 1)
+            self._search_tasks.pop(search_id, None)
 
     async def search(
         self,
@@ -823,6 +925,7 @@ class SearchOrchestrator:
                     logger.debug(f"Plugin {tracker_name} error: {r['__error__']}")
                 return
             try:
+                ct, q = _detect_result_metadata(r.get("name", ""), r.get("size", "0 B"))
                 results.append(
                     SearchResult(
                         name=r.get("name", ""),
@@ -833,6 +936,8 @@ class SearchOrchestrator:
                         desc_link=r.get("desc_link", ""),
                         tracker=tracker_name,
                         engine_url=PUBLIC_TRACKERS.get(tracker_name, ""),
+                        content_type=ct,
+                        quality=q,
                     )
                 )
             except Exception as e:
@@ -1011,6 +1116,7 @@ class SearchOrchestrator:
                         seeds = 0
                     leechers = int(d.get("leech", 0) or 0)
 
+                    ct, q = _detect_result_metadata(title, self._format_size(size_val) if size_val else "0 B")
                     results.append(
                         SearchResult(
                             name=title,
@@ -1021,6 +1127,8 @@ class SearchOrchestrator:
                             desc_link=f"{base_url}/forum/viewtopic.php?t={topic_id}",
                             tracker="rutracker",
                             engine_url=base_url,
+                            content_type=ct,
+                            quality=q,
                         )
                     )
                 except Exception as e:
@@ -1130,6 +1238,7 @@ class SearchOrchestrator:
         for tor in torrent_re.finditer(html_content):
             try:
                 topic_id = tor.group("desc_link").split("=")[-1]
+                ct, q = _detect_result_metadata(unescape(tor.group("name")), tor.group("size").translate(cyrillic_table))
                 results.append(
                     SearchResult(
                         name=unescape(tor.group("name")),
@@ -1140,6 +1249,8 @@ class SearchOrchestrator:
                         desc_link=f"{base_url}{tor.group('desc_link')}",
                         tracker="kinozal",
                         engine_url=base_url,
+                        content_type=ct,
+                        quality=q,
                     )
                 )
             except Exception as e:
@@ -1206,6 +1317,7 @@ class SearchOrchestrator:
 
         for match in torrent_re.finditer(html_content):
             try:
+                ct, q = _detect_result_metadata(unescape(match.group("name")), match.group("size"))
                 results.append(
                     SearchResult(
                         name=unescape(match.group("name")),
@@ -1216,6 +1328,8 @@ class SearchOrchestrator:
                         desc_link=f"{base_url}/forum/{match.group('desc_link')}",
                         tracker="nnmclub",
                         engine_url=base_url,
+                        content_type=ct,
+                        quality=q,
                     )
                 )
             except Exception as e:
@@ -1323,6 +1437,7 @@ class SearchOrchestrator:
             if is_free and "[free]" not in name_text:
                 name_text = name_text.rstrip() + " [free]"
 
+            ct, q = _detect_result_metadata(name_text, size_match.group("size") if size_match else "0 B")
             try:
                 results.append(
                     SearchResult(
@@ -1335,6 +1450,8 @@ class SearchOrchestrator:
                         tracker="iptorrents",
                         engine_url=base_url,
                         freeleech=is_free,
+                        content_type=ct,
+                        quality=q,
                     )
                 )
             except Exception as e:

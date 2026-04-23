@@ -28,6 +28,7 @@ _classify_plugin_stderr = _search_mod._classify_plugin_stderr
 validate_tracker_name = _search_mod.validate_tracker_name
 SearchOrchestrator = _search_mod.SearchOrchestrator
 SearchResult = _search_mod.SearchResult
+_detect_result_metadata = _search_mod._detect_result_metadata
 ContentType = _search_mod.ContentType
 CanonicalIdentity = _search_mod.CanonicalIdentity
 TrackerSource = _search_mod.TrackerSource
@@ -194,6 +195,83 @@ class TestSearchResultToDict:
         )
         d = r.to_dict()
         assert d["tracker_display"] is None
+
+
+    def test_to_dict_includes_content_type_and_quality(self):
+        r = SearchResult(
+            name="Test",
+            link="http://x",
+            size="1 GB",
+            seeds=10,
+            leechers=5,
+            engine_url="http://x",
+            content_type="movie",
+            quality="full_hd",
+        )
+        d = r.to_dict()
+        assert d["content_type"] == "movie"
+        assert d["quality"] == "full_hd"
+
+    def test_to_dict_content_type_quality_none_by_default(self):
+        r = SearchResult(
+            name="Test",
+            link="http://x",
+            size="1 GB",
+            seeds=10,
+            leechers=5,
+            engine_url="http://x",
+        )
+        d = r.to_dict()
+        assert d["content_type"] is None
+        assert d["quality"] is None
+
+
+class TestDetectResultMetadata:
+    def test_detects_movie_from_resolution(self):
+        ct, q = _detect_result_metadata("My Movie 1080p BluRay", "8 GB")
+        assert ct == "movie"
+        assert q == "full_hd"
+
+    def test_detects_tv_from_season_episode(self):
+        ct, q = _detect_result_metadata("Show S01E05 720p", "1 GB")
+        assert ct == "tv"
+        assert q == "hd"
+
+    def test_detects_game_from_release_group(self):
+        ct, q = _detect_result_metadata("Game FitGirl Repack", "15 GB")
+        assert ct == "game"
+
+    def test_detects_software_from_os_name(self):
+        ct, q = _detect_result_metadata("Ubuntu 22.04 LTS ISO", "4 GB")
+        assert ct == "software"
+
+    def test_detects_ebook_from_format(self):
+        ct, q = _detect_result_metadata("Linux Guide EPUB", "5 MB")
+        assert ct == "ebook"
+
+    def test_detects_music_from_audio_format(self):
+        ct, q = _detect_result_metadata("Album FLAC 2024", "300 MB")
+        assert ct == "music"
+
+    def test_quality_size_fallback_uhd(self):
+        ct, q = _detect_result_metadata("Some Large File", "50 GB")
+        assert q == "uhd_4k"
+
+    def test_quality_size_fallback_hd(self):
+        ct, q = _detect_result_metadata("Some Medium File", "3 GB")
+        assert q == "hd"
+
+    def test_quality_size_fallback_sd(self):
+        ct, q = _detect_result_metadata("Some Small File", "500 MB")
+        assert q == "sd"
+
+    def test_quality_unknown_for_tiny_file(self):
+        ct, q = _detect_result_metadata("Tiny File", "10 MB")
+        assert q is None
+
+    def test_unknown_content_type_when_no_signals(self):
+        ct, q = _detect_result_metadata("Random File", "1 GB")
+        assert ct is None
 
 
 class TestCanonicalIdentityToDict:

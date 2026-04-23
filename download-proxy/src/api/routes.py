@@ -211,14 +211,17 @@ def _detect_quality(name: str, size: str) -> str:
 
 
 def _to_response(r, content_type: str | None = None) -> SearchResultResponse:
+    quality = getattr(r, "quality", None)
+    if not quality:
+        quality = _detect_quality(r.name, r.size)
     return SearchResultResponse(
         name=r.name,
         size=r.size,
         seeds=r.seeds,
         leechers=r.leechers,
         download_urls=[r.link],
-        quality=_detect_quality(r.name, r.size),
-        content_type=content_type,
+        quality=quality,
+        content_type=getattr(r, "content_type", None) or content_type,
         desc_link=r.desc_link,
         tracker=r.tracker,
         sources=[{"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers}],
@@ -286,7 +289,8 @@ async def search(request: SearchRequest, req: Request):
         except Exception as e:
             logger.error(f"Background search {metadata.search_id} failed: {e}")
 
-    asyncio.create_task(_background())  # noqa: RUF006
+    task = asyncio.create_task(_background())  # noqa: RUF006
+    orch._search_tasks[metadata.search_id] = task
 
     # Return immediately — the caller should attach to SSE for real-time
     # results.  Any callers that want the old blocking behaviour can hit
@@ -500,14 +504,14 @@ async def get_search(search_id: str, req: Request):
             best = m.original_results[0] if m.original_results else None
             if best:
                 ct = m.canonical_identity.content_type.value if m.canonical_identity else None
-                r = _to_response(best, ct)
-                r.sources = [
-                    {"tracker": r.tracker, "seeds": r.seeds, "leechers": r.leechers} for r in m.original_results
+                resp = _to_response(best, ct)
+                resp.sources = [
+                    {"tracker": orig.tracker, "seeds": orig.seeds, "leechers": orig.leechers} for orig in m.original_results
                 ]
-                r.download_urls = list(dict.fromkeys(lnk for lnk in (r.link for r in m.original_results)))
-                r.seeds = m.total_seeds
-                r.leechers = m.total_leechers
-                result_resp.append(r)
+                resp.download_urls = list(dict.fromkeys(lnk for lnk in (orig.link for orig in m.original_results)))
+                resp.seeds = m.total_seeds
+                resp.leechers = m.total_leechers
+                result_resp.append(resp)
     return SearchResponse(
         search_id=metadata.search_id,
         query=metadata.query,
@@ -525,10 +529,10 @@ async def get_search(search_id: str, req: Request):
 
 @router.post("/search/{search_id}/abort")
 async def abort_search(search_id: str, req: Request):
-    """Mark a search as aborted so it won't be counted as completed."""
+    """Cancel a running search and its background tracker tasks."""
     orch = _get_orchestrator(req)
     if search_id in orch._active_searches:
-        orch._active_searches[search_id].status = "aborted"
+        orch.cancel_search(search_id)
         return {"search_id": search_id, "status": "aborted"}
     return {"search_id": search_id, "status": "not_found"}
 
