@@ -67,11 +67,14 @@ def _wait_for_port(port: int, host: str = "127.0.0.1", timeout: float = 300.0) -
     raise TimeoutError(f"Port {port} on {host} did not become responsive within {timeout}s")
 
 
-def _start_compose_stack(compose_cmd: str, compose_file: str, project_name: str) -> None:
+def _start_compose_stack(compose_cmd: str, compose_file: str) -> None:
     """Run `compose_cmd up -d`."""
     import shlex
 
-    cmd = f"{compose_cmd} -f {shlex.quote(compose_file)} -p {shlex.quote(project_name)} up -d"
+    # Intentionally omit `-p` so docker compose uses the directory name as the
+    # project name. This makes the fixture idempotent with CI workflows that
+    # also run `docker compose up` from the repo root.
+    cmd = f"{compose_cmd} -f {shlex.quote(compose_file)} up -d"
     print(f"Starting compose stack: {cmd}")
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
@@ -99,8 +102,7 @@ def compose_up(pytestconfig: Any) -> dict[str, str]:
         # Need to start the stack
         runtime, compose_cmd = _detect_container_runtime()
         compose_file = os.path.join(str(pytestconfig.rootdir), "docker-compose.yml")
-        project_name = "qbittorrent"
-        _start_compose_stack(compose_cmd, compose_file, project_name)
+        _start_compose_stack(compose_cmd, compose_file)
         # Wait for ports
         for port in ports:
             _wait_for_port(port, timeout=120.0)
