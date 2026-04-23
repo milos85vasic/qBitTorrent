@@ -21,6 +21,15 @@ import {
   platformBrowserDynamicTesting,
 } from '@angular/platform-browser-dynamic/testing';
 
+// Ensure navigator.userAgent is defined so Angular's DefaultValueAccessor
+// (used by ngModel) doesn't crash in jsdom/vitest environments.
+if (typeof navigator !== 'undefined' && !navigator.userAgent) {
+  Object.defineProperty(navigator, 'userAgent', {
+    value: 'vitest-jsdom',
+    configurable: true,
+  });
+}
+
 getTestBed().initTestEnvironment(
   BrowserDynamicTestingModule,
   platformBrowserDynamicTesting(),

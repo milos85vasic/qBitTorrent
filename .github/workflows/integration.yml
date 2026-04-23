@@ -52,6 +52,12 @@ jobs:
             echo "runtime=docker" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: install plugins
+        run: |
+          mkdir -p config/qBittorrent/nova3/engines
+          cp plugins/*.py config/qBittorrent/nova3/engines/
+          chmod 644 config/qBittorrent/nova3/engines/*.py
+
       - name: start stack
         run: |
           set -euo pipefail
