@@ -42,7 +42,7 @@ describe('AppComponent', () => {
     const fx = TestBed.createComponent(AppComponent);
     fx.detectChanges();
     drainBootstrapRequests();
-    expect(fx.componentInstance.title).toBe('Merge Search Dashboard');
+    expect(fx.componentInstance.title).toBe('Боба Dashboard');
   });
 
   it('renders the dashboard, toast container, and confirm dialog', () => {

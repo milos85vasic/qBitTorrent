@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Merge Search Service.
+Main entry point for the Боба Search Service.
 
 Starts both:
 1. The original download proxy (HTTP server)
@@ -82,7 +82,7 @@ def main():
     signal.signal(signal.SIGINT, _signal_handler)
 
     logger.info("=" * 60)
-    logger.info("Merge Search Service Starting")
+    logger.info("Боба Search Service Starting")
     logger.info("=" * 60)
 
     proxy_thread = threading.Thread(target=start_original_proxy, daemon=True)

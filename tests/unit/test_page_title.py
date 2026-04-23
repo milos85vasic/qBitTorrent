@@ -1,8 +1,8 @@
 """Guards the user-visible browser tab title.
 
 Per owner directive (2026-04-19): the tab title must read exactly
-"Merge Search Dashboard" — not "qBittorrent-Fixed" and not the
-compound "qBittorrent-Fixed — Merge Search Dashboard".
+"Боба Dashboard" — not "qBittorrent-Fixed" and not the
+compound "qBittorrent-Fixed — Боба Dashboard".
 
 Also guards the served bundle so a rebuild gap can't leak the old
 title back in silently.
@@ -20,7 +20,7 @@ REPO = Path(__file__).resolve().parents[2]
 INDEX_HTML = REPO / "frontend" / "src" / "index.html"
 DASHBOARD_HTML = REPO / "frontend" / "src" / "app" / "components" / "dashboard" / "dashboard.component.html"
 
-EXPECTED_TITLE = "Merge Search Dashboard"
+EXPECTED_TITLE = "Боба Dashboard"
 
 
 @pytest.fixture(scope="module")
@@ -39,7 +39,7 @@ def test_index_html_title_is_exact(index_html: str) -> None:
 def test_index_html_has_no_qbittorrent_fixed_leak(index_html: str) -> None:
     assert "qBittorrent-Fixed" not in index_html, (
         "index.html contains the legacy 'qBittorrent-Fixed' string — owner "
-        "renamed this to 'Merge Search Dashboard' on 2026-04-19"
+        "renamed this to 'Боба Dashboard' on 2026-04-23"
     )
 
 

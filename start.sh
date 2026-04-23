@@ -435,7 +435,7 @@ show_status() {
     $COMPOSE_CMD ps
     echo ""
     print_success "qBitTorrent Web UI: http://localhost:${WEBUI_PORT:-7185}"
-    print_success "Merge Search Dashboard: http://localhost:${MERGE_SERVICE_PORT:-7187}/"
+    print_success "Боба Dashboard: http://localhost:${MERGE_SERVICE_PORT:-7187}/"
     print_info "Default credentials: admin / admin"
     print_warning "Remember to change the default password!"
     echo ""

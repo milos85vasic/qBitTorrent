@@ -58,7 +58,7 @@ def test_openapi_has_all_required_operations(openapi_schema: dict) -> None:
 
 def test_openapi_info_has_title_and_version(openapi_schema: dict) -> None:
     info = openapi_schema.get("info", {})
-    assert info.get("title") == "qBittorrent Merge Search Service"
+    assert info.get("title") == "Боба Search Service"
     assert info.get("version"), "info.version must be set"
 
 

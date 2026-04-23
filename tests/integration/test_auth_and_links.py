@@ -104,10 +104,10 @@ class TestServiceLinksAccessibility:
         self.qbit_url = all_services_live["qbittorrent"]
 
     def test_merge_search_dashboard_accessible(self):
-        """Merge Search dashboard (port 7187) must be accessible."""
+        """Боба Dashboard (port 7187) must be accessible."""
         r = requests.get(f"{self.base_url}/dashboard", timeout=30)
         assert r.status_code == 200
-        assert "Merge Search Dashboard" in r.text
+        assert "Боба Dashboard" in r.text
 
     def test_qbittorrent_webui_accessible(self):
         """qBittorrent WebUI (port 7185) must respond."""

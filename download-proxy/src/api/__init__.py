@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="qBittorrent Merge Search Service",
+    title="Боба Search Service",
     description="Search and merge results across multiple torrent trackers",
     version="1.0.0",
     lifespan=lifespan,

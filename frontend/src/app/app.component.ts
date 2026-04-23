@@ -27,5 +27,5 @@ import { SiteFooterComponent } from './components/site-footer/site-footer.compon
   `]
 })
 export class AppComponent {
-  title = 'Merge Search Dashboard';
+  title = 'Боба Dashboard';
 }

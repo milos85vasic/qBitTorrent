@@ -1,17 +1,17 @@
 <div class="container">
   <header>
     <div class="brand">
-      <img class="brand-logo" src="logo-header.png" alt="Merge Search Dashboard logo"
+      <img class="brand-logo" src="logo-header.png" alt="Боба Dashboard logo"
            width="48" height="48" loading="eager" decoding="async">
       <div class="brand-text">
-        <h1>Merge Search Dashboard</h1>
+        <h1>Боба Dashboard</h1>
         <p class="tagline">Multi-tracker meta-search with private-tracker bridge</p>
       </div>
     </div>
     <div class="service-links">
       <a [attr.href]="config().qbittorrent_url" target="_blank">qBittorrent WebUI</a>
       <a [attr.href]="hostUrl + ':7186'" target="_blank">Download Proxy</a>
-      <a [attr.href]="hostUrl + ':7187'" class="current">Merge Search</a>
+      <a [attr.href]="hostUrl + ':7187'" class="current">Боба Dashboard</a>
       <a [attr.href]="hostUrl + ':7188'" target="_blank"
          [class.disabled-link]="bridgeHealthy() === false"
          [class.checking]="bridgeHealthy() === null"
