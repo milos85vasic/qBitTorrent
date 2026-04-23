@@ -3,6 +3,7 @@ config/qBittorrent/
 !config/qBittorrent/.gitkeep
 !config/qBittorrent/config/
 !config/qBittorrent/config/qBittorrent.conf
+!config/qBittorrent/qBittorrent.conf
 
 # Keep directory structure but ignore all contents
 config/qBittorrent/*

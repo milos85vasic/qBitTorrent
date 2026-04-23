@@ -26,6 +26,9 @@ WEBUI_PASS = os.environ.get("QBITTORRENT_PASS", "admin")
 
 
 def _detect_runtime():
+    env = os.environ.get("CONTAINER_RUNTIME")
+    if env:
+        return env
     for cmd in ("podman", "docker"):
         try:
             subprocess.run(

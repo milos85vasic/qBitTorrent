@@ -61,9 +61,6 @@ jobs:
       - name: start stack
         run: |
           set -euo pipefail
-          # Remove existing qBittorrent config so WEBUI_PASSWORD=admin is
-          # applied on first start (fresh config + env var = correct creds).
-          rm -f config/qBittorrent/qBittorrent.conf
           # GitHub runners ship Docker Compose v2 via `docker compose`.
           docker compose -f docker-compose.yml up -d --build
           # Wait for all required ports before running tests.
@@ -88,6 +85,7 @@ jobs:
         env:
           MERGE_SERVICE_URL: http://localhost:7187
           QBITTORRENT_URL: http://localhost:7186
+          CONTAINER_RUNTIME: docker
         run: |
           python -m pytest tests/integration/ tests/e2e/ \
             -v --import-mode=importlib \
