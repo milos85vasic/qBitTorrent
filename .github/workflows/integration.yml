@@ -44,7 +44,7 @@ jobs:
           npx ng build --configuration production
 
       - name: install Playwright browsers
-        run: npx playwright install chromium
+        run: python -m playwright install chromium
 
       - name: detect container runtime
         id: runtime
@@ -72,9 +72,10 @@ jobs:
           # Give qBittorrent time to create nova3/ novaprinter.py etc.
           sleep 5
           # Copy plugins into engines/ now that nova3/ exists.
-          mkdir -p config/qBittorrent/nova3/engines
-          cp plugins/*.py config/qBittorrent/nova3/engines/
-          chmod 644 config/qBittorrent/nova3/engines/*.py
+          # Use tar + docker compose exec to avoid host permission issues.
+          tar czf - -C plugins . | \
+            docker compose -f docker-compose.yml exec -T qbittorrent sh -c \
+            'mkdir -p /config/qBittorrent/nova3/engines && tar xzf - -C /config/qBittorrent/nova3/engines && chmod 644 /config/qBittorrent/nova3/engines/*.py'
           # Start download-proxy (depends on qbittorrent health).
           docker compose -f docker-compose.yml up -d download-proxy
           # Wait for all required ports before running tests.
