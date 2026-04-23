@@ -69,11 +69,36 @@ jobs:
             fi
             sleep 1
           done
-          # Give qBittorrent time to create nova3/ novaprinter.py etc.
-          sleep 5
-          # Copy plugins into engines/ now that nova3/ exists.
+          # Trigger qBittorrent to initialise nova3/ (helpers.py, novaprinter.py etc.)
+          curl -sf http://localhost:7185/api/v2/auth/login \
+            -X POST -d "username=admin&password=admin" \
+            -c /tmp/qb_cookie.txt >/dev/null
+          curl -sf http://localhost:7185/api/v2/search/plugins \
+            -b /tmp/qb_cookie.txt >/dev/null || true
+          # Wait for qBittorrent to write the standard nova3 files.
+          for i in {1..30}; do
+            if docker compose -f docker-compose.yml exec -T qbittorrent \
+               test -f /config/qBittorrent/nova3/novaprinter.py; then
+              echo "nova3 ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          # Overwrite qBittorrent's support files with our versions
+          # (our plugins depend on helpers.py extensions like build_magnet_link).
+          docker compose -f docker-compose.yml cp plugins/helpers.py qbittorrent:/config/qBittorrent/nova3/helpers.py
+          docker compose -f docker-compose.yml cp plugins/novaprinter.py qbittorrent:/config/qBittorrent/nova3/novaprinter.py
+          # Copy tracker plugins into engines/ (flatten community/ into engines/).
           # Use tar + docker compose exec to avoid host permission issues.
-          tar czf - -C plugins . | \
+          mkdir -p /tmp/ci-plugins
+          cp plugins/*.py /tmp/ci-plugins/ 2>/dev/null || true
+          cp plugins/community/*.py /tmp/ci-plugins/ 2>/dev/null || true
+          # Remove support files and non-tracker modules.
+          rm -f /tmp/ci-plugins/helpers.py /tmp/ci-plugins/nova2.py \
+            /tmp/ci-plugins/novaprinter.py /tmp/ci-plugins/socks.py \
+            /tmp/ci-plugins/download_proxy.py /tmp/ci-plugins/env_loader.py \
+            /tmp/ci-plugins/theme_injector.py
+          tar czf - -C /tmp/ci-plugins . | \
             docker compose -f docker-compose.yml exec -T qbittorrent sh -c \
             'mkdir -p /config/qBittorrent/nova3/engines && tar xzf - -C /config/qBittorrent/nova3/engines && chmod 644 /config/qBittorrent/nova3/engines/*.py'
           # Start download-proxy (depends on qbittorrent health).
