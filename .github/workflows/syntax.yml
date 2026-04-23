@@ -35,6 +35,8 @@ jobs:
           ignore_paths: >
             download-proxy
             frontend
+            .specify
+            .worktrees
 
   python:
     runs-on: ubuntu-latest

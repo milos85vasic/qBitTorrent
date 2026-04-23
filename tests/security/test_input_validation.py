@@ -161,7 +161,7 @@ class TestInputValidation:
         """
         resp = requests.post(
             f"{self.base_url}/api/v1/search",
-            data=b"\xef\xbb\xbf{\"query\": \"test\"}",
+            data=b'\xef\xbb\xbf{"query": "test"}',
             headers={"Content-Type": "application/json"},
             timeout=60,
         )

@@ -22,7 +22,7 @@ if str(_SRC) not in sys.path:
 
 os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost")
 
-from merge_service.search import (  # noqa: E402
+from merge_service.search import (
     SearchOrchestrator,
     SearchResult,
     TrackerSource,
@@ -48,7 +48,7 @@ def _tracker_payloads(draw):
 def _result(name="r") -> SearchResult:
     return SearchResult(
         name=name,
-        link=f"magnet:?xt=urn:btih:{'a'*40}",
+        link=f"magnet:?xt=urn:btih:{'a' * 40}",
         size="1 MB",
         seeds=1,
         leechers=0,
@@ -59,8 +59,7 @@ def _result(name="r") -> SearchResult:
 async def _run_search_with_payloads(payloads):
     orch = SearchOrchestrator()
     fake_trackers = [
-        TrackerSource(name=name, url=f"https://{name}.example", enabled=True)
-        for (name, _count, _fail) in payloads
+        TrackerSource(name=name, url=f"https://{name}.example", enabled=True) for (name, _count, _fail) in payloads
     ]
     orch._get_enabled_trackers = lambda: fake_trackers
 

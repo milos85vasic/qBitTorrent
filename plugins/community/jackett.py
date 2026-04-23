@@ -52,13 +52,13 @@ proxy_manager.enable_proxy(False)  # off by default
 
 ###############################################################################
 # load configuration from file
-CONFIG_FILE = 'jackett.json'
+CONFIG_FILE = "jackett.json"
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), CONFIG_FILE)
 CONFIG_DATA: Dict[str, Any] = {
-    'api_key': 'YOUR_API_KEY_HERE',  # jackett api
-    'url': 'http://127.0.0.1:9117',  # jackett url
-    'tracker_first': False,          # (False/True) add tracker name to beginning of search result
-    'thread_count': 20,              # number of threads to use for http requests
+    "api_key": "YOUR_API_KEY_HERE",  # jackett api
+    "url": "http://127.0.0.1:9117",  # jackett url
+    "tracker_first": False,  # (False/True) add tracker name to beginning of search result
+    "thread_count": 20,  # number of threads to use for http requests
 }
 PRINTER_THREAD_LOCK = Lock()
 
@@ -67,27 +67,27 @@ def load_configuration() -> None:
     global CONFIG_DATA
     try:
         # try to load user data from file
-        with open(CONFIG_PATH, encoding='utf-8') as f:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
             CONFIG_DATA = json.load(f)  # pyright: ignore [reportConstantRedefinition]
     except ValueError:
         # if file exists, but it's malformed we load add a flag
-        CONFIG_DATA['malformed'] = True
+        CONFIG_DATA["malformed"] = True
     except Exception:  # pylint: disable=broad-exception-caught
         # if file doesn't exist, we create it
         save_configuration()
 
     # do some checks
-    if any(item not in CONFIG_DATA for item in ['api_key', 'tracker_first', 'url']):
-        CONFIG_DATA['malformed'] = True
+    if any(item not in CONFIG_DATA for item in ["api_key", "tracker_first", "url"]):
+        CONFIG_DATA["malformed"] = True
 
     # add missing keys
-    if 'thread_count' not in CONFIG_DATA:
-        CONFIG_DATA['thread_count'] = 20
+    if "thread_count" not in CONFIG_DATA:
+        CONFIG_DATA["thread_count"] = 20
         save_configuration()
 
 
 def save_configuration() -> None:
-    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         f.write(json.dumps(CONFIG_DATA, indent=4, sort_keys=True))
 
 
@@ -96,39 +96,39 @@ load_configuration()
 
 
 class jackett:
-    name = 'Jackett'
-    url = CONFIG_DATA['url'] if CONFIG_DATA['url'][-1] != '/' else CONFIG_DATA['url'][:-1]
-    api_key = CONFIG_DATA['api_key']
-    thread_count = CONFIG_DATA['thread_count']
+    name = "Jackett"
+    url = CONFIG_DATA["url"] if CONFIG_DATA["url"][-1] != "/" else CONFIG_DATA["url"][:-1]
+    api_key = CONFIG_DATA["api_key"]
+    thread_count = CONFIG_DATA["thread_count"]
     supported_categories = {
-        'all': None,
-        'anime': ['5070'],
-        'books': ['8000'],
-        'games': ['1000', '4000'],
-        'movies': ['2000'],
-        'music': ['3000'],
-        'software': ['4000'],
-        'tv': ['5000'],
+        "all": None,
+        "anime": ["5070"],
+        "books": ["8000"],
+        "games": ["1000", "4000"],
+        "movies": ["2000"],
+        "music": ["3000"],
+        "software": ["4000"],
+        "tv": ["5000"],
     }
 
     def download_torrent(self, download_url: str) -> None:
         # fix for some indexers with magnet link inside .torrent file
-        if download_url.startswith('magnet:?'):
+        if download_url.startswith("magnet:?"):
             print(download_url + " " + download_url)
         proxy_manager.enable_proxy(True)
         response = self.get_response(download_url)
         proxy_manager.enable_proxy(False)
-        if response is not None and response.startswith('magnet:?'):
+        if response is not None and response.startswith("magnet:?"):
             print(response + " " + download_url)
         else:
             print(helpers.download_file(download_url))
 
-    def search(self, what: str, cat: str = 'all') -> None:
+    def search(self, what: str, cat: str = "all") -> None:
         what = unquote(what)
         category = self.supported_categories[cat.lower()]
 
         # check for malformed configuration
-        if 'malformed' in CONFIG_DATA:
+        if "malformed" in CONFIG_DATA:
             self.handle_error("malformed configuration file", what)
             return
 
@@ -146,14 +146,10 @@ class jackett:
             with Pool(min(len(indexers), self.thread_count)) as pool:
                 pool.starmap(self.search_jackett_indexer, args)
         else:
-            self.search_jackett_indexer(what, category, 'all')
+            self.search_jackett_indexer(what, category, "all")
 
     def get_jackett_indexers(self, what: str) -> List[str]:
-        params = urlencode([
-            ('apikey', self.api_key),
-            ('t', 'indexers'),
-            ('configured', 'true')
-        ])
+        params = urlencode([("apikey", self.api_key), ("t", "indexers"), ("configured", "true")])
         jacket_url = f"{self.url}/api/v2.0/indexers/all/results/torznab/api?{params}"
         response = self.get_response(jacket_url)
         if response is None:
@@ -162,24 +158,21 @@ class jackett:
         # process results
         response_xml = xml.etree.ElementTree.fromstring(response)
         indexers: List[str] = []
-        for indexer in response_xml.findall('indexer'):
-            indexers.append(indexer.attrib['id'])
+        for indexer in response_xml.findall("indexer"):
+            indexers.append(indexer.attrib["id"])
         return indexers
 
     def search_jackett_indexer(self, what: str, category: Union[List[str], None], indexer_id: str) -> None:
         def toStr(s: Union[str, None]) -> str:
-            return s if s is not None else ''
+            return s if s is not None else ""
 
         def getTextProp(e: Union[xml.etree.ElementTree.Element, None]) -> str:
-            return toStr(e.text if e is not None else '')
+            return toStr(e.text if e is not None else "")
 
         # prepare jackett url
-        params_tmp = [
-            ('apikey', self.api_key),
-            ('q', what)
-        ]
+        params_tmp = [("apikey", self.api_key), ("q", what)]
         if category is not None:
-            params_tmp.append(('cat', ','.join(category)))
+            params_tmp.append(("cat", ",".join(category)))
         params = urlencode(params_tmp)
         jacket_url = f"{self.url}/api/v2.0/indexers/{indexer_id}/results/torznab/api?{params}"
         response = self.get_response(jacket_url)
@@ -188,61 +181,61 @@ class jackett:
             return
         # process search results
         response_xml = xml.etree.ElementTree.fromstring(response)
-        channel = response_xml.find('channel')
+        channel = response_xml.find("channel")
         if channel is None:
             return
-        for result in channel.findall('item'):
+        for result in channel.findall("item"):
             res: Dict[str, Any] = {}
 
-            title_tmp = result.find('title')
+            title_tmp = result.find("title")
             if title_tmp is not None:
                 title = title_tmp.text
             else:
                 continue
 
-            tracker = getTextProp(result.find('jackettindexer'))
-            if CONFIG_DATA['tracker_first']:
-                res['name'] = f"[{tracker}] {title}"
+            tracker = getTextProp(result.find("jackettindexer"))
+            if CONFIG_DATA["tracker_first"]:
+                res["name"] = f"[{tracker}] {title}"
             else:
-                res['name'] = f"{title} [{tracker}]"
+                res["name"] = f"{title} [{tracker}]"
 
-            res['link'] = result.find(self.generate_xpath('magneturl'))
-            if res['link'] is not None:
-                res['link'] = res['link'].attrib['value']
+            res["link"] = result.find(self.generate_xpath("magneturl"))
+            if res["link"] is not None:
+                res["link"] = res["link"].attrib["value"]
             else:
-                res['link'] = result.find('link')
-                if res['link'] is not None:
-                    res['link'] = res['link'].text
+                res["link"] = result.find("link")
+                if res["link"] is not None:
+                    res["link"] = res["link"].text
                 else:
                     continue
 
-            res['size'] = result.find('size')
-            res['size'] = -1 if res['size'] is None else (toStr(res['size'].text) + ' B')
+            res["size"] = result.find("size")
+            res["size"] = -1 if res["size"] is None else (toStr(res["size"].text) + " B")
 
-            res['seeds'] = result.find(self.generate_xpath('seeders'))
-            res['seeds'] = -1 if res['seeds'] is None else int(res['seeds'].attrib['value'])
+            res["seeds"] = result.find(self.generate_xpath("seeders"))
+            res["seeds"] = -1 if res["seeds"] is None else int(res["seeds"].attrib["value"])
 
-            res['leech'] = result.find(self.generate_xpath('peers'))
-            res['leech'] = -1 if res['leech'] is None else int(res['leech'].attrib['value'])
+            res["leech"] = result.find(self.generate_xpath("peers"))
+            res["leech"] = -1 if res["leech"] is None else int(res["leech"].attrib["value"])
 
-            if res['seeds'] != -1 and res['leech'] != -1:
-                res['leech'] -= res['seeds']
+            if res["seeds"] != -1 and res["leech"] != -1:
+                res["leech"] -= res["seeds"]
 
-            res['desc_link'] = result.find('comments')
-            if res['desc_link'] is not None:
-                res['desc_link'] = res['desc_link'].text
+            res["desc_link"] = result.find("comments")
+            if res["desc_link"] is not None:
+                res["desc_link"] = res["desc_link"].text
             else:
-                res['desc_link'] = result.find('guid')
-                res['desc_link'] = '' if res['desc_link'] is None else res['desc_link'].text
+                res["desc_link"] = result.find("guid")
+                res["desc_link"] = "" if res["desc_link"] is None else res["desc_link"].text
 
             # note: engine_url can't be changed, torrent download stops working
-            res['engine_url'] = self.url
+            res["engine_url"] = self.url
 
             try:
-                date = datetime.strptime(getTextProp(result.find('pubDate')), '%a, %d %b %Y %H:%M:%S %z')
-                res['pub_date'] = int(date.timestamp())
+                date = datetime.strptime(getTextProp(result.find("pubDate")), "%a, %d %b %Y %H:%M:%S %z")
+                res["pub_date"] = int(date.timestamp())
             except Exception:  # pylint: disable=broad-exception-caught
-                res['pub_date'] = -1
+                res["pub_date"] = -1
 
             self.pretty_printer_thread_safe(res)
 
@@ -255,7 +248,7 @@ class jackett:
             # we can't use helpers.retrieve_url because of redirects
             # we need the cookie processor to handle redirects
             opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
-            response = opener.open(query).read().decode('utf-8')
+            response = opener.open(query).read().decode("utf-8")
         except urllib.request.HTTPError as e:
             # if the page returns a magnet redirect, used in download_torrent
             if e.code == 302:
@@ -267,16 +260,18 @@ class jackett:
     def handle_error(self, error_msg: str, what: str) -> None:
         # we need to print the search text to be displayed in qBittorrent when
         # 'Torrent names only' is enabled
-        self.pretty_printer_thread_safe({
-            'link': self.url,
-            'name': f"Jackett: {error_msg}! Right-click this row and select 'Open description page' to open help. Configuration file: '{CONFIG_PATH}' Search: '{what}'",
-            'size': -1,
-            'seeds': -1,
-            'leech': -1,
-            'engine_url': self.url,
-            'desc_link': 'https://github.com/qbittorrent/search-plugins/wiki/How-to-configure-Jackett-plugin',  # noqa
-            'pub_date': -1
-        })
+        self.pretty_printer_thread_safe(
+            {
+                "link": self.url,
+                "name": f"Jackett: {error_msg}! Right-click this row and select 'Open description page' to open help. Configuration file: '{CONFIG_PATH}' Search: '{what}'",
+                "size": -1,
+                "seeds": -1,
+                "leech": -1,
+                "engine_url": self.url,
+                "desc_link": "https://github.com/qbittorrent/search-plugins/wiki/How-to-configure-Jackett-plugin",  # noqa
+                "pub_date": -1,
+            }
+        )
 
     def pretty_printer_thread_safe(self, dictionary: Dict[str, Any]) -> None:
         escaped_dict = self.escape_pipe(dictionary)
@@ -287,5 +282,5 @@ class jackett:
         # Safety measure until it's fixed in prettyPrinter
         for key in dictionary.keys():
             if isinstance(dictionary[key], str):
-                dictionary[key] = dictionary[key].replace('|', '%7C')
+                dictionary[key] = dictionary[key].replace("|", "%7C")
         return dictionary

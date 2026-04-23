@@ -81,9 +81,7 @@ def test_piratebay_specifically_returns_results(linux_search: dict) -> None:
     assert pb["results_count"] > 0, (
         f"piratebay returned 0 results for {QUERY!r}. It's the canonical "
         "working public tracker — 0 here implies the monkeypatch or NDJSON "
-        "capture broke again. Status={status}, error={error}".format(
-            status=pb.get("status"), error=pb.get("error")
-        )
+        "capture broke again. Status={status}, error={error}".format(status=pb.get("status"), error=pb.get("error"))
     )
 
 
@@ -92,8 +90,7 @@ def test_query_roundtrip_matches(linux_search: dict) -> None:
     the merge service wired the right query into every fan-out task."""
     for t in linux_search.get("tracker_stats", []):
         assert t.get("query") == QUERY, (
-            f"tracker {t.get('name')!r} recorded query={t.get('query')!r} "
-            f"(expected {QUERY!r})"
+            f"tracker {t.get('name')!r} recorded query={t.get('query')!r} (expected {QUERY!r})"
         )
 
 
@@ -132,14 +129,28 @@ def test_dead_trackers_excluded_from_fan_out(linux_search: dict) -> None:
     """
     stat_names = {t["name"] for t in linux_search.get("tracker_stats", [])}
     dead = {
-        "eztv", "kickass", "bt4g", "extratorrent", "one337x",
-        "bitru", "megapeer",
-        "nyaa", "audiobookbay", "torlock",
-        "pctorrent", "yihua", "torrentgalaxy",
+        "eztv",
+        "kickass",
+        "bt4g",
+        "extratorrent",
+        "one337x",
+        "bitru",
+        "megapeer",
+        "nyaa",
+        "audiobookbay",
+        "torlock",
+        "pctorrent",
+        "yihua",
+        "torrentgalaxy",
         "xfsub",
         "anilibra",
-        "solidtorrents", "therarbg", "torrentfunk",
-        "ali213", "btsow", "gamestorrents", "torrentkitty",
+        "solidtorrents",
+        "therarbg",
+        "torrentfunk",
+        "ali213",
+        "btsow",
+        "gamestorrents",
+        "torrentkitty",
     }
     leaked = stat_names & dead
     assert not leaked, (
@@ -176,8 +187,7 @@ def test_empty_trackers_surface_a_reason(linux_search: dict) -> None:
     # Every classified tracker should have a human-readable summary too.
     for t in classified:
         assert t.get("error"), (
-            f"tracker {t['name']!r} has error_type={t.get('error_type')!r} "
-            f"but no human-readable error summary"
+            f"tracker {t['name']!r} has error_type={t.get('error_type')!r} but no human-readable error summary"
         )
 
     # Floor: at least one classification should be present. Since the

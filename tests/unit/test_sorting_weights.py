@@ -31,6 +31,7 @@ class TestSortingWeights:
             {"content_type": "unknown"},
             {"content_type": "music"},
         ]
+
         # Simulate frontend sort logic
         def sort_type_asc(a, b):
             av = a.get("content_type") or "unknown"
@@ -54,8 +55,10 @@ class TestSortingWeights:
     def test_size_parsing_for_sorting(self):
         """Size strings must parse to bytes for numeric sorting."""
         sizes = ["1.5 GB", "500 MB", "2 TB", "1 GB"]
+
         def parse_size(s):
             import re
+
             m = re.match(r"([\d.]+)\s*([KMGT]?B)", s, re.I)
             if not m:
                 return 0
@@ -63,6 +66,7 @@ class TestSortingWeights:
             unit = m.group(2).upper()
             mult = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
             return val * mult.get(unit, 1)
+
         parsed = [(s, parse_size(s)) for s in sizes]
         parsed.sort(key=lambda x: x[1])
         assert [p[0] for p in parsed] == ["500 MB", "1 GB", "1.5 GB", "2 TB"]
@@ -87,6 +91,7 @@ class TestBackendSortingSupport:
     def test_search_request_has_sort_fields(self):
         """SearchRequest model should support sort_by and sort_order."""
         from api.routes import SearchRequest
+
         # After fix, these should exist
         req = SearchRequest(query="test", sort_by="seeds", sort_order="desc")
         assert req.sort_by == "seeds"
@@ -95,6 +100,7 @@ class TestBackendSortingSupport:
     def test_search_request_default_sort(self):
         """Default sort should be by seeds descending."""
         from api.routes import SearchRequest
+
         req = SearchRequest(query="test")
         assert req.sort_by == "seeds"
         assert req.sort_order == "desc"

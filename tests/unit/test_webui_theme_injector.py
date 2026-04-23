@@ -61,8 +61,8 @@ def test_injector_inserts_both_tags_before_head_close(dp):
     assert '<script src="/__qbit_theme__/bootstrap.js" defer></script>' in text
     # Tags are before </head> (case-insensitive).
     head_close = text.lower().rfind("</head>")
-    link_pos = text.find('/__qbit_theme__/skin.css')
-    script_pos = text.find('/__qbit_theme__/bootstrap.js')
+    link_pos = text.find("/__qbit_theme__/skin.css")
+    script_pos = text.find("/__qbit_theme__/bootstrap.js")
     assert 0 < link_pos < head_close
     assert 0 < script_pos < head_close
 
@@ -72,8 +72,8 @@ def test_injector_is_idempotent(dp):
     twice = dp.inject_theme_assets(once, "text/html")
     text = twice.decode("utf-8")
     # Each bridge tag appears exactly once.
-    assert text.count('/__qbit_theme__/skin.css') == 1
-    assert text.count('/__qbit_theme__/bootstrap.js') == 1
+    assert text.count("/__qbit_theme__/skin.css") == 1
+    assert text.count("/__qbit_theme__/bootstrap.js") == 1
 
 
 def test_injector_is_case_insensitive_on_head_tag(dp):
@@ -198,9 +198,7 @@ def test_csp_rewrite_adds_merge_origin_to_connect_src(dp):
 
 
 def test_csp_rewrite_is_idempotent(dp):
-    original = (
-        "default-src 'self'; connect-src 'self' " + dp.MERGE_SERVICE_ORIGIN + ";"
-    )
+    original = "default-src 'self'; connect-src 'self' " + dp.MERGE_SERVICE_ORIGIN + ";"
     assert dp.rewrite_csp(original).count(dp.MERGE_SERVICE_ORIGIN) == 1
 
 
@@ -227,6 +225,7 @@ def test_body_gzip_is_decompressed_for_injection(dp):
     Accept-Encoding: gzip. The injector needs to see plain text, so
     the proxy must decompress first. We test the helper directly."""
     import gzip as _gzip
+
     decoded, flag = dp._maybe_decode_body(_gzip.compress(SAMPLE_HTML), "gzip")
     assert flag is True
     assert decoded == SAMPLE_HTML
@@ -234,6 +233,7 @@ def test_body_gzip_is_decompressed_for_injection(dp):
 
 def test_body_deflate_is_decompressed(dp):
     import zlib as _zlib
+
     decoded, flag = dp._maybe_decode_body(_zlib.compress(SAMPLE_HTML), "deflate")
     assert flag is True
     assert decoded == SAMPLE_HTML
@@ -241,6 +241,7 @@ def test_body_deflate_is_decompressed(dp):
 
 def test_body_raw_deflate_is_decompressed(dp):
     import zlib as _zlib
+
     # Raw deflate (no zlib header).
     compressor = _zlib.compressobj(wbits=-_zlib.MAX_WBITS)
     raw = compressor.compress(SAMPLE_HTML) + compressor.flush()

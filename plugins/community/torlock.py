@@ -60,9 +60,7 @@ class torlock:
                 "tdl": "leech",
             }
 
-        def handle_starttag(
-            self, tag: str, attrs: List[Tuple[str, Union[str, None]]]
-        ) -> None:
+        def handle_starttag(self, tag: str, attrs: List[Tuple[str, Union[str, None]]]) -> None:
             params = dict(attrs)
 
             if self.item_found:
@@ -108,9 +106,7 @@ class torlock:
                         elif self.current_item["pub_date"] == "Yesterday":
                             date = datetime.now() - timedelta(days=1)
                         else:
-                            date = datetime.strptime(
-                                self.current_item["pub_date"], "%m/%d/%Y"
-                            )
+                            date = datetime.strptime(self.current_item["pub_date"], "%m/%d/%Y")
                         date = date.replace(hour=0, minute=0, second=0, microsecond=0)
                         self.current_item["pub_date"] = int(date.timestamp())
                     except Exception:
@@ -126,9 +122,7 @@ class torlock:
                     if magnet_link:
                         self.current_item["link"] = magnet_link
                     else:
-                        self.current_item["link"] = "".join(
-                            (self.url, "/tor/", torrent_id, ".torrent")
-                        )
+                        self.current_item["link"] = "".join((self.url, "/tor/", torrent_id, ".torrent"))
 
                     prettyPrinter(self.current_item)
                     self.page_items += 1
@@ -152,9 +146,7 @@ class torlock:
 
         for page in range(1, 5):
             parser = self.MyHtmlParser(self.url, self)
-            page_url = (
-                f"{self.url}/{category}/torrents/{query}.html?sort=seeds&page={page}"
-            )
+            page_url = f"{self.url}/{category}/torrents/{query}.html?sort=seeds&page={page}"
             html = retrieve_url(page_url)
             parser.feed(html)
             parser.close()

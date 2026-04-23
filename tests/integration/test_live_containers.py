@@ -237,8 +237,7 @@ class TestContainerEnvironment:
     def test_rutracker_creds_configured(self):
         r = _exec("qbittorrent-proxy", "env | grep RUTRACKER_USERNAME || true")
         assert r.stdout.strip(), (
-            "RUTRACKER_USERNAME must be configured in .env — "
-            "required for the rutracker plugin to search"
+            "RUTRACKER_USERNAME must be configured in .env — required for the rutracker plugin to search"
         )
 
     def test_proxy_port_env(self):
@@ -260,8 +259,7 @@ class TestContainerEnvironment:
     def test_shared_tmp_mount(self):
         r = _exec("qbittorrent-proxy", "ls -la /shared-tmp/ 2>/dev/null || true")
         assert r.returncode == 0 and "/shared-tmp" not in r.stderr, (
-            "/shared-tmp must be mounted — update docker-compose.yml and "
-            "`podman compose up -d` to pick up the mount"
+            "/shared-tmp must be mounted — update docker-compose.yml and `podman compose up -d` to pick up the mount"
         )
 
     def test_shared_tmp_in_qbittorrent(self):

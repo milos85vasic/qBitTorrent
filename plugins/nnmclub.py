@@ -33,9 +33,7 @@ FILE = Path(__file__)
 BASEDIR = FILE.parent.absolute()
 
 FILENAME = FILE.stem
-FILE_J, FILE_C, FILE_L = [
-    BASEDIR / (FILENAME + fl) for fl in (".json", ".cookie", ".log")
-]
+FILE_J, FILE_C, FILE_L = [BASEDIR / (FILENAME + fl) for fl in (".json", ".cookie", ".log")]
 
 
 RE_TORRENTS = re.compile(

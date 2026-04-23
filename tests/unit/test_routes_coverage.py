@@ -108,8 +108,7 @@ class TestSaveLoadCredentials:
     def test_load_corrupt_file(self):
         from api.routes import _load_saved_qbit_credentials
 
-        with patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=Exception("read error")):
+        with patch("os.path.isfile", return_value=True), patch("builtins.open", side_effect=Exception("read error")):
             assert _load_saved_qbit_credentials() is None
 
 
@@ -123,8 +122,10 @@ class TestGetQbitUsernamePassword:
     def test_username_from_env(self):
         from api.routes import _get_qbit_username
 
-        with patch("api.routes._load_saved_qbit_credentials", return_value=None), \
-             patch.dict(os.environ, {"QBITTORRENT_USER": "env_user"}, clear=False):
+        with (
+            patch("api.routes._load_saved_qbit_credentials", return_value=None),
+            patch.dict(os.environ, {"QBITTORRENT_USER": "env_user"}, clear=False),
+        ):
             assert _get_qbit_username() == "env_user"
 
     def test_password_from_saved(self):
@@ -136,8 +137,10 @@ class TestGetQbitUsernamePassword:
     def test_password_from_env(self):
         from api.routes import _get_qbit_password
 
-        with patch("api.routes._load_saved_qbit_credentials", return_value=None), \
-             patch.dict(os.environ, {"QBITTORRENT_PASS": "env_pass"}, clear=False):
+        with (
+            patch("api.routes._load_saved_qbit_credentials", return_value=None),
+            patch.dict(os.environ, {"QBITTORRENT_PASS": "env_pass"}, clear=False),
+        ):
             assert _get_qbit_password() == "env_pass"
 
 
@@ -189,11 +192,13 @@ class TestInitiateDownload:
         mock_req = MagicMock()
         req = DownloadRequest(result_id="test", download_urls=["https://example.com/file.torrent"])
 
-        with patch("api.routes._get_orchestrator", return_value=MagicMock()), \
-             patch("api.routes._get_qbit_username", return_value="admin"), \
-             patch("api.routes._get_qbit_password", return_value="admin"), \
-             patch("api.hooks.dispatch_event", new_callable=AsyncMock), \
-             patch("aiohttp.ClientSession", return_value=mock_session):
+        with (
+            patch("api.routes._get_orchestrator", return_value=MagicMock()),
+            patch("api.routes._get_qbit_username", return_value="admin"),
+            patch("api.routes._get_qbit_password", return_value="admin"),
+            patch("api.hooks.dispatch_event", new_callable=AsyncMock),
+            patch("aiohttp.ClientSession", return_value=mock_session),
+        ):
             result = await initiate_download(req, mock_req)
             assert result["status"] == "auth_failed"
 
@@ -214,9 +219,11 @@ class TestActiveDownloads:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("api.routes._get_qbit_username", return_value="admin"), \
-             patch("api.routes._get_qbit_password", return_value="admin"), \
-             patch("aiohttp.ClientSession", return_value=mock_session):
+        with (
+            patch("api.routes._get_qbit_username", return_value="admin"),
+            patch("api.routes._get_qbit_password", return_value="admin"),
+            patch("aiohttp.ClientSession", return_value=mock_session),
+        ):
             result = await get_active_downloads()
             assert result["downloads"] == []
             assert result.get("error") == "auth failed"
@@ -225,9 +232,11 @@ class TestActiveDownloads:
     async def test_connection_failure(self):
         from api.routes import get_active_downloads
 
-        with patch("api.routes._get_qbit_username", return_value="admin"), \
-             patch("api.routes._get_qbit_password", return_value="admin"), \
-             patch("aiohttp.ClientSession", side_effect=Exception("no connection")):
+        with (
+            patch("api.routes._get_qbit_username", return_value="admin"),
+            patch("api.routes._get_qbit_password", return_value="admin"),
+            patch("aiohttp.ClientSession", side_effect=Exception("no connection")),
+        ):
             result = await get_active_downloads()
             assert result["downloads"] == []
             assert result.get("error") == "unavailable"

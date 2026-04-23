@@ -26,7 +26,10 @@ class TestIssue1DownloadButton:
         """There must be an endpoint to download .torrent files."""
         resp = requests.post(
             f"{self.base_url}/api/v1/download/file",
-            json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:41082bfe3a7f3f47930d2e2ce72ba844c82da906"]},
+            json={
+                "result_id": "test",
+                "download_urls": ["magnet:?xt=urn:btih:41082bfe3a7f3f47930d2e2ce72ba844c82da906"],
+            },
             timeout=30,
             allow_redirects=False,
         )
@@ -37,8 +40,8 @@ class TestIssue1DownloadButton:
         """Dashboard must be Angular SPA."""
         dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
-        assert "<base href=\"/\">" in dashboard
-        assert "<script src=\"main-" in dashboard
+        assert '<base href="/">' in dashboard
+        assert '<script src="main-' in dashboard
 
     def test_download_button_is_angular_component(self):
         """Download button must be Angular component."""
@@ -54,7 +57,7 @@ class TestIssue1DownloadButton:
                 "download_urls": [
                     "magnet:?xt=urn:btih:41082bfe3a7f3f47930d2e2ce72ba844c82da906&tr=udp://t1:1337",
                     "magnet:?xt=urn:btih:def4567890abc123def4567890abc123def45678&tr=udp://t2:6969",
-                ]
+                ],
             },
             timeout=30,
         )
@@ -98,8 +101,9 @@ class TestIssue2TypeColumn:
         assert len(results) > 0, "No results found"
         non_unknown = [r for r in results if r.get("content_type") != "unknown"]
         # At least 20% should have a detected type
-        assert len(non_unknown) >= max(1, len(results) * 0.2), \
+        assert len(non_unknown) >= max(1, len(results) * 0.2), (
             f"Too many unknown types: {len(non_unknown)}/{len(results)} have detected type"
+        )
 
     def test_type_detection_works_for_movies(self):
         """Searching 'matrix' should have mostly movie types."""
@@ -147,8 +151,9 @@ class TestIssue3SeedsLeechers:
         assert len(results) > 0
         nonzero = [r for r in results if r.get("seeds", 0) > 0]
         # At least 10% should have non-zero seeds (many trackers don't report seeds)
-        assert len(nonzero) >= len(results) * 0.1, \
+        assert len(nonzero) >= len(results) * 0.1, (
             f"Too many zero seeds: {len(results) - len(nonzero)}/{len(results)} have 0 seeds"
+        )
 
     def test_seeds_are_integers(self):
         """Seeds must be integers."""
@@ -218,7 +223,7 @@ class TestIssue5Sorting:
         """Dashboard must be Angular SPA."""
         dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
-        assert "<script src=\"main-" in dashboard
+        assert '<script src="main-' in dashboard
 
     def test_backend_supports_sort_params(self):
         """Backend should support sort parameters."""
@@ -241,7 +246,7 @@ class TestFooter:
         """Dashboard must be Angular SPA."""
         dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
-        assert "<script src=\"main-" in dashboard
+        assert '<script src="main-' in dashboard
 
 
 class TestSearchPerformance:
@@ -276,8 +281,7 @@ class TestSearchPerformance:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data.get("status") in ("running", "in_progress", "completed"), \
-            f"Unexpected status: {data.get('status')}"
+        assert data.get("status") in ("running", "in_progress", "completed"), f"Unexpected status: {data.get('status')}"
 
 
 class TestDownloadButtonConsistency:
@@ -309,13 +313,13 @@ class TestDashboardCacheControl:
         """Dashboard response must include Cache-Control: no-cache or similar."""
         resp = requests.get(f"{self.base_url}/", timeout=30)
         cc = resp.headers.get("Cache-Control", "").lower()
-        assert "no-cache" in cc or "no-store" in cc or "must-revalidate" in cc, \
+        assert "no-cache" in cc or "no-store" in cc or "must-revalidate" in cc, (
             f"Missing cache-control header, got: {cc!r}"
+        )
 
     def test_dashboard_has_no_etag_or_weak_etag(self):
         """Dashboard should not use strong etag caching."""
         resp = requests.get(f"{self.base_url}/", timeout=30)
         # ETag is OK if Cache-Control is set to no-cache
         cc = resp.headers.get("Cache-Control", "").lower()
-        assert "no-cache" in cc or "no-store" in cc, \
-            "Dashboard must have cache-busting headers"
+        assert "no-cache" in cc or "no-store" in cc, "Dashboard must have cache-busting headers"

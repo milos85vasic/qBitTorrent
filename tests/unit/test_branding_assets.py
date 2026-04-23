@@ -73,10 +73,10 @@ def test_index_html_references_favicon_and_manifest() -> None:
     text = INDEX_HTML.read_text()
     for ref in (
         'rel="icon"',
-        'favicon.ico',
+        "favicon.ico",
         'rel="apple-touch-icon"',
         'rel="manifest"',
-        'manifest.webmanifest',
+        "manifest.webmanifest",
         'meta name="theme-color"',
     ):
         assert ref in text, f"index.html missing {ref!r}"
@@ -103,5 +103,5 @@ def test_manifest_has_maskable_icon(manifest: dict) -> None:
 
 def test_dashboard_template_references_logo() -> None:
     tpl = (REPO_ROOT / "frontend" / "src" / "app" / "components" / "dashboard" / "dashboard.component.html").read_text()
-    assert 'logo-header.png' in tpl or 'logo.png' in tpl, "dashboard template should reference the branding logo"
+    assert "logo-header.png" in tpl or "logo.png" in tpl, "dashboard template should reference the branding logo"
     assert 'class="brand"' in tpl or 'class="brand-logo"' in tpl, "dashboard should have .brand/.brand-logo element"

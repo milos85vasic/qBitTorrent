@@ -66,6 +66,7 @@ def test_pending_captchas_cache_bounded(monkeypatch):
     import importlib
 
     from api import auth as auth_mod
+
     importlib.reload(auth_mod)
 
     for i in range(64):

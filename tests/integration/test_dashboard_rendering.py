@@ -24,8 +24,8 @@ class TestDashboardHtmlStructure:
     def test_dashboard_is_angular_app(self):
         """Dashboard must be Angular SPA."""
         assert "<app-root>" in self.dashboard or "<app-root></app-root>" in self.dashboard
-        assert "<base href=\"/\">" in self.dashboard
-        assert "<script src=\"main-" in self.dashboard
+        assert '<base href="/">' in self.dashboard
+        assert '<script src="main-' in self.dashboard
 
     def test_angular_styles_bundle_loaded(self):
         """Angular styles bundle must be loaded."""
@@ -125,7 +125,7 @@ class TestDashboardButtonsInHtml:
 
     def test_dashboard_is_angular_app(self):
         assert "<app-root>" in self.dashboard or "<app-root></app-root>" in self.dashboard
-        assert "<script src=\"main-" in self.dashboard
+        assert '<script src="main-' in self.dashboard
 
     def test_angular_styles_loaded(self):
         assert "styles-" in self.dashboard

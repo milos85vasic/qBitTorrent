@@ -51,9 +51,7 @@ def test_default_uses_localhost_origins(monkeypatch, caplog):
     ]
 
     wildcards = [
-        rec
-        for rec in caplog.records
-        if rec.levelno == logging.WARNING and "CORS wildcard" in rec.getMessage()
+        rec for rec in caplog.records if rec.levelno == logging.WARNING and "CORS wildcard" in rec.getMessage()
     ]
     assert not wildcards
 
@@ -71,9 +69,7 @@ def test_explicit_origins_are_respected(monkeypatch, caplog):
         "https://b.example",
     ]
     wildcards = [
-        rec
-        for rec in caplog.records
-        if rec.levelno == logging.WARNING and "CORS wildcard" in rec.getMessage()
+        rec for rec in caplog.records if rec.levelno == logging.WARNING and "CORS wildcard" in rec.getMessage()
     ]
     assert not wildcards, (
         "Did not expect a wildcard warning when ALLOWED_ORIGINS is explicitly set; "

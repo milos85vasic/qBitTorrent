@@ -63,9 +63,7 @@ class limetorrents:
                 r"(\d+)\s+minutes?": lambda m: now - timedelta(minutes=int(m[1])),
             }
 
-        def handle_starttag(
-            self, tag: str, attrs: List[Tuple[str, Union[str, None]]]
-        ) -> None:
+        def handle_starttag(self, tag: str, attrs: List[Tuple[str, Union[str, None]]]) -> None:
             params = dict(attrs)
 
             if params.get("class") == "table2":
@@ -73,9 +71,7 @@ class limetorrents:
             elif not self.inside_table:
                 return
 
-            if tag == self.TR and (
-                params.get("bgcolor") == "#F4F4F4" or params.get("bgcolor") == "#FFFFFF"
-            ):
+            if tag == self.TR and (params.get("bgcolor") == "#F4F4F4" or params.get("bgcolor") == "#FFFFFF"):
                 self.inside_tr = True
                 self.column_index = -1
                 self.current_item = {"engine_url": self.url}
@@ -125,29 +121,25 @@ class limetorrents:
     def _fetch_url_with_retry(self, url: str, max_retries: int = 3) -> str:
         """Fetch URL with retry logic and proper URL encoding."""
         from urllib.parse import quote
-        
+
         # Fix URL encoding - spaces and special characters need to be encoded
         # Split URL into parts to encode only the path
-        if ' ' in url or '%20' in url:
+        if " " in url or "%20" in url:
             # URL contains spaces, need to fix encoding
-            url = url.replace('%20', ' ')
-            url = quote(url, safe='/:=?&()[]')  # Keep URL structure characters safe
-        
+            url = url.replace("%20", " ")
+            url = quote(url, safe="/:=?&()[]")  # Keep URL structure characters safe
+
         for attempt in range(max_retries):
             try:
                 req = Request(
                     url,
-                    headers={
-                        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
-                    },
+                    headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"},
                 )
                 with urlopen(req, timeout=15) as response:
                     html = response.read().decode("utf-8", errors="ignore")
                     return html
             except (URLError, HTTPError) as e:
-                logger.warning(
-                    f"Attempt {attempt + 1}/{max_retries} failed for {url}: {e}"
-                )
+                logger.warning(f"Attempt {attempt + 1}/{max_retries} failed for {url}: {e}")
                 if attempt == max_retries - 1:
                     raise
         return ""
@@ -212,15 +204,11 @@ class limetorrents:
                 if magnet_link:
                     result["link"] = magnet_link
                     result.pop("_info_link", None)
-                    logger.info(
-                        f"✅ Returning result with magnet: {result.get('name', 'Unknown')[:50]}"
-                    )
+                    logger.info(f"✅ Returning result with magnet: {result.get('name', 'Unknown')[:50]}")
                     prettyPrinter(result)
                 else:
                     # Skip results without magnet links
-                    logger.warning(
-                        f"Skipping result without magnet: {result.get('name', 'Unknown')[:50]}"
-                    )
+                    logger.warning(f"Skipping result without magnet: {result.get('name', 'Unknown')[:50]}")
                     continue
 
             if parser.page_items < 20:

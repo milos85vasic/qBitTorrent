@@ -28,9 +28,7 @@ if _SRC_PATH not in sys.path:
 def _import_retry():
     sys.modules.setdefault("merge_service", type(sys)("merge_service"))
     sys.modules["merge_service"].__path__ = [_MS_PATH]
-    spec = importlib.util.spec_from_file_location(
-        "merge_service.retry", os.path.join(_MS_PATH, "retry.py")
-    )
+    spec = importlib.util.spec_from_file_location("merge_service.retry", os.path.join(_MS_PATH, "retry.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules["merge_service.retry"] = mod
     spec.loader.exec_module(mod)

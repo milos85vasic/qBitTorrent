@@ -17,9 +17,7 @@ _MS_PATH = os.path.join(_SRC_PATH, "merge_service")
 sys.modules.setdefault("merge_service", type(sys)("merge_service"))
 sys.modules["merge_service"].__path__ = [_MS_PATH]
 
-_search_spec = importlib.util.spec_from_file_location(
-    "merge_service.search", os.path.join(_MS_PATH, "search.py")
-)
+_search_spec = importlib.util.spec_from_file_location("merge_service.search", os.path.join(_MS_PATH, "search.py"))
 _search_mod = importlib.util.module_from_spec(_search_spec)
 sys.modules["merge_service.search"] = _search_mod
 _search_spec.loader.exec_module(_search_mod)
@@ -195,7 +193,6 @@ class TestSearchResultToDict:
         )
         d = r.to_dict()
         assert d["tracker_display"] is None
-
 
     def test_to_dict_includes_content_type_and_quality(self):
         r = SearchResult(

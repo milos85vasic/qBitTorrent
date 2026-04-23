@@ -21,8 +21,8 @@ class TestDashboardIssue1DownloadButton:
     def test_dashboard_is_angular_app(self):
         dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
-        assert "<base href=\"/\">" in dashboard
-        assert "<script src=\"main-" in dashboard
+        assert '<base href="/">' in dashboard
+        assert '<script src="main-' in dashboard
 
     def test_magnet_dialog_uses_backend_endpoint(self):
         """Magnet endpoint should exist in API."""
@@ -79,8 +79,9 @@ class TestDashboardIssue2TypeAndSeeds:
         if not results:
             assert False, "query returned 0 results — check tracker fan-out"
         non_unknown = [r for r in results if r.get("content_type") not in (None, "unknown", "")]
-        assert len(non_unknown) >= max(1, len(results) * 0.1), \
+        assert len(non_unknown) >= max(1, len(results) * 0.1), (
             f"Too many unknown types: {len(non_unknown)}/{len(results)}"
+        )
 
     def test_seeds_are_integers_and_nonnegative(self, live_search_result):
         # Use the session-cached "linux" search — 'ubuntu' sometimes
@@ -188,7 +189,7 @@ class TestDashboardIssue5Sorting:
     def test_dashboard_is_angular_app(self):
         dashboard = requests.get(f"{self.base_url}/dashboard", timeout=30).text
         assert "<app-root>" in dashboard or "<app-root></app-root>" in dashboard
-        assert "<script src=\"main-" in dashboard
+        assert '<script src="main-' in dashboard
 
     def test_backend_supports_sort_params(self):
         resp = requests.post(

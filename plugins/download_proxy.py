@@ -646,7 +646,7 @@ def inject_theme_assets(body: bytes, content_type: str) -> bytes:
         return body
     # Inject just before the </head> tag preserving the original casing.
     insertion = _THEME_HEAD_TAGS.encode("utf-8")
-    return body[: match.start()] + insertion + body[match.start():]
+    return body[: match.start()] + insertion + body[match.start() :]
 
 
 def serve_theme_asset(path: str) -> tuple[int, dict[str, str], bytes]:
@@ -672,10 +672,14 @@ def serve_theme_asset(path: str) -> tuple[int, dict[str, str], bytes]:
         }
         return 200, headers, payload
     payload = b"Not Found"
-    return 404, {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Content-Length": str(len(payload)),
-    }, payload
+    return (
+        404,
+        {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Content-Length": str(len(payload)),
+        },
+        payload,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -696,15 +700,17 @@ _REBRAND_PATTERNS = [
     (re.compile(r"href='images/qbittorrent32\.png'", re.IGNORECASE), 'href="/images/boba-logo.jpeg"'),
     (re.compile(r'alt="qBittorrent logo"', re.IGNORECASE), 'alt="Боба logo"'),
     (re.compile(r"alt='qBittorrent logo'", re.IGNORECASE), 'alt="Боба logo"'),
-    (re.compile(r'<title>qBittorrent', re.IGNORECASE), '<title>Боба'),
+    (re.compile(r"<title>qBittorrent", re.IGNORECASE), "<title>Боба"),
     (re.compile(r'content="qBittorrent WebUI"', re.IGNORECASE), 'content="Боба WebUI"'),
     (re.compile(r"content='qBittorrent WebUI'", re.IGNORECASE), 'content="Боба WebUI"'),
-    (re.compile(r'qBittorrent', re.IGNORECASE), 'Боба'),
+    (re.compile(r"qBittorrent", re.IGNORECASE), "Боба"),
 ]
 
 _BOBA_LOGO_BYTES: bytes | None = None
 _BOBA_LOGO_PATH_ON_DISK = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "static", "boba-logo.jpeg",
+    os.path.dirname(os.path.abspath(__file__)),
+    "static",
+    "boba-logo.jpeg",
 )
 
 
@@ -727,15 +733,23 @@ def serve_boba_logo() -> tuple[int, dict[str, str], bytes]:
     payload = _load_boba_logo()
     if not payload:
         payload = b"Not Found"
-        return 404, {
-            "Content-Type": "text/plain; charset=utf-8",
+        return (
+            404,
+            {
+                "Content-Type": "text/plain; charset=utf-8",
+                "Content-Length": str(len(payload)),
+            },
+            payload,
+        )
+    return (
+        200,
+        {
+            "Content-Type": "image/jpeg",
+            "Cache-Control": "public, max-age=604800",
             "Content-Length": str(len(payload)),
-        }, payload
-    return 200, {
-        "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=604800",
-        "Content-Length": str(len(payload)),
-    }, payload
+        },
+        payload,
+    )
 
 
 def rebrand_html(body: bytes, content_type: str) -> bytes:

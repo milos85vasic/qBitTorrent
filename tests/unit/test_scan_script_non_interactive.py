@@ -41,14 +41,10 @@ class TestScanScriptNonInteractive:
     @pytest.mark.parametrize("pattern", FORBIDDEN_PATTERNS)
     def test_no_forbidden_patterns(self, script_content, pattern):
         matches = re.findall(pattern, script_content)
-        assert (
-            not matches
-        ), f"Forbidden pattern '{pattern}' found in {SCRIPT}: {matches}"
+        assert not matches, f"Forbidden pattern '{pattern}' found in {SCRIPT}: {matches}"
 
     def test_has_strict_mode(self, script_content):
-        assert "set -euo pipefail" in script_content, (
-            "Missing 'set -euo pipefail'"
-        )
+        assert "set -euo pipefail" in script_content, "Missing 'set -euo pipefail'"
 
 
 class TestScanScriptFlags:
@@ -62,35 +58,23 @@ class TestScanScriptFlags:
         assert "--scanner" in script_content, "Missing --scanner flag handling"
 
     def test_has_run_bandit_function(self, script_content):
-        assert re.search(r"(?:function\s+)?run_bandit\s*\(\s*\)", script_content), (
-            "Missing run_bandit() function"
-        )
+        assert re.search(r"(?:function\s+)?run_bandit\s*\(\s*\)", script_content), "Missing run_bandit() function"
 
     def test_has_run_semgrep_function(self, script_content):
-        assert re.search(r"(?:function\s+)?run_semgrep\s*\(\s*\)", script_content), (
-            "Missing run_semgrep() function"
-        )
+        assert re.search(r"(?:function\s+)?run_semgrep\s*\(\s*\)", script_content), "Missing run_semgrep() function"
 
     def test_has_run_trivy_function(self, script_content):
-        assert re.search(r"(?:function\s+)?run_trivy\s*\(\s*\)", script_content), (
-            "Missing run_trivy() function"
-        )
+        assert re.search(r"(?:function\s+)?run_trivy\s*\(\s*\)", script_content), "Missing run_trivy() function"
 
     def test_has_run_gitleaks_function(self, script_content):
-        assert re.search(r"(?:function\s+)?run_gitleaks\s*\(\s*\)", script_content), (
-            "Missing run_gitleaks() function"
-        )
+        assert re.search(r"(?:function\s+)?run_gitleaks\s*\(\s*\)", script_content), "Missing run_gitleaks() function"
 
     def test_has_run_pip_audit_function(self, script_content):
-        assert re.search(r"(?:function\s+)?run_pip_audit\s*\(\s*\)", script_content), (
-            "Missing run_pip_audit() function"
-        )
+        assert re.search(r"(?:function\s+)?run_pip_audit\s*\(\s*\)", script_content), "Missing run_pip_audit() function"
 
     def test_quick_runs_bandit_and_pip_audit_only(self, script_content):
         has_quick_logic = (
             "QUICK" in script_content
             or "quick" in script_content.split("--quick")[0][:1] + "quick_mode" in script_content
         )
-        assert has_quick_logic or "quick" in script_content.lower(), (
-            "Missing --quick mode logic"
-        )
+        assert has_quick_logic or "quick" in script_content.lower(), "Missing --quick mode logic"

@@ -75,6 +75,4 @@ def test_health_endpoint_has_no_required_auth(openapi_schema: dict) -> None:
     health = openapi_schema["paths"]["/health"]["get"]
     # No 'security' requirement means it's public — required for the
     # stack's external healthcheck.
-    assert "security" not in health or health["security"] == [], (
-        "health endpoint must be public"
-    )
+    assert "security" not in health or health["security"] == [], "health endpoint must be public"

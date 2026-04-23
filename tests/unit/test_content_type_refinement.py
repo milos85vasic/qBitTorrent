@@ -138,8 +138,9 @@ class TestContentTypeRefinement:
         for name in cases:
             ct = self._detect(name)
             # Currently these may be unknown - we need to add ebook patterns
-            assert ct.value in ("ebook", "unknown"), \
+            assert ct.value in ("ebook", "unknown"), (
                 f"'{name}' detected as {ct}, expected EBOOK or UNKNOWN (until fixed)"
+            )
 
     def test_anime_detection(self):
         """Anime with [anime] marker."""
@@ -164,6 +165,7 @@ class TestContentTypeApiResponse:
     def test_content_type_unknown_is_string(self):
         from api.routes import _to_response
         from merge_service.search import SearchResult
+
         r = SearchResult(
             name="Some Random File",
             link="magnet:x",
@@ -179,6 +181,7 @@ class TestContentTypeApiResponse:
     def test_content_type_movie_is_string(self):
         from api.routes import _to_response
         from merge_service.search import SearchResult
+
         r = SearchResult(
             name="Movie 2024 1080p",
             link="magnet:x",

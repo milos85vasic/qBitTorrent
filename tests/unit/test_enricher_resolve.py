@@ -52,14 +52,16 @@ class TestEnricherLookupOMDb:
     @pytest.mark.asyncio
     async def test_lookup_omdb_success(self, enricher):
         """OMDb lookup with valid response."""
-        mock_session_cm = _make_mock_session({
-            "Title": "The Matrix",
-            "Year": "1999",
-            "imdbRating": "8.7",
-            "Genre": "Action, Sci-Fi",
-            "Plot": "A computer hacker learns...",
-            "Response": "True",
-        })
+        mock_session_cm = _make_mock_session(
+            {
+                "Title": "The Matrix",
+                "Year": "1999",
+                "imdbRating": "8.7",
+                "Genre": "Action, Sci-Fi",
+                "Plot": "A computer hacker learns...",
+                "Response": "True",
+            }
+        )
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cm):
             result = await enricher._lookup_omdb("The Matrix")
@@ -108,15 +110,19 @@ class TestEnricherLookupTMDB:
     @pytest.mark.asyncio
     async def test_lookup_tmdb_success(self, enricher):
         """TMDB lookup with valid response."""
-        mock_session_cm = _make_mock_session({
-            "results": [{
-                "title": "The Matrix",
-                "release_date": "1999-03-31",
-                "vote_average": 8.7,
-                "genre_ids": [28, 878],
-                "overview": "A computer hacker...",
-            }]
-        })
+        mock_session_cm = _make_mock_session(
+            {
+                "results": [
+                    {
+                        "title": "The Matrix",
+                        "release_date": "1999-03-31",
+                        "vote_average": 8.7,
+                        "genre_ids": [28, 878],
+                        "overview": "A computer hacker...",
+                    }
+                ]
+            }
+        )
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cm):
             result = await enricher._lookup_tmdb("The Matrix")
@@ -153,15 +159,19 @@ class TestEnricherLookupTVMaze:
     @pytest.mark.asyncio
     async def test_lookup_tvmaze_success(self, enricher):
         """TVMaze lookup with valid response."""
-        mock_session_cm = _make_mock_session([{
-            "show": {
-                "name": "Breaking Bad",
-                "premiered": "2008-01-20",
-                "rating": {"average": 9.5},
-                "genres": ["Drama", "Crime"],
-                "summary": "A high school chemistry teacher...",
-            }
-        }])
+        mock_session_cm = _make_mock_session(
+            [
+                {
+                    "show": {
+                        "name": "Breaking Bad",
+                        "premiered": "2008-01-20",
+                        "rating": {"average": 9.5},
+                        "genres": ["Drama", "Crime"],
+                        "summary": "A high school chemistry teacher...",
+                    }
+                }
+            ]
+        )
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cm):
             result = await enricher._lookup_tvmaze("Breaking Bad")
@@ -195,17 +205,20 @@ class TestEnricherLookupAniList:
     @pytest.mark.asyncio
     async def test_lookup_anilist_success(self, enricher_with_anilist):
         """AniList lookup with valid response."""
-        mock_session_cm = _make_mock_session({
-            "data": {
-                "Media": {
-                    "id": 1,
-                    "title": {"english": "Attack on Titan", "romaji": "Shingeki no Kyojin"},
-                    "startDate": {"year": 2013},
-                    "coverImage": {"large": "https://example.com/poster.jpg"},
-                    "description": "Humans fight giants...",
+        mock_session_cm = _make_mock_session(
+            {
+                "data": {
+                    "Media": {
+                        "id": 1,
+                        "title": {"english": "Attack on Titan", "romaji": "Shingeki no Kyojin"},
+                        "startDate": {"year": 2013},
+                        "coverImage": {"large": "https://example.com/poster.jpg"},
+                        "description": "Humans fight giants...",
+                    }
                 }
-            }
-        }, method="post")
+            },
+            method="post",
+        )
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cm):
             result = await enricher_with_anilist._lookup_anilist("Attack on Titan")
@@ -217,9 +230,7 @@ class TestEnricherLookupAniList:
     @pytest.mark.asyncio
     async def test_lookup_anilist_empty(self, enricher_with_anilist):
         """AniList lookup with empty results returns None."""
-        mock_session_cm = _make_mock_session({
-            "data": {"Media": None}
-        }, method="post")
+        mock_session_cm = _make_mock_session({"data": {"Media": None}}, method="post")
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cm):
             result = await enricher_with_anilist._lookup_anilist("NonExistentAnime12345")
@@ -244,13 +255,17 @@ class TestEnricherLookupMusicBrainz:
     @pytest.mark.asyncio
     async def test_lookup_musicbrainz_success(self, enricher):
         """MusicBrainz lookup with valid response."""
-        mock_session_cm = _make_mock_session({
-            "release-groups": [{
-                "title": "Abbey Road",
-                "first-release-date": "1969-09-26",
-                "id": "abc123",
-            }]
-        })
+        mock_session_cm = _make_mock_session(
+            {
+                "release-groups": [
+                    {
+                        "title": "Abbey Road",
+                        "first-release-date": "1969-09-26",
+                        "id": "abc123",
+                    }
+                ]
+            }
+        )
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cm):
             result = await enricher._lookup_musicbrainz("Abbey Road Beatles")
@@ -278,13 +293,17 @@ class TestEnricherLookupOpenLibrary:
     @pytest.mark.asyncio
     async def test_lookup_openlibrary_success(self, enricher):
         """OpenLibrary lookup with valid response."""
-        mock_session_cm = _make_mock_session({
-            "docs": [{
-                "title": "The Great Gatsby",
-                "author_name": ["F. Scott Fitzgerald"],
-                "first_publish_year": 1925,
-            }]
-        })
+        mock_session_cm = _make_mock_session(
+            {
+                "docs": [
+                    {
+                        "title": "The Great Gatsby",
+                        "author_name": ["F. Scott Fitzgerald"],
+                        "first_publish_year": 1925,
+                    }
+                ]
+            }
+        )
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cm):
             result = await enricher._lookup_openlibrary("The Great Gatsby")
@@ -342,15 +361,19 @@ class TestEnricherResolve:
     @pytest.mark.asyncio
     async def test_resolve_tmdb_first(self, enricher):
         """resolve() should try TMDB first and return its result."""
-        mock_session_cm = _make_mock_session({
-            "results": [{
-                "title": "TMDB Movie",
-                "release_date": "2024-01-01",
-                "vote_average": 7.5,
-                "genre_ids": [28],
-                "overview": "TMDB overview",
-            }]
-        })
+        mock_session_cm = _make_mock_session(
+            {
+                "results": [
+                    {
+                        "title": "TMDB Movie",
+                        "release_date": "2024-01-01",
+                        "vote_average": 7.5,
+                        "genre_ids": [28],
+                        "overview": "TMDB overview",
+                    }
+                ]
+            }
+        )
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cm):
             with patch.dict(os.environ, {"TMDB_API_KEY": "test_key"}):
@@ -370,8 +393,12 @@ class TestEnricherResolve:
     def test_clear_cache(self, enricher):
         """Clear cache should empty the cache."""
         enricher._cache["test"] = MetadataResult(
-            source="test", title="Test", year=2024,
-            content_type="movie", genres=["Action"], overview="Test",
+            source="test",
+            title="Test",
+            year=2024,
+            content_type="movie",
+            genres=["Action"],
+            overview="Test",
         )
         enricher.clear_cache()
         assert len(enricher._cache) == 0

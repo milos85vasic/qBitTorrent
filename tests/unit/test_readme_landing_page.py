@@ -83,9 +83,7 @@ REQUIRED_REGISTRATION_LINKS = [
 
 @pytest.mark.parametrize("name,host_path", REQUIRED_REGISTRATION_LINKS)
 def test_readme_has_registration_link(readme: str, name: str, host_path: str) -> None:
-    assert host_path in readme, (
-        f"README.md registration table missing {name!r} link (expected {host_path!r})"
-    )
+    assert host_path in readme, f"README.md registration table missing {name!r} link (expected {host_path!r})"
 
 
 def test_readme_explicitly_tags_mandatory_vs_optional(readme: str) -> None:
@@ -95,7 +93,7 @@ def test_readme_explicitly_tags_mandatory_vs_optional(readme: str) -> None:
 
 
 def test_readme_renders_branding_logo(readme: str) -> None:
-    assert 'docs/assets/logo.png' in readme, "README should show the branded logo"
+    assert "docs/assets/logo.png" in readme, "README should show the branded logo"
 
 
 def test_readme_has_quickstart_and_documentation_sections(readme: str) -> None:

@@ -63,8 +63,7 @@ def test_courses_readme_exists_and_is_substantive() -> None:
     assert readme.is_file(), "courses/README.md is missing"
     line_count = sum(1 for _ in readme.read_text(encoding="utf-8").splitlines())
     assert line_count >= COURSES_README_MIN_LINES, (
-        f"courses/README.md must be at least {COURSES_README_MIN_LINES} lines "
-        f"(got {line_count})"
+        f"courses/README.md must be at least {COURSES_README_MIN_LINES} lines (got {line_count})"
     )
 
 
@@ -90,19 +89,14 @@ def test_track_has_required_file(track: str, filename: str) -> None:
 @pytest.mark.parametrize("track", EXPECTED_TRACKS)
 def test_demo_sh_has_strict_header(track: str) -> None:
     body = (COURSES_DIR / track / "demo.sh").read_text(encoding="utf-8")
-    assert REQUIRED_DEMO_HEADER in body, (
-        f"courses/{track}/demo.sh must contain `{REQUIRED_DEMO_HEADER}`"
-    )
+    assert REQUIRED_DEMO_HEADER in body, f"courses/{track}/demo.sh must contain `{REQUIRED_DEMO_HEADER}`"
 
 
 @pytest.mark.parametrize("track", EXPECTED_TRACKS)
 @pytest.mark.parametrize("token", FORBIDDEN_DEMO_TOKENS)
 def test_demo_sh_is_non_interactive(track: str, token: str) -> None:
     body = (COURSES_DIR / track / "demo.sh").read_text(encoding="utf-8")
-    assert token not in body, (
-        f"courses/{track}/demo.sh must not contain `{token.strip()}` "
-        "(interactive / privileged)"
-    )
+    assert token not in body, f"courses/{track}/demo.sh must not contain `{token.strip()}` (interactive / privileged)"
 
 
 # --------------------------------------------------------------------------- #
@@ -127,15 +121,10 @@ def _parse_cast_lines(cast_path: Path) -> tuple[dict, list[list]]:
         try:
             event = json.loads(line)
         except json.JSONDecodeError as exc:
-            raise AssertionError(
-                f"{cast_path}:{idx} is not valid JSON: {exc}"
-            ) from exc
-        assert isinstance(event, list), (
-            f"{cast_path}:{idx} must be a JSON array, got {type(event).__name__}"
-        )
+            raise AssertionError(f"{cast_path}:{idx} is not valid JSON: {exc}") from exc
+        assert isinstance(event, list), f"{cast_path}:{idx} must be a JSON array, got {type(event).__name__}"
         assert len(event) == 3, (
-            f"{cast_path}:{idx} must have exactly 3 elements (timestamp, type, data); "
-            f"got {len(event)}"
+            f"{cast_path}:{idx} must have exactly 3 elements (timestamp, type, data); got {len(event)}"
         )
         events.append(event)
     return header, events
@@ -145,9 +134,7 @@ def _parse_cast_lines(cast_path: Path) -> tuple[dict, list[list]]:
 def test_demo_cast_header_is_valid_v2(track: str) -> None:
     cast = COURSES_DIR / track / "demo.cast"
     header, _events = _parse_cast_lines(cast)
-    assert header.get("version") == 2, (
-        f"{cast} header must have version: 2 (got {header.get('version')!r})"
-    )
+    assert header.get("version") == 2, f"{cast} header must have version: 2 (got {header.get('version')!r})"
     assert "width" in header, f"{cast} header is missing `width`"
     assert "height" in header, f"{cast} header is missing `height`"
     assert isinstance(header["width"], int) and header["width"] > 0

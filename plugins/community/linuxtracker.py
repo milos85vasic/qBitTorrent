@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-#VERSION: 1.1
-#AUTHORS: Joost Bremmer (toost.b@gmail.com)
+# VERSION: 1.1
+# AUTHORS: Joost Bremmer (toost.b@gmail.com)
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -33,16 +33,17 @@ except:
 class linuxtracker(object):
     """Class used by qBittorrent to search for torrents"""
 
-    url = 'http://linuxtracker.org'
-    name = 'Linux Tracker'
+    url = "http://linuxtracker.org"
+    name = "Linux Tracker"
     # defines which search categories are supported by this search engine
     # and their corresponding id. Possible categories are:
     # 'all', 'movies', 'tv', 'music', 'games', 'anime', 'software', 'pictures',
     # 'books'
-    supported_categories = { 'all' : 0, 'software': 0}
+    supported_categories = {"all": 0, "software": 0}
 
     class LinuxSearchParser(HTMLParser):
-        """ Parses BakaBT browse page for search results and prints them"""
+        """Parses BakaBT browse page for search results and prints them"""
+
         def __init__(self, res, url):
             try:
                 super().__init__()
@@ -56,28 +57,25 @@ class linuxtracker(object):
             self.wait_for_data = True
 
         def handle_starttag(self, tag, attr):
-            if tag == 'a':
+            if tag == "a":
                 self.start_a(attr)
 
         def handle_endtag(self, tag):
-            if tag == 'strong':
+            if tag == "strong":
                 self.end_strong()
 
         def start_a(self, attr):
             params = dict(attr)
-            if 'href' in params and 'title' in params and \
-                    "torrent-details" in params['href']:
-                hit = {'desc_link': self.engine_url + '/' + params['href']}
+            if "href" in params and "title" in params and "torrent-details" in params["href"]:
+                hit = {"desc_link": self.engine_url + "/" + params["href"]}
                 self.curr = hit
                 self.wait_for_data = True
-            elif 'href' in params and \
-                    "magnet:?" in params['href']:
-                self.curr['link'] = params['href']
-                self.curr['engine_url'] = self.engine_url
+            elif "href" in params and "magnet:?" in params["href"]:
+                self.curr["link"] = params["href"]
+                self.curr["engine_url"] = self.engine_url
                 self.results.append(self.curr)
                 self.curr = None
-            elif 'href' in params and \
-                    "peers" in params['href']:
+            elif "href" in params and "peers" in params["href"]:
                 self.wait_for_data = True
 
         def end_strong(self):
@@ -89,14 +87,14 @@ class linuxtracker(object):
                 # We process the data in order of name, size, seeds, leechers
                 if self.strong_count == 0 and self.curr:
                     # Get title
-                    self.curr['name'] = data.strip()
+                    self.curr["name"] = data.strip()
                 elif self.strong_count == 3 and self.curr:
                     # Get size
-                        # Strip all comma's since it screws with
-                        # prettyPrinter
-                        if "," in data:
-                            data = re.sub(",", '', data)
-                        self.curr["size"] = data.strip()
+                    # Strip all comma's since it screws with
+                    # prettyPrinter
+                    if "," in data:
+                        data = re.sub(",", "", data)
+                    self.curr["size"] = data.strip()
                 elif self.strong_count == 4 and self.curr:
                     # Get seeds
                     try:
@@ -122,7 +120,7 @@ class linuxtracker(object):
 
     # DO NOT CHANGE the name and parameters of this function
     # This function will be the one called by nova2.py
-    def search(self, what, cat='all'):
+    def search(self, what, cat="all"):
         """
         Retreive and parse engine search results by category and query.
 
@@ -132,8 +130,7 @@ class linuxtracker(object):
         :param cat:  the name of a search category, see supported_categories.
         """
 
-        url = str("{0}/index.php?page=torrents"
-                  "&active=1&order=5&by=2&search={1}").format(self.url, what)
+        url = ("{0}/index.php?page=torrents&active=1&order=5&by=2&search={1}").format(self.url, what)
 
         hits = []
         page = 1

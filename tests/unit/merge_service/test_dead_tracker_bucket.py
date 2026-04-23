@@ -35,9 +35,7 @@ _MS_PATH = REPO / "download-proxy" / "src" / "merge_service"
 
 sys.modules.setdefault("merge_service", type(sys)("merge_service"))
 sys.modules["merge_service"].__path__ = [str(_MS_PATH)]  # type: ignore[attr-defined]
-_spec = importlib.util.spec_from_file_location(
-    "merge_service.search", str(_MS_PATH / "search.py")
-)
+_spec = importlib.util.spec_from_file_location("merge_service.search", str(_MS_PATH / "search.py"))
 _search = importlib.util.module_from_spec(_spec)
 sys.modules["merge_service.search"] = _search
 _spec.loader.exec_module(_search)  # type: ignore[union-attr]
@@ -69,16 +67,21 @@ def test_env_flag_forces_dead_trackers_back_in() -> None:
         enabled = {t.name for t in orch._get_enabled_trackers()}
     missing = set(_search.DEAD_PUBLIC_TRACKERS) - enabled
     assert not missing, (
-        f"ENABLE_DEAD_TRACKERS=1 should include dead trackers but these "
-        f"were still missing: {sorted(missing)}"
+        f"ENABLE_DEAD_TRACKERS=1 should include dead trackers but these were still missing: {sorted(missing)}"
     )
 
 
 @pytest.mark.parametrize(
     "canary",
     [
-        "piratebay", "linuxtracker", "rutor", "torrentscsv",
-        "academictorrents", "yts", "glotorrents", "yourbittorrent",
+        "piratebay",
+        "linuxtracker",
+        "rutor",
+        "torrentscsv",
+        "academictorrents",
+        "yts",
+        "glotorrents",
+        "yourbittorrent",
     ],
 )
 def test_canary_trackers_stay_in_default_fan_out(canary: str) -> None:

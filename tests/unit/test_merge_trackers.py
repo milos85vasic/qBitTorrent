@@ -19,9 +19,7 @@ from merge_service.search import (
 # Public trackers that aren't bucketed as dead. Most of the fan-out
 # math now uses this rather than `PUBLIC_TRACKERS` directly because
 # dead trackers are filtered out of `_get_enabled_trackers`.
-LIVE_PUBLIC_TRACKERS = {
-    name: url for name, url in PUBLIC_TRACKERS.items() if name not in DEAD_PUBLIC_TRACKERS
-}
+LIVE_PUBLIC_TRACKERS = {name: url for name, url in PUBLIC_TRACKERS.items() if name not in DEAD_PUBLIC_TRACKERS}
 
 
 class TestPublicTrackersRegistry:
@@ -88,18 +86,14 @@ class TestGetEnabledTrackers:
             for name in LIVE_PUBLIC_TRACKERS:
                 assert name in names, f"Live public tracker {name} missing from enabled list"
             for dead in DEAD_PUBLIC_TRACKERS:
-                assert dead not in names, (
-                    f"Dead tracker {dead} leaked into default fan-out"
-                )
+                assert dead not in names, f"Dead tracker {dead} leaked into default fan-out"
 
     def test_public_trackers_all_enabled_when_env_flag_set(self):
         with patch.dict(os.environ, {"ENABLE_DEAD_TRACKERS": "1"}, clear=True):
             trackers = self.orch._get_enabled_trackers()
             names = [t.name for t in trackers]
             for name in PUBLIC_TRACKERS:
-                assert name in names, (
-                    f"ENABLE_DEAD_TRACKERS=1 should force {name} back in"
-                )
+                assert name in names, f"ENABLE_DEAD_TRACKERS=1 should force {name} back in"
 
     def test_private_trackers_without_credentials(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -489,6 +483,7 @@ class TestConcurrentSearch:
         runs — so a raise inside the mock never reached the error
         pipe.
         """
+
         async def mock_search(tracker, query, category):
             if tracker.name == "piratebay":
                 return [

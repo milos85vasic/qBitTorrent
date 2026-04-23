@@ -60,9 +60,11 @@ class TestBridgeHealth:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch.dict(os.environ, {"BRIDGE_URL": "http://localhost:7188", "BRIDGE_PORT": "7188"}), \
-             patch("aiohttp.ClientSession", return_value=mock_session), \
-             patch("aiohttp.ClientTimeout", return_value=None):
+        with (
+            patch.dict(os.environ, {"BRIDGE_URL": "http://localhost:7188", "BRIDGE_PORT": "7188"}),
+            patch("aiohttp.ClientSession", return_value=mock_session),
+            patch("aiohttp.ClientTimeout", return_value=None),
+        ):
             result = await bridge_health()
             assert result["healthy"] is True
             assert result["status_code"] == 200
@@ -71,8 +73,10 @@ class TestBridgeHealth:
     async def test_bridge_health_failure(self):
         from api import bridge_health
 
-        with patch.dict(os.environ, {"BRIDGE_URL": "http://localhost:7188", "BRIDGE_PORT": "7188"}), \
-             patch("aiohttp.ClientSession", side_effect=Exception("connection refused")):
+        with (
+            patch.dict(os.environ, {"BRIDGE_URL": "http://localhost:7188", "BRIDGE_PORT": "7188"}),
+            patch("aiohttp.ClientSession", side_effect=Exception("connection refused")),
+        ):
             result = await bridge_health()
             assert result["healthy"] is False
             assert "connection refused" in result["error"]

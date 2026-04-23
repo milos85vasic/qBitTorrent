@@ -80,7 +80,7 @@ def load_env():
 no_creds = pytest.mark.skipif(
     not (os.environ.get("IPTORRENTS_USERNAME") or os.environ.get("IPTORRENTS_USER")),
     reason="IPTorrents credentials not configured in environment — "
-           "set IPTORRENTS_USERNAME / IPTORRENTS_PASSWORD in .env",
+    "set IPTORRENTS_USERNAME / IPTORRENTS_PASSWORD in .env",
 )
 
 
@@ -151,8 +151,7 @@ class TestIPTorrentsMergeService:
         result = live_search_result("linux", 20)
         ip_results = [r for r in result.get("results", []) if r.get("tracker") == "iptorrents"]
         assert ip_results, (
-            "No iptorrents results — check IPTorrents credentials/health. "
-            f"total_results={result.get('total_results')}"
+            f"No iptorrents results — check IPTorrents credentials/health. total_results={result.get('total_results')}"
         )
         for r in ip_results:
             assert "freeleech" in r, "Missing freeleech field in iptorrents result"

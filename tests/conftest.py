@@ -57,9 +57,10 @@ def _isolate_download_proxy_modules(request):
                 del sys.modules[k]
         sys.modules.update(saved)
 
+
 # Re-export live-service fixtures so that tests can request them by name
 # from any conftest without an explicit import.
-from tests.fixtures.services import (  # noqa: F401 -- re-exported
+from tests.fixtures.services import (
     all_services_live,
     merge_service_endpoint,
     merge_service_live,
@@ -69,7 +70,7 @@ from tests.fixtures.services import (  # noqa: F401 -- re-exported
     webui_bridge_live,
     webui_bridge_process,
 )
-from tests.fixtures.compose import compose_up  # noqa: F401 -- re-exported
+from tests.fixtures.compose import compose_up
 
 
 @pytest.fixture(scope="session")
@@ -88,12 +89,15 @@ def docker_compose_file(pytestconfig: Any) -> str:
 def docker_compose_project_name() -> str:
     """Use the same project name as the existing stack (qbittorrent)."""
     return "qbittorrent"
+
+
 @pytest.fixture(scope="session")
 def docker_setup() -> list[str]:
     """Skip automatic compose up; we'll handle startup manually."""
     return []
 
-from tests.fixtures.live_search import (  # noqa: F401 -- re-exported
+
+from tests.fixtures.live_search import (
     _live_search_cache,
     fresh_magnet_hash,
     fresh_magnet_uri,

@@ -77,7 +77,5 @@ def test_python_mirror_tokens_match_ts(palette_id):
     assert palette_id in py, f"Python mirror missing {palette_id}"
     for mode in ("light", "dark"):
         assert py[palette_id][mode] == ts[palette_id][mode], (
-            f"{palette_id}/{mode} drifted:\n"
-            f"  TS: {ts[palette_id][mode]}\n"
-            f"  Py: {py[palette_id][mode]}"
+            f"{palette_id}/{mode} drifted:\n  TS: {ts[palette_id][mode]}\n  Py: {py[palette_id][mode]}"
         )

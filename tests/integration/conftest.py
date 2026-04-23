@@ -49,9 +49,8 @@ def _wait_for_idle(base_url: str, max_wait: float = 180.0) -> None:
     # Don't fail the test outright — logs the reason so operators can
     # spot a stuck orchestrator in CI output.
     import logging
-    logging.getLogger(__name__).warning(
-        "orchestrator did not reach idle within %.0fs — proceeding", max_wait
-    )
+
+    logging.getLogger(__name__).warning("orchestrator did not reach idle within %.0fs — proceeding", max_wait)
 
 
 @pytest.fixture(autouse=True)

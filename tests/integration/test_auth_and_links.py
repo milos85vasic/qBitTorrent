@@ -75,7 +75,7 @@ class TestQbitDefaultPassword:
         import tempfile
 
         # Write bad credentials to a temp file and copy into the proxy container
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write('{"username":"admin","password":"wrongwrong"}')
             tmp_path = f.name
 
@@ -126,8 +126,8 @@ class TestServiceLinksAccessibility:
         r = requests.get(f"{self.base_url}/dashboard", timeout=30)
         assert r.status_code == 200
         assert "<app-root>" in r.text or "<app-root></app-root>" in r.text
-        assert "<base href=\"/\">" in r.text
-        assert "<script src=\"main-" in r.text
+        assert '<base href="/">' in r.text
+        assert '<script src="main-' in r.text
 
 
 class TestAuthEndpointBehavior:
@@ -166,7 +166,7 @@ class TestAuthEndpointBehavior:
         import tempfile
 
         # Write bad credentials to a temp file and copy into the proxy container
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write('{"username":"admin","password":"wrong"}')
             tmp_path = f.name
 
@@ -175,7 +175,10 @@ class TestAuthEndpointBehavior:
 
         resp = requests.post(
             f"{self.base_url}/api/v1/download",
-            json={"result_id": "test", "download_urls": ["magnet:?xt=urn:btih:8bb5455909752072cce7b2556b825d2faaf7c0fb"]},
+            json={
+                "result_id": "test",
+                "download_urls": ["magnet:?xt=urn:btih:8bb5455909752072cce7b2556b825d2faaf7c0fb"],
+            },
             timeout=30,
         )
 
@@ -220,10 +223,12 @@ class TestPasswordScripts:
 
     def test_fix_qbit_password_script_exists(self):
         import os
+
         assert os.path.isfile("fix-qbit-password.sh")
 
     def test_init_qbit_password_script_exists(self):
         import os
+
         assert os.path.isfile("init-qbit-password.sh")
 
     def test_fix_script_uses_correct_api(self):

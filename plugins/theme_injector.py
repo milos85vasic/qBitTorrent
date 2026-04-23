@@ -56,9 +56,7 @@ def _build_palette_catalog() -> dict:
     from pathlib import Path
 
     plugin_path = Path(__file__).resolve().with_name("download_proxy.py")
-    spec = importlib.util.spec_from_file_location(
-        "_theme_injector_catalog_donor", plugin_path
-    )
+    spec = importlib.util.spec_from_file_location("_theme_injector_catalog_donor", plugin_path)
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules["_theme_injector_catalog_donor"] = mod
@@ -274,19 +272,23 @@ _REBRAND_PATTERNS = [
     (re.compile(r'alt="qBittorrent logo"', re.IGNORECASE), 'alt="Боба logo"'),
     (re.compile(r"alt='qBittorrent logo'", re.IGNORECASE), 'alt="Боба logo"'),
     # Title
-    (re.compile(r'<title>qBittorrent', re.IGNORECASE), '<title>Боба'),
+    (re.compile(r"<title>qBittorrent", re.IGNORECASE), "<title>Боба"),
     # Meta description
     (re.compile(r'content="qBittorrent WebUI"', re.IGNORECASE), 'content="Боба WebUI"'),
     (re.compile(r"content='qBittorrent WebUI'", re.IGNORECASE), 'content="Боба WebUI"'),
     # Headings and visible text (catch remaining "qBittorrent" occurrences)
-    (re.compile(r'qBittorrent', re.IGNORECASE), 'Боба'),
+    (re.compile(r"qBittorrent", re.IGNORECASE), "Боба"),
 ]
 
 # Load the Boba logo bytes once at import time.
 _BOBA_LOGO_BYTES: bytes | None = None
 _BOBA_LOGO_PATH_ON_DISK = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "download-proxy", "src", "ui", "static", "boba-logo.jpeg",
+    "download-proxy",
+    "src",
+    "ui",
+    "static",
+    "boba-logo.jpeg",
 )
 
 
@@ -309,15 +311,23 @@ def serve_boba_logo() -> Tuple[int, dict, bytes]:
     payload = _load_boba_logo()
     if not payload:
         payload = b"Not Found"
-        return 404, {
-            "Content-Type": "text/plain; charset=utf-8",
+        return (
+            404,
+            {
+                "Content-Type": "text/plain; charset=utf-8",
+                "Content-Length": str(len(payload)),
+            },
+            payload,
+        )
+    return (
+        200,
+        {
+            "Content-Type": "image/jpeg",
+            "Cache-Control": "public, max-age=604800",
             "Content-Length": str(len(payload)),
-        }, payload
-    return 200, {
-        "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=604800",
-        "Content-Length": str(len(payload)),
-    }, payload
+        },
+        payload,
+    )
 
 
 def rebrand_html(body: bytes, content_type: str) -> bytes:
@@ -413,27 +423,39 @@ def inject_theme_assets(body: bytes, content_type: str) -> bytes:
     if not match:
         return body
     insertion = _THEME_HEAD_TAGS.encode("utf-8")
-    return body[: match.start()] + insertion + body[match.start():]
+    return body[: match.start()] + insertion + body[match.start() :]
 
 
 def serve_theme_asset(path: str) -> Tuple[int, dict, bytes]:
     """(status, headers, body) for ``/__qbit_theme__/*``."""
     if path == "/__qbit_theme__/skin.css":
         payload = THEME_SKIN_CSS.encode("utf-8")
-        return 200, {
-            "Content-Type": "text/css; charset=utf-8",
-            "Cache-Control": "no-cache",
-            "Content-Length": str(len(payload)),
-        }, payload
+        return (
+            200,
+            {
+                "Content-Type": "text/css; charset=utf-8",
+                "Cache-Control": "no-cache",
+                "Content-Length": str(len(payload)),
+            },
+            payload,
+        )
     if path == "/__qbit_theme__/bootstrap.js":
         payload = THEME_BOOTSTRAP_JS.encode("utf-8")
-        return 200, {
-            "Content-Type": "application/javascript; charset=utf-8",
-            "Cache-Control": "no-cache",
-            "Content-Length": str(len(payload)),
-        }, payload
+        return (
+            200,
+            {
+                "Content-Type": "application/javascript; charset=utf-8",
+                "Cache-Control": "no-cache",
+                "Content-Length": str(len(payload)),
+            },
+            payload,
+        )
     payload = b"Not Found"
-    return 404, {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Content-Length": str(len(payload)),
-    }, payload
+    return (
+        404,
+        {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Content-Length": str(len(payload)),
+        },
+        payload,
+    )

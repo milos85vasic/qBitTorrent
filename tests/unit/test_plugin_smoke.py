@@ -11,9 +11,7 @@ import sys
 
 import pytest
 
-_PLUGINS_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "plugins")
-)
+_PLUGINS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "plugins"))
 
 CANONICAL_PLUGINS = [
     "eztv",

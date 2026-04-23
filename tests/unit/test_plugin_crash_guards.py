@@ -76,9 +76,7 @@ def test_anilibra_handles_data_null_upstream_response() -> None:
     cls = mod.anilibra
     instance = cls()
 
-    with patch.object(
-        sys.modules["helpers"], "retrieve_url", return_value='{"data": null}'
-    ):
+    with patch.object(sys.modules["helpers"], "retrieve_url", return_value='{"data": null}'):
         instance.search("linux")
     assert captured == [], "no rows should be captured for a null data response"
 
@@ -87,9 +85,7 @@ def test_anilibra_handles_completely_missing_data_key() -> None:
     mod, captured = _load_plugin("anilibra")
     cls = mod.anilibra
     instance = cls()
-    with patch.object(
-        sys.modules["helpers"], "retrieve_url", return_value='{"meta": "no data here"}'
-    ):
+    with patch.object(sys.modules["helpers"], "retrieve_url", return_value='{"meta": "no data here"}'):
         instance.search("linux")
     assert captured == []
 
@@ -98,9 +94,7 @@ def test_anilibra_handles_non_dict_upstream_response() -> None:
     mod, captured = _load_plugin("anilibra")
     cls = mod.anilibra
     instance = cls()
-    with patch.object(
-        sys.modules["helpers"], "retrieve_url", return_value='["unexpected", "array"]'
-    ):
+    with patch.object(sys.modules["helpers"], "retrieve_url", return_value='["unexpected", "array"]'):
         instance.search("linux")
     assert captured == []
 
@@ -116,15 +110,9 @@ def test_yourbittorrent_handles_missing_results_table() -> None:
     # The auth-wall response: only ONE table-responsive wrapper on the
     # login page, never a second one for the results.
     auth_wall_html = (
-        "<html><body>"
-        '<div class="table-responsive">'
-        "<table><tr><td>Please log in</td></tr></table>"
-        "</div>"
-        "</body></html>"
+        '<html><body><div class="table-responsive"><table><tr><td>Please log in</td></tr></table></div></body></html>'
     )
-    with patch.object(
-        sys.modules["helpers"], "retrieve_url", return_value=auth_wall_html
-    ):
+    with patch.object(sys.modules["helpers"], "retrieve_url", return_value=auth_wall_html):
         instance.search("linux")
     assert captured == [], "auth-wall HTML should yield 0 rows without crashing"
 

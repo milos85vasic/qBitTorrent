@@ -68,9 +68,7 @@ def _install_fake_api_package() -> None:
 
 def _reimport_hooks(env=None):
     _install_fake_api_package()
-    spec = importlib.util.spec_from_file_location(
-        "api.hooks", os.path.join(_SRC_PATH, "api", "hooks.py")
-    )
+    spec = importlib.util.spec_from_file_location("api.hooks", os.path.join(_SRC_PATH, "api", "hooks.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules["api.hooks"] = mod
     spec.loader.exec_module(mod)
@@ -79,9 +77,7 @@ def _reimport_hooks(env=None):
 
 def _reimport_streaming():
     _install_fake_api_package()
-    spec = importlib.util.spec_from_file_location(
-        "api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py")
-    )
+    spec = importlib.util.spec_from_file_location("api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules["api.streaming"] = mod
     spec.loader.exec_module(mod)
@@ -178,12 +174,8 @@ async def test_two_concurrent_sse_streams_do_not_share_seen_hashes(monkeypatch):
     orch_a = FakeOrch([_make_results(["abc"])])
     orch_b = FakeOrch([_make_results(["abc"])])
 
-    gen_a = streaming_mod.SSEHandler.search_results_stream(
-        "sid-a", orch_a, poll_interval=0.001
-    )
-    gen_b = streaming_mod.SSEHandler.search_results_stream(
-        "sid-b", orch_b, poll_interval=0.001
-    )
+    gen_a = streaming_mod.SSEHandler.search_results_stream("sid-a", orch_a, poll_interval=0.001)
+    gen_b = streaming_mod.SSEHandler.search_results_stream("sid-b", orch_b, poll_interval=0.001)
 
     events_a, events_b = await asyncio.gather(drain(gen_a), drain(gen_b))
 

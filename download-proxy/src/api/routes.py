@@ -289,7 +289,7 @@ async def search(request: SearchRequest, req: Request):
         except Exception as e:
             logger.error(f"Background search {metadata.search_id} failed: {e}")
 
-    task = asyncio.create_task(_background())  # noqa: RUF006
+    task = asyncio.create_task(_background())
     orch._search_tasks[metadata.search_id] = task
 
     # Return immediately — the caller should attach to SSE for real-time
@@ -506,7 +506,8 @@ async def get_search(search_id: str, req: Request):
                 ct = m.canonical_identity.content_type.value if m.canonical_identity else None
                 resp = _to_response(best, ct)
                 resp.sources = [
-                    {"tracker": orig.tracker, "seeds": orig.seeds, "leechers": orig.leechers} for orig in m.original_results
+                    {"tracker": orig.tracker, "seeds": orig.seeds, "leechers": orig.leechers}
+                    for orig in m.original_results
                 ]
                 resp.download_urls = list(dict.fromkeys(lnk for lnk in (orig.link for orig in m.original_results)))
                 resp.seeds = m.total_seeds

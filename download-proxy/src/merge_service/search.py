@@ -144,21 +144,44 @@ def _detect_result_metadata(name: str, size: str) -> tuple[str | None, str | Non
         content_type = "tv"
     elif _re.search(r"\baudiobook\b", n):
         content_type = "audiobook"
-    elif any(p in n for p in ["codex", "tenoke", "fitgirl", "masquerade", "xbox", "playstation", "ps3", "ps4", "ps5", "nintendo", "switch", "steam", "epic", "vr"]):
+    elif any(
+        p in n
+        for p in [
+            "codex",
+            "tenoke",
+            "fitgirl",
+            "masquerade",
+            "xbox",
+            "playstation",
+            "ps3",
+            "ps4",
+            "ps5",
+            "nintendo",
+            "switch",
+            "steam",
+            "epic",
+            "vr",
+        ]
+    ):
         content_type = "game"
-    elif _re.search(r"\b(x86|x64|portable|\.exe|installer|iso|dmg|appimage|snap|flatpak|pkg|deb|rpm|msi)\b", n):
+    elif _re.search(
+        r"\b(x86|x64|portable|\.exe|installer|iso|dmg|appimage|snap|flatpak|pkg|deb|rpm|msi)\b", n
+    ) or _re.search(
+        r"\b(ubuntu|debian|fedora|arch linux|linux mint|opensuse|centos|redhat|gentoo|slackware|kali|manjaro|pop!_os|elementary)\b",
+        n,
+    ):
         content_type = "software"
-    elif _re.search(r"\b(ubuntu|debian|fedora|arch linux|linux mint|opensuse|centos|redhat|gentoo|slackware|kali|manjaro|pop!_os|elementary)\b", n):
-        content_type = "software"
-    elif _re.search(r"\b(bluray|blu-ray|bdremux|web-?dl|webrip|h?drip|dvdrip|bdrip|x264|x265|hevc|hdr)\b", n):
-        content_type = "movie"
-    elif _re.search(r"\b(720p|1080p|2160p|4k)\b", n):
+    elif _re.search(
+        r"\b(bluray|blu-ray|bdremux|web-?dl|webrip|h?drip|dvdrip|bdrip|x264|x265|hevc|hdr)\b", n
+    ) or _re.search(r"\b(720p|1080p|2160p|4k)\b", n):
         content_type = "movie"
     elif _re.search(r"\b(epub|pdf|mobi|azw3|cbz|cbr|djvu)\b", n):
         content_type = "ebook"
-    elif _re.search(r"\b(mp3|flac|ogg|opus|aac|wav|aiff|alac|m4a|wma)\b", n) or _re.search(r"\b(lossless|320kbps|256kbps|128kbps|v0|vbr|cbr|v2)\b", n):
-        content_type = "music"
-    elif _re.search(r"\b(ost|soundtrack|score)\b", n):
+    elif (
+        _re.search(r"\b(mp3|flac|ogg|opus|aac|wav|aiff|alac|m4a|wma)\b", n)
+        or _re.search(r"\b(lossless|320kbps|256kbps|128kbps|v0|vbr|cbr|v2)\b", n)
+        or _re.search(r"\b(ost|soundtrack|score)\b", n)
+    ):
         content_type = "music"
 
     # --- quality ---
@@ -173,9 +196,7 @@ def _detect_result_metadata(name: str, size: str) -> tuple[str | None, str | Non
         quality = "sd"
     elif "bluray" in n or "blu-ray" in n or "bdrip" in n or "bd-remux" in n:
         quality = "full_hd"
-    elif "web-dl" in n or "webrip" in n or "web.dl" in n or "webdl" in n:
-        quality = "hd"
-    elif "hdtv" in n:
+    elif "web-dl" in n or "webrip" in n or "web.dl" in n or "webdl" in n or "hdtv" in n:
         quality = "hd"
     elif "dvd" in n:
         quality = "sd"
@@ -1238,7 +1259,9 @@ class SearchOrchestrator:
         for tor in torrent_re.finditer(html_content):
             try:
                 topic_id = tor.group("desc_link").split("=")[-1]
-                ct, q = _detect_result_metadata(unescape(tor.group("name")), tor.group("size").translate(cyrillic_table))
+                ct, q = _detect_result_metadata(
+                    unescape(tor.group("name")), tor.group("size").translate(cyrillic_table)
+                )
                 results.append(
                     SearchResult(
                         name=unescape(tor.group("name")),

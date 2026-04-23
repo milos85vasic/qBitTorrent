@@ -94,8 +94,7 @@ create_data_directories() {
 
 cleanup_stale_config() {
     local stale_config="$SCRIPT_DIR/config/qBittorrent/qBittorrent.conf"
-    local correct_config="$SCRIPT_DIR/config/qBittorrent/config/qBittorrent.conf"
-    
+
     if [[ -f "$stale_config" ]] && [[ ! -L "$stale_config" ]]; then
         if grep -q "SavePath=/downloads/" "$stale_config" 2>/dev/null || \
            grep -q "DefaultSavePath=/downloads/" "$stale_config" 2>/dev/null; then

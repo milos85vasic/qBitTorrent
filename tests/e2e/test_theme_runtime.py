@@ -43,6 +43,7 @@ def _parse_palette_tokens() -> dict[str, dict[str, dict[str, str]]]:
     the catalogue. Reuses the parser from the unit test so both suites
     stay in lockstep."""
     import importlib.util as _imp
+
     spec = _imp.spec_from_file_location(
         "palette_catalog_parser",
         Path(__file__).resolve().parent.parent / "unit" / "test_palette_catalog.py",
@@ -127,22 +128,16 @@ def test_theme_switching_applies_tokens_and_persists(palettes: dict[str, dict[st
     # component is defined inside the compiled main-*.js bundle. To
     # check whether the served bundle actually has the feature we
     # must grep the bundle, not the shell.
-    m = re.search(r'main-[A-Z0-9]+\.js', body)
-    assert m, (
-        "Could not locate main-*.js in the index HTML — "
-        "rebuild the frontend (`cd frontend && ng build`)"
-    )
+    m = re.search(r"main-[A-Z0-9]+\.js", body)
+    assert m, "Could not locate main-*.js in the index HTML — rebuild the frontend (`cd frontend && ng build`)"
     try:
-        with urllib.request.urlopen(
-            f"{DASHBOARD_URL.rstrip('/')}/{m.group(0)}", timeout=10
-        ) as r:
+        with urllib.request.urlopen(f"{DASHBOARD_URL.rstrip('/')}/{m.group(0)}", timeout=10) as r:
             bundle = r.read().decode("utf-8", errors="ignore")
     except Exception as exc:
         pytest.fail(f"Dashboard bundle {m.group(0)} not reachable: {exc}")
 
     assert "theme-picker" in bundle or "palette-dropdown" in bundle, (
-        "Dashboard bundle does not include the theme-picker — rebuild + "
-        "restart qbittorrent-proxy and re-run"
+        "Dashboard bundle does not include the theme-picker — rebuild + restart qbittorrent-proxy and re-run"
     )
 
     with sync_playwright() as pw:
@@ -165,9 +160,7 @@ def test_theme_switching_applies_tokens_and_persists(palettes: dict[str, dict[st
                 timeout=5000,
             )
             # Pick up the runtime mode so we compare against the right variant.
-            mode = page.evaluate(
-                "() => document.documentElement.getAttribute('data-mode')"
-            ) or "dark"
+            mode = page.evaluate("() => document.documentElement.getAttribute('data-mode')") or "dark"
             nord_tokens = palettes["nord"][mode]
             for css_var in REQUIRED_CSS_VARS:
                 # Reverse lookup token key from css var.

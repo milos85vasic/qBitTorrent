@@ -30,9 +30,10 @@ class TestMainStartup:
     def test_main_functions_exist(self):
         """main.py should define required functions."""
         import main
-        assert hasattr(main, 'start_original_proxy')
-        assert hasattr(main, 'start_fastapi_server')
-        assert hasattr(main, 'main')
+
+        assert hasattr(main, "start_original_proxy")
+        assert hasattr(main, "start_fastapi_server")
+        assert hasattr(main, "main")
         assert callable(main.start_original_proxy)
         assert callable(main.start_fastapi_server)
         assert callable(main.main)
@@ -40,16 +41,19 @@ class TestMainStartup:
     def test_start_original_proxy_runs(self):
         """start_original_proxy should exist."""
         import main
+
         assert main.start_original_proxy is not None
 
     def test_start_fastapi_server_runs(self):
         """start_fastapi_server should exist."""
         import main
+
         assert main.start_fastapi_server is not None
 
     def test_main_function_exists(self):
         """main() function should orchestrate startup."""
         import main
+
         # The main function should start both services
         sig = main.main.__code__.co_varnames
         assert isinstance(sig, tuple)
@@ -57,9 +61,10 @@ class TestMainStartup:
     def test_main_starts_both_services_mocked(self):
         """main() should attempt to start both services (mocked)."""
         import main
+
         main._shutdown_event.set()
         try:
-            with patch('threading.Thread') as mock_thread:
+            with patch("threading.Thread") as mock_thread:
                 main.main()
             assert mock_thread.call_count >= 1
         finally:
@@ -71,6 +76,7 @@ class TestMainStartup:
             import importlib
 
             import main
+
             importlib.reload(main)
             # Should read from environment
             assert main is not None

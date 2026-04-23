@@ -27,22 +27,27 @@ class TestPublicTrackerSubprocessScript:
         # We can't easily call _search_public_tracker without mocking,
         # but we can inspect the method source to verify the script template.
         import inspect
+
         source = inspect.getsource(orch._search_public_tracker)
         # The buggy code had: importlib.import_module(f'engines.{{tracker_name}}')
         # which produced a literal {tracker_name} in the subprocess.
         # After fix, it should use the actual tracker name.
-        assert "f'engines.{{tracker_name}}'" not in source, \
+        assert "f'engines.{{tracker_name}}'" not in source, (
             "Bug: subprocess script uses undefined {tracker_name} variable"
-        assert "getattr(_mod, '{{tracker_name}}')" not in source, \
+        )
+        assert "getattr(_mod, '{{tracker_name}}')" not in source, (
             "Bug: subprocess script uses undefined {tracker_name} variable"
+        )
 
     def test_script_uses_hardcoded_tracker_name(self):
         """Script template must interpolate tracker_name into the string."""
         import inspect
+
         source = inspect.getsource(SearchOrchestrator._search_public_tracker)
         # Should have direct interpolation like 'engines.{tracker_name}'
-        assert "'engines.{tracker_name}'" in source or '"engines.{tracker_name}"' in source, \
+        assert "'engines.{tracker_name}'" in source or '"engines.{tracker_name}"' in source, (
             "Fix: tracker name must be hardcoded in subprocess script"
+        )
 
     @pytest.mark.asyncio
     async def test_subprocess_script_compiles(self, tmp_path):
@@ -56,11 +61,14 @@ class TestPublicTrackerSubprocessScript:
             nonlocal captured_script
             if len(args) >= 3 and args[0] == "python3" and args[1] == "-c":
                 captured_script = args[2]
+
             # Return a mock process
             class MockProc:
                 returncode = 0
+
                 async def communicate(self):
                     return (b"[]", b"")
+
             return MockProc()
 
         original_create = asyncio.create_subprocess_exec
@@ -74,13 +82,16 @@ class TestPublicTrackerSubprocessScript:
         # The script must compile
         compile(captured_script, "<string>", "exec")
         # It must NOT contain unresolved {tracker_name}
-        assert "{tracker_name}" not in captured_script, \
+        assert "{tracker_name}" not in captured_script, (
             f"Script contains unresolved {{tracker_name}}: {captured_script}"
+        )
         # It MUST contain the actual tracker name
-        assert "'engines.yts'" in captured_script or '"engines.yts"' in captured_script, \
+        assert "'engines.yts'" in captured_script or '"engines.yts"' in captured_script, (
             f"Script does not contain hardcoded tracker name: {captured_script}"
-        assert "'yts'" in captured_script or '"yts"' in captured_script, \
+        )
+        assert "'yts'" in captured_script or '"yts"' in captured_script, (
             f"Script does not reference tracker class: {captured_script}"
+        )
 
 
 class TestPublicTrackerResultParsing:
@@ -89,6 +100,7 @@ class TestPublicTrackerResultParsing:
     def test_search_result_from_plugin_dict(self):
         """Plugin result dict must be converted to SearchResult with correct fields."""
         from merge_service.search import SearchResult
+
         r = SearchResult(
             name="Test Movie 2024 1080p",
             link="magnet:?xt=urn:btih:abc123",
@@ -114,6 +126,7 @@ class TestPublicTrackerResultParsing:
         }
         # This is how _search_public_tracker parses it
         from merge_service.search import SearchResult
+
         r = SearchResult(
             name=plugin_dict.get("name", ""),
             size=plugin_dict.get("size", "0 B"),
@@ -140,8 +153,7 @@ class TestSearchOrchestratorTrackerCount:
         orch = SearchOrchestrator()
         trackers = orch._get_enabled_trackers()
         names = [t.name for t in trackers]
-        live_canaries = ["piratebay", "rutor", "linuxtracker",
-                         "torrentscsv", "academictorrents", "limetorrents"]
+        live_canaries = ["piratebay", "rutor", "linuxtracker", "torrentscsv", "academictorrents", "limetorrents"]
         found = [n for n in live_canaries if n in names]
         assert len(found) >= 5, f"Too few live public trackers enabled: {found}"
 

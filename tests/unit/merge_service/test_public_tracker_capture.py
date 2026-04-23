@@ -84,8 +84,7 @@ def test_script_patches_top_level_novaprinter(search_source: str) -> None:
 def test_script_streams_ndjson_not_batched(search_source: str) -> None:
     body = _extract_subprocess_script(search_source)
     assert "sys.stdout.flush()" in body, (
-        "Capture must flush after each row so a subprocess kill at timeout "
-        "preserves partial results."
+        "Capture must flush after each row so a subprocess kill at timeout preserves partial results."
     )
     assert "_json.dumps(d)" in body, "Capture should emit NDJSON per row"
     assert "print(_json.dumps(_results))" not in body, (
@@ -210,9 +209,7 @@ import importlib.util as _importlib_util
 _MS_PATH = str(REPO / "download-proxy" / "src" / "merge_service")
 sys.modules.setdefault("merge_service", type(sys)("merge_service"))
 sys.modules["merge_service"].__path__ = [_MS_PATH]  # type: ignore[attr-defined]
-_search_spec = _importlib_util.spec_from_file_location(
-    "merge_service.search", str(Path(_MS_PATH) / "search.py")
-)
+_search_spec = _importlib_util.spec_from_file_location("merge_service.search", str(Path(_MS_PATH) / "search.py"))
 _search_mod = _importlib_util.module_from_spec(_search_spec)
 sys.modules["merge_service.search"] = _search_mod
 _search_spec.loader.exec_module(_search_mod)  # type: ignore[union-attr]

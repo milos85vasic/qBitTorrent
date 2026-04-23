@@ -49,6 +49,5 @@ def test_demo_sh_passes_bash_n(track: str) -> None:
         check=False,
     )
     assert result.returncode == 0, (
-        f"`bash -n {demo}` reported a syntax error:\n"
-        f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        f"`bash -n {demo}` reported a syntax error:\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )

@@ -81,9 +81,7 @@ except ImportError:
 
 
 # Configure logging
-logging.basicConfig(
-    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 RE_TORRENTS = re.compile(
@@ -118,11 +116,7 @@ def date_normalize(date_str: str) -> int:
         "Дек",
     )
     try:
-        date_str = [
-            date_str.replace(m, f"{i:02d}")
-            for i, m in enumerate(months, 1)
-            if m in date_str
-        ][0]
+        date_str = [date_str.replace(m, f"{i:02d}") for i, m in enumerate(months, 1) if m in date_str][0]
         return int(time.mktime(time.strptime(date_str, "%d %m %y")))
     except:
         return int(time.time())

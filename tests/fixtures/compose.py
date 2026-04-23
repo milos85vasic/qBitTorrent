@@ -22,24 +22,22 @@ import pytest
 
 def _detect_container_runtime() -> tuple[str, str]:
     """Detect podman or docker and return (runtime, compose_cmd)."""
-    if subprocess.run(["which", "podman"], capture_output=True).returncode == 0:
-        runtime = "podman"
-        # Try podman-compose first, then podman compose
-        if subprocess.run(["which", "podman-compose"], capture_output=True).returncode == 0:
-            compose_cmd = "podman-compose"
-        else:
-            compose_cmd = "podman compose"
-    elif subprocess.run(["which", "docker"], capture_output=True).returncode == 0:
-        runtime = "docker"
-        # Try docker compose (v2), then docker-compose (v1)
+    # Prefer docker compose on CI runners where podman may be present
+    # but podman compose is not functional.
+    if subprocess.run(["which", "docker"], capture_output=True).returncode == 0:
         result = subprocess.run(["docker", "compose", "version"], capture_output=True)
         if result.returncode == 0:
-            compose_cmd = "docker compose"
-        else:
-            compose_cmd = "docker-compose"
-    else:
-        raise RuntimeError("Neither podman nor docker found in PATH")
-    return runtime, compose_cmd
+            return "docker", "docker compose"
+        if subprocess.run(["which", "docker-compose"], capture_output=True).returncode == 0:
+            return "docker", "docker-compose"
+    if subprocess.run(["which", "podman"], capture_output=True).returncode == 0:
+        if subprocess.run(["which", "podman-compose"], capture_output=True).returncode == 0:
+            return "podman", "podman-compose"
+        # Only use "podman compose" if it actually works
+        result = subprocess.run(["podman", "compose", "version"], capture_output=True)
+        if result.returncode == 0:
+            return "podman", "podman compose"
+    raise RuntimeError("No functional container runtime found in PATH")
 
 
 def _is_port_listening(port: int, host: str = "127.0.0.1") -> bool:
@@ -72,6 +70,7 @@ def _wait_for_port(port: int, host: str = "127.0.0.1", timeout: float = 300.0) -
 def _start_compose_stack(compose_cmd: str, compose_file: str, project_name: str) -> None:
     """Run `compose_cmd up -d`."""
     import shlex
+
     cmd = f"{compose_cmd} -f {shlex.quote(compose_file)} -p {shlex.quote(project_name)} up -d"
     print(f"Starting compose stack: {cmd}")
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -95,7 +94,7 @@ def compose_up(pytestconfig: Any) -> dict[str, str]:
     # Check if services are already listening
     ports = [qbittorrent_port, proxy_port, merge_port]
     all_listening = all(_is_port_listening(port) for port in ports)
-    
+
     if not all_listening:
         # Need to start the stack
         runtime, compose_cmd = _detect_container_runtime()
@@ -105,9 +104,10 @@ def compose_up(pytestconfig: Any) -> dict[str, str]:
         # Wait for ports
         for port in ports:
             _wait_for_port(port, timeout=120.0)
-    
+
     # Verify health by making HTTP requests
     import requests
+
     # Merge service health
     merge_url = f"http://localhost:{merge_port}"
     for _ in range(30):
@@ -120,7 +120,7 @@ def compose_up(pytestconfig: Any) -> dict[str, str]:
         time.sleep(1)
     else:
         raise RuntimeError(f"Merge service not healthy at {merge_url}")
-    
+
     # qBittorrent proxy health (just check it responds)
     proxy_url = f"http://localhost:{proxy_port}"
     for _ in range(30):
@@ -133,7 +133,7 @@ def compose_up(pytestconfig: Any) -> dict[str, str]:
         time.sleep(1)
     else:
         raise RuntimeError(f"Proxy not healthy at {proxy_url}")
-    
+
     return {
         "merge_service": merge_url,
         "qbittorrent_proxy": proxy_url,

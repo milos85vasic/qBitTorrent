@@ -42,11 +42,11 @@ def test_pytest_ini_options_strict_and_cov(pyproject: dict) -> None:
     # scripts/run-tests.sh instead).
     for banned in ("--cov=", "--cov-report"):
         assert banned not in addopts_joined, (
-            f"pytest addopts must not contain {banned!r}; coverage lives "
-            f"in scripts/run-tests.sh now"
+            f"pytest addopts must not contain {banned!r}; coverage lives in scripts/run-tests.sh now"
         )
     # But the run-tests.sh wrapper must still configure coverage.
     import pathlib
+
     runner = pathlib.Path(__file__).resolve().parents[2] / "scripts" / "run-tests.sh"
     assert runner.is_file(), "scripts/run-tests.sh must exist"
     runner_src = runner.read_text(encoding="utf-8")

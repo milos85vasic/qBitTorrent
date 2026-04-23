@@ -195,12 +195,15 @@ class TestPrivateTrackerSearch:
     @pytest.mark.asyncio
     async def test_search_kinozal_fallback_to_iptorrents(self, orchestrator):
         """Kinozal should fallback to IPTorrents credentials."""
-        with patch.dict(os.environ, {
-            "KINOZAL_USERNAME": "",
-            "KINOZAL_PASSWORD": "",
-            "IPTORRENTS_USERNAME": "ipt_user",
-            "IPTORRENTS_PASSWORD": "ipt_pass",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "KINOZAL_USERNAME": "",
+                "KINOZAL_PASSWORD": "",
+                "IPTORRENTS_USERNAME": "ipt_user",
+                "IPTORRENTS_PASSWORD": "ipt_pass",
+            },
+        ):
             # Should use IPTorrents credentials as fallback
             assert orchestrator is not None
 

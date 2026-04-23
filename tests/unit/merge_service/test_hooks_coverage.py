@@ -18,9 +18,7 @@ _MS_PATH = os.path.join(_SRC_PATH, "merge_service")
 sys.modules.setdefault("merge_service", type(sys)("merge_service"))
 sys.modules["merge_service"].__path__ = [_MS_PATH]
 
-_hooks_spec = importlib.util.spec_from_file_location(
-    "merge_service.hooks", os.path.join(_MS_PATH, "hooks.py")
-)
+_hooks_spec = importlib.util.spec_from_file_location("merge_service.hooks", os.path.join(_MS_PATH, "hooks.py"))
 _hooks_mod = importlib.util.module_from_spec(_hooks_spec)
 sys.modules["merge_service.hooks"] = _hooks_mod
 _hooks_spec.loader.exec_module(_hooks_mod)
@@ -143,7 +141,9 @@ class TestHookDispatcherExecution:
         os.chmod(str(script), os.stat(str(script)).st_mode | stat.S_IEXEC)
 
         d = HookDispatcher()
-        cfg = HookConfig(name="slow", event=HookEventType.SEARCH_START, script_path=str(script), enabled=True, timeout=1)
+        cfg = HookConfig(
+            name="slow", event=HookEventType.SEARCH_START, script_path=str(script), enabled=True, timeout=1
+        )
         d.register_hook(cfg)
 
         event = HookEvent(event_type=HookEventType.SEARCH_START, data={})
@@ -211,9 +211,14 @@ class TestCreateDefaultHook:
 class TestHookEventTypeComplete:
     def test_all_types(self):
         expected = {
-            "search_start", "search_progress", "search_complete",
-            "download_start", "download_progress", "download_complete",
-            "merge_complete", "validation_complete",
+            "search_start",
+            "search_progress",
+            "search_complete",
+            "download_start",
+            "download_progress",
+            "download_complete",
+            "merge_complete",
+            "validation_complete",
         }
         actual = {e.value for e in HookEventType}
         assert actual == expected

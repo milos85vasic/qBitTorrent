@@ -71,5 +71,5 @@ jobs:
       - name: npm ci
         run: npm ci --no-audit --no-fund
 
-      - name: unit tests (vitest)
-        run: npx vitest run
+      - name: unit tests (Angular builder)
+        run: npx ng test --watch=false

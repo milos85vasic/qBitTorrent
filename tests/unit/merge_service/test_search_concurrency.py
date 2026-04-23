@@ -28,9 +28,7 @@ sys.modules["merge_service"].__path__ = [_MS_PATH]
 
 
 def _import_search_module():
-    spec = importlib.util.spec_from_file_location(
-        "merge_service.search", os.path.join(_MS_PATH, "search.py")
-    )
+    spec = importlib.util.spec_from_file_location("merge_service.search", os.path.join(_MS_PATH, "search.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules["merge_service.search"] = mod
     spec.loader.exec_module(mod)
@@ -51,8 +49,7 @@ async def _run_bounded_search(orch, search_mod, num_trackers: int, tick: float =
     tracker_source_cls = search_mod.TrackerSource
 
     fake_trackers = [
-        tracker_source_cls(name=f"t{i}", url=f"http://tracker-{i}.invalid", enabled=True)
-        for i in range(num_trackers)
+        tracker_source_cls(name=f"t{i}", url=f"http://tracker-{i}.invalid", enabled=True) for i in range(num_trackers)
     ]
 
     calls: list[str] = []

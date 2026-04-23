@@ -15,9 +15,7 @@ _MS_PATH = os.path.join(_SRC_PATH, "merge_service")
 sys.modules.setdefault("merge_service", type(sys)("merge_service"))
 sys.modules["merge_service"].__path__ = [_MS_PATH]
 
-_enricher_spec = importlib.util.spec_from_file_location(
-    "merge_service.enricher", os.path.join(_MS_PATH, "enricher.py")
-)
+_enricher_spec = importlib.util.spec_from_file_location("merge_service.enricher", os.path.join(_MS_PATH, "enricher.py"))
 _enricher_mod = importlib.util.module_from_spec(_enricher_spec)
 sys.modules["merge_service.enricher"] = _enricher_mod
 _enricher_spec.loader.exec_module(_enricher_mod)

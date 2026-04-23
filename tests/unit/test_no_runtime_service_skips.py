@@ -73,8 +73,7 @@ def test_no_runtime_service_skips() -> None:
         "Found runtime service-availability skips. Convert them to fixture gates "
         "(merge_service_live / qbittorrent_live / webui_bridge_live / all_services_live) "
         "or append a trailing '# allow-skip: <reason>' comment if the skip is truly "
-        "data-dependent and not about service availability.\n  - "
-        + "\n  - ".join(offenders)
+        "data-dependent and not about service availability.\n  - " + "\n  - ".join(offenders)
     )
 
 

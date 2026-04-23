@@ -33,7 +33,7 @@ async def test_sse_emits_initial_state_then_updates(tmp_path, monkeypatch):
     theme_path = tmp_path / "theme.json"
     monkeypatch.setenv("THEME_STATE_PATH", str(theme_path))
     _purge_api_module()
-    import api  # noqa: F401
+    import api
     from api import theme_state as ts
 
     ts._store = None  # type: ignore[attr-defined]
@@ -57,7 +57,7 @@ async def test_sse_multiple_subscribers_receive_same_updates(tmp_path, monkeypat
     theme_path = tmp_path / "theme.json"
     monkeypatch.setenv("THEME_STATE_PATH", str(theme_path))
     _purge_api_module()
-    import api  # noqa: F401
+    import api
     from api import theme_state as ts
 
     ts._store = None  # type: ignore[attr-defined]
@@ -154,7 +154,7 @@ async def test_sse_endpoint_serves_initial_event(tmp_path, monkeypatch):
     assert "event: theme" in text
     for line in text.splitlines():
         if line.startswith("data: "):
-            payload = json.loads(line[len("data: "):])
+            payload = json.loads(line[len("data: ") :])
             assert payload["paletteId"] == "darcula"
             assert payload["mode"] == "dark"
             break

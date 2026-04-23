@@ -46,40 +46,34 @@ helpers.htmlentitydecode  # pylint: disable=pointless-statement # dirty workarou
 
 
 class piratebay:
-    url = 'https://thepiratebay.org'
-    name = 'The Pirate Bay'
-    supported_categories = {
-        'all': '0',
-        'music': '100',
-        'movies': '200',
-        'games': '400',
-        'software': '300'
-    }
+    url = "https://thepiratebay.org"
+    name = "The Pirate Bay"
+    supported_categories = {"all": "0", "music": "100", "movies": "200", "games": "400", "software": "300"}
 
     # initialize trackers for magnet links
     trackers_list = [
-        'udp://tracker.internetwarriors.net:1337/announce',
-        'udp://tracker.opentrackr.org:1337/announce',
-        'udp://p4p.arenabg.ch:1337/announce',
-        'udp://tracker.openbittorrent.com:6969/announce',
-        'udp://www.torrent.eu.org:451/announce',
-        'udp://tracker.torrent.eu.org:451/announce',
-        'udp://retracker.lanta-net.ru:2710/announce',
-        'udp://open.stealth.si:80/announce',
-        'udp://exodus.desync.com:6969/announce',
-        'udp://tracker.tiny-vps.com:6969/announce'
+        "udp://tracker.internetwarriors.net:1337/announce",
+        "udp://tracker.opentrackr.org:1337/announce",
+        "udp://p4p.arenabg.ch:1337/announce",
+        "udp://tracker.openbittorrent.com:6969/announce",
+        "udp://www.torrent.eu.org:451/announce",
+        "udp://tracker.torrent.eu.org:451/announce",
+        "udp://retracker.lanta-net.ru:2710/announce",
+        "udp://open.stealth.si:80/announce",
+        "udp://exodus.desync.com:6969/announce",
+        "udp://tracker.tiny-vps.com:6969/announce",
     ]
-    trackers = '&'.join(urlencode({'tr': tracker}) for tracker in trackers_list)
+    trackers = "&".join(urlencode({"tr": tracker}) for tracker in trackers_list)
 
-    def search(self, what: str, cat: str = 'all') -> None:
+    def search(self, what: str, cat: str = "all") -> None:
         base_url = "https://apibay.org/q.php?%s"
 
         # get response json
         what = unquote(what)
         category = self.supported_categories[cat]
-        params = {'q': what}
-        if category != '0':
-            params['cat'] = category
+        params = {"q": what}
+        if category != "0":
+            params["cat"] = category
 
         # Calling custom `retrieve_url` function with adequate escaping
         data = self.retrieve_url(base_url % urlencode(params))
@@ -91,26 +85,28 @@ class piratebay:
 
         # parse results
         for result in response_json:
-            if result['info_hash'] == '0000000000000000000000000000000000000000':
+            if result["info_hash"] == "0000000000000000000000000000000000000000":
                 continue
-            prettyPrinter({
-                'link': self.download_link(result),
-                'name': result['name'],
-                'size': str(result['size']) + " B",
-                'seeds': result['seeders'],
-                'leech': result['leechers'],
-                'engine_url': self.url,
-                'desc_link': self.url + '/description.php?id=' + result['id'],
-                'pub_date': result['added'],
-            })
+            prettyPrinter(
+                {
+                    "link": self.download_link(result),
+                    "name": result["name"],
+                    "size": str(result["size"]) + " B",
+                    "seeds": result["seeders"],
+                    "leech": result["leechers"],
+                    "engine_url": self.url,
+                    "desc_link": self.url + "/description.php?id=" + result["id"],
+                    "pub_date": result["added"],
+                }
+            )
 
     def download_link(self, result: Mapping[str, str]) -> str:
-        dn = urlencode({'dn': result['name']})
+        dn = urlencode({"dn": result["name"]})
         return f"magnet:?xt=urn:btih:{result['info_hash']}&{dn}&{self.trackers}"
 
     def retrieve_url(self, url: str) -> str:
         def getBrowserUserAgent() -> str:
-            """ Disguise as browser to circumvent website blocking """
+            """Disguise as browser to circumvent website blocking"""
 
             # Firefox release calendar
             # https://whattrainisitnow.com/calendar/
@@ -125,7 +121,7 @@ class piratebay:
             return f"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:{nowVersion}.0) Gecko/20100101 Firefox/{nowVersion}.0"
 
         # Request data from API
-        request = urllib.request.Request(url, None, {'User-Agent': getBrowserUserAgent()})
+        request = urllib.request.Request(url, None, {"User-Agent": getBrowserUserAgent()})
 
         try:
             response: http.client.HTTPResponse = urllib.request.urlopen(request)  # pylint: disable=consider-using-with
@@ -134,19 +130,19 @@ class piratebay:
 
         data = response.read()
 
-        if data[:2] == b'\x1f\x8b':
+        if data[:2] == b"\x1f\x8b":
             # Data is gzip encoded, decode it
             with io.BytesIO(data) as stream, gzip.GzipFile(fileobj=stream) as gzipper:
                 data = gzipper.read()
 
-        charset = 'utf-8'
+        charset = "utf-8"
         try:
-            charset = response.getheader('Content-Type', '').split('charset=', 1)[1]
+            charset = response.getheader("Content-Type", "").split("charset=", 1)[1]
         except IndexError:
             pass
 
-        dataStr = data.decode(charset, 'replace')
-        dataStr = dataStr.replace('&quot;', '\\"')  # Manually escape &quot; before
+        dataStr = data.decode(charset, "replace")
+        dataStr = dataStr.replace("&quot;", '\\"')  # Manually escape &quot; before
         dataStr = html.unescape(dataStr)
 
         return dataStr
@@ -154,7 +150,8 @@ class piratebay:
     def download_torrent(self, url):
         """Handle magnet links - just pass through."""
         import sys
-        if url.startswith('magnet:'):
+
+        if url.startswith("magnet:"):
             # For magnet links, output as-is (qBittorrent handles them)
             print(url + " " + url)
             sys.stdout.flush()
@@ -162,20 +159,21 @@ class piratebay:
             # Fallback to direct download
             import tempfile
             import urllib.request
+
             try:
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
                 with urllib.request.urlopen(req, timeout=30) as response:
                     data = response.read()
-                
+
                 fd, path = tempfile.mkstemp(suffix=".torrent")
                 with os.fdopen(fd, "wb") as f:
                     f.write(data)
-                
+
                 import os
+
                 os.chmod(path, 0o644)
                 print(path + " " + url)
                 sys.stdout.flush()
             except Exception as e:
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
-

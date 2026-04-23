@@ -47,18 +47,14 @@ class bt4g(object):
 
         def __findTorrents(self, html):
             torrents = []
-            trs = re.findall(
-                r"<div class=\"list-group-item result-item\">.+?</div>", html
-            )
+            trs = re.findall(r"<div class=\"list-group-item result-item\">.+?</div>", html)
             for tr in trs:
                 url_titles = re.search(
                     r".+?title=\"(.+?)\" href=\"(.+?)\".+?Creation Time: (.+?)<.+?Total Size.+?>([0-9\,\.]+(TB|GB|MB|KB)).+?seeders\">([0-9,]+).+?leechers\">([0-9,]+)",
                     tr,
                 )
                 if url_titles:
-                    timestamp = int(
-                        datetime.strptime(url_titles.group(3), "%Y-%m-%d").timestamp()
-                    )
+                    timestamp = int(datetime.strptime(url_titles.group(3), "%Y-%m-%d").timestamp())
                     generic_url = "{0}{1}".format(self.url[:-1], url_titles.group(2))
                     torrent_data = [
                         quote(generic_url),
@@ -78,11 +74,7 @@ class bt4g(object):
             print("{0} {1}".format(magnet_match.groups()[0], info))
 
     def search(self, what, cat="all"):
-        cat = (
-            ""
-            if cat == "all"
-            else "&category={0}".format(self.supported_categories[cat])
-        )
+        cat = "" if cat == "all" else "&category={0}".format(self.supported_categories[cat])
         parser = self.HTMLParser(self.url)
         current_page = 1
         while True:

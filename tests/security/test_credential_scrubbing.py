@@ -15,7 +15,7 @@ _src = os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "sr
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from config.log_filter import CredentialScrubber  # noqa: E402
+from config.log_filter import CredentialScrubber
 
 
 class TestCredentialScrubbing:

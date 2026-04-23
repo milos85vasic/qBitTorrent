@@ -32,9 +32,7 @@ _MS_PATH = REPO / "download-proxy" / "src" / "merge_service"
 
 sys.modules.setdefault("merge_service", type(sys)("merge_service"))
 sys.modules["merge_service"].__path__ = [str(_MS_PATH)]  # type: ignore[attr-defined]
-_spec = importlib.util.spec_from_file_location(
-    "merge_service.search", str(_MS_PATH / "search.py")
-)
+_spec = importlib.util.spec_from_file_location("merge_service.search", str(_MS_PATH / "search.py"))
 _search = importlib.util.module_from_spec(_spec)
 sys.modules["merge_service.search"] = _search
 _spec.loader.exec_module(_search)  # type: ignore[union-attr]
@@ -58,7 +56,7 @@ def _proc_mock(rows_then_eof: list[bytes], *, returncode: int = 0) -> AsyncMock:
         (None, 60.0),
         ("10", 10.0),
         ("60", 60.0),
-        ("3", 5.0),      # clamped up
+        ("3", 5.0),  # clamped up
         ("999", 120.0),  # clamped down
         ("not-a-number", 60.0),  # invalid falls back to default
     ],
@@ -76,9 +74,7 @@ def test_deadline_env_clamping(env_val, expected) -> None:
         # We never let the real subprocess run; just record the deadline.
         return _proc_mock([b'{"name":"x","size":"1 B","seeds":1,"leech":0,"link":"m","desc_link":"d"}\n'])
 
-    with patch.dict(os.environ, env, clear=True), patch(
-        "asyncio.create_subprocess_exec", side_effect=fake_subprocess
-    ):
+    with patch.dict(os.environ, env, clear=True), patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
         asyncio.run(orch._search_public_tracker("piratebay", "q", "all"))
 
     diag = orch._last_public_tracker_diag.get("piratebay")
@@ -125,9 +121,10 @@ def test_deadline_hit_flag_true_when_readline_times_out() -> None:
         return mock
 
     # Tighten deadline so the test runs quickly.
-    with patch.dict(
-        os.environ, {"PUBLIC_TRACKER_DEADLINE_SECONDS": "5"}, clear=False
-    ), patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
+    with (
+        patch.dict(os.environ, {"PUBLIC_TRACKER_DEADLINE_SECONDS": "5"}, clear=False),
+        patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess),
+    ):
         results = asyncio.run(orch._search_public_tracker("slowplug", "q", "all"))
 
     assert results == [], "no rows should have flushed"

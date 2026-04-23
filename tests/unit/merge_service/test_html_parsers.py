@@ -98,9 +98,7 @@ NNMCLUB_MULTI_HTML = """
 
 class TestParseRutrackerHtml:
     def test_single_result(self, orchestrator):
-        results = orchestrator._parse_rutracker_html(
-            RUTRACKER_SAMPLE_HTML, "https://rutracker.org"
-        )
+        results = orchestrator._parse_rutracker_html(RUTRACKER_SAMPLE_HTML, "https://rutracker.org")
         assert len(results) == 1
         r = results[0]
         assert "Interstellar" in r.name
@@ -111,9 +109,7 @@ class TestParseRutrackerHtml:
         assert "12345" in r.desc_link
 
     def test_multiple_results(self, orchestrator):
-        results = orchestrator._parse_rutracker_html(
-            RUTRACKER_MULTI_HTML, "https://rutracker.org"
-        )
+        results = orchestrator._parse_rutracker_html(RUTRACKER_MULTI_HTML, "https://rutracker.org")
         assert len(results) == 2
         assert results[0].name == "Movie A 1080p"
         assert results[0].seeds == 200
@@ -131,18 +127,12 @@ class TestParseRutrackerHtml:
         assert results == []
 
     def test_link_contains_base_url(self, orchestrator):
-        results = orchestrator._parse_rutracker_html(
-            RUTRACKER_SAMPLE_HTML, "https://rutracker.org"
-        )
+        results = orchestrator._parse_rutracker_html(RUTRACKER_SAMPLE_HTML, "https://rutracker.org")
         assert results[0].link.startswith("https://rutracker.org/forum/dl.php")
-        assert results[0].desc_link.startswith(
-            "https://rutracker.org/forum/viewtopic.php"
-        )
+        assert results[0].desc_link.startswith("https://rutracker.org/forum/viewtopic.php")
 
     def test_size_formatted(self, orchestrator):
-        results = orchestrator._parse_rutracker_html(
-            RUTRACKER_SAMPLE_HTML, "https://rutracker.org"
-        )
+        results = orchestrator._parse_rutracker_html(RUTRACKER_SAMPLE_HTML, "https://rutracker.org")
         size = results[0].size
         assert size != "0 B"
         assert float(size.split()[0]) > 0
@@ -164,9 +154,7 @@ class TestParseRutrackerHtml:
 
 class TestParseKinozalHtml:
     def test_single_result(self, orchestrator):
-        results = orchestrator._parse_kinozal_html(
-            KINOZAL_SAMPLE_HTML, "https://kinozal.tv"
-        )
+        results = orchestrator._parse_kinozal_html(KINOZAL_SAMPLE_HTML, "https://kinozal.tv")
         assert len(results) == 1
         r = results[0]
         assert "Interstellar" in r.name
@@ -175,16 +163,12 @@ class TestParseKinozalHtml:
         assert r.tracker == "kinozal"
 
     def test_cyrillic_size_translated(self, orchestrator):
-        results = orchestrator._parse_kinozal_html(
-            KINOZAL_SAMPLE_HTML, "https://kinozal.tv"
-        )
+        results = orchestrator._parse_kinozal_html(KINOZAL_SAMPLE_HTML, "https://kinozal.tv")
         size = results[0].size
         assert "G" in size or "GB" in size
 
     def test_multiple_results(self, orchestrator):
-        results = orchestrator._parse_kinozal_html(
-            KINOZAL_MULTI_HTML, "https://kinozal.tv"
-        )
+        results = orchestrator._parse_kinozal_html(KINOZAL_MULTI_HTML, "https://kinozal.tv")
         assert len(results) == 2
         assert "Film X" in results[0].name
         assert results[0].seeds == 100
@@ -196,31 +180,23 @@ class TestParseKinozalHtml:
         assert results == []
 
     def test_malformed_html_returns_empty(self, orchestrator):
-        results = orchestrator._parse_kinozal_html(
-            "<html><body>nothing</body></html>", "https://kinozal.tv"
-        )
+        results = orchestrator._parse_kinozal_html("<html><body>nothing</body></html>", "https://kinozal.tv")
         assert results == []
 
     def test_link_uses_dl_subdomain(self, orchestrator):
-        results = orchestrator._parse_kinozal_html(
-            KINOZAL_SAMPLE_HTML, "https://kinozal.tv"
-        )
+        results = orchestrator._parse_kinozal_html(KINOZAL_SAMPLE_HTML, "https://kinozal.tv")
         assert "dl." in results[0].link
         assert "67890" in results[0].link
 
     def test_desc_link(self, orchestrator):
-        results = orchestrator._parse_kinozal_html(
-            KINOZAL_SAMPLE_HTML, "https://kinozal.tv"
-        )
+        results = orchestrator._parse_kinozal_html(KINOZAL_SAMPLE_HTML, "https://kinozal.tv")
         assert "details.php?id=67890" in results[0].desc_link
         assert results[0].desc_link.startswith("https://kinozal.tv")
 
 
 class TestParseNnmclubHtml:
     def test_single_result(self, orchestrator):
-        results = orchestrator._parse_nnmclub_html(
-            NNMCLUB_SAMPLE_HTML, "https://nnmclub.to"
-        )
+        results = orchestrator._parse_nnmclub_html(NNMCLUB_SAMPLE_HTML, "https://nnmclub.to")
         assert len(results) == 1
         r = results[0]
         assert "Interstellar" in r.name
@@ -229,9 +205,7 @@ class TestParseNnmclubHtml:
         assert r.tracker == "nnmclub"
 
     def test_multiple_results(self, orchestrator):
-        results = orchestrator._parse_nnmclub_html(
-            NNMCLUB_MULTI_HTML, "https://nnmclub.to"
-        )
+        results = orchestrator._parse_nnmclub_html(NNMCLUB_MULTI_HTML, "https://nnmclub.to")
         assert len(results) == 2
         assert "Show A" in results[0].name
         assert results[0].seeds == 80
@@ -243,22 +217,16 @@ class TestParseNnmclubHtml:
         assert results == []
 
     def test_malformed_html_returns_empty(self, orchestrator):
-        results = orchestrator._parse_nnmclub_html(
-            "<html>nope</html>", "https://nnmclub.to"
-        )
+        results = orchestrator._parse_nnmclub_html("<html>nope</html>", "https://nnmclub.to")
         assert results == []
 
     def test_link_contains_base_url(self, orchestrator):
-        results = orchestrator._parse_nnmclub_html(
-            NNMCLUB_SAMPLE_HTML, "https://nnmclub.to"
-        )
+        results = orchestrator._parse_nnmclub_html(NNMCLUB_SAMPLE_HTML, "https://nnmclub.to")
         assert results[0].link.startswith("https://nnmclub.to/forum/")
         assert results[0].desc_link.startswith("https://nnmclub.to/forum/")
 
     def test_size_is_raw_value(self, orchestrator):
-        results = orchestrator._parse_nnmclub_html(
-            NNMCLUB_SAMPLE_HTML, "https://nnmclub.to"
-        )
+        results = orchestrator._parse_nnmclub_html(NNMCLUB_SAMPLE_HTML, "https://nnmclub.to")
         assert results[0].size == "1572864000"
 
 
@@ -300,9 +268,7 @@ IPTORRENTS_FREELEECH_HTML = """<form><table id="torrents">
 
 class TestParseIptorrentsHtml:
     def test_single_result(self, orchestrator):
-        results = orchestrator._parse_iptorrents_html(
-            IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com"
-        )
+        results = orchestrator._parse_iptorrents_html(IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com")
         assert len(results) == 2
         r = results[0]
         assert "Ubuntu Server" in r.name
@@ -312,9 +278,7 @@ class TestParseIptorrentsHtml:
         assert r.freeleech is False
 
     def test_multiple_results(self, orchestrator):
-        results = orchestrator._parse_iptorrents_html(
-            IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com"
-        )
+        results = orchestrator._parse_iptorrents_html(IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com")
         assert len(results) == 2
         assert "Ubuntu Server" in results[0].name
         assert results[0].seeds == 335
@@ -322,9 +286,7 @@ class TestParseIptorrentsHtml:
         assert results[1].seeds == 200
 
     def test_freeleech_detected(self, orchestrator):
-        results = orchestrator._parse_iptorrents_html(
-            IPTORRENTS_FREELEECH_HTML, "https://iptorrents.com"
-        )
+        results = orchestrator._parse_iptorrents_html(IPTORRENTS_FREELEECH_HTML, "https://iptorrents.com")
         assert len(results) == 1
         assert results[0].freeleech is True
         assert "Free Movie" in results[0].name
@@ -334,22 +296,16 @@ class TestParseIptorrentsHtml:
         assert results == []
 
     def test_malformed_html_returns_empty(self, orchestrator):
-        results = orchestrator._parse_iptorrents_html(
-            "<html><body>nothing</body></html>", "https://iptorrents.com"
-        )
+        results = orchestrator._parse_iptorrents_html("<html><body>nothing</body></html>", "https://iptorrents.com")
         assert results == []
 
     def test_link_contains_base_url(self, orchestrator):
-        results = orchestrator._parse_iptorrents_html(
-            IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com"
-        )
+        results = orchestrator._parse_iptorrents_html(IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com")
         assert results[0].link.startswith("https://iptorrents.com/download.php/")
         assert results[0].desc_link.startswith("https://iptorrents.com/t/")
 
     def test_size_parsed(self, orchestrator):
-        results = orchestrator._parse_iptorrents_html(
-            IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com"
-        )
+        results = orchestrator._parse_iptorrents_html(IPTORRENTS_SAMPLE_HTML, "https://iptorrents.com")
         assert "GB" in results[0].size or "4.5" in results[0].size
 
     def test_header_row_skipped(self, orchestrator):

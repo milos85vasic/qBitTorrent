@@ -174,8 +174,7 @@ class TestQBitLoginButton:
         assert resp.status_code in [200, 401, 403], "Unexpected status"
 
         if resp.status_code == 200:
-            assert data.get("status") == "authenticated", \
-                f"qBittorrent auth via merge service failed: {data}"
+            assert data.get("status") == "authenticated", f"qBittorrent auth via merge service failed: {data}"
 
     def test_login_form_is_angular_app(self):
         """Login form should be in Angular app."""
@@ -200,7 +199,7 @@ class TestButtonUIIntegration:
         """All button handlers should be in Angular app."""
         html = self.session.get(self.base_url).text
         assert "<app-root>" in html or "<app-root></app-root>" in html
-        assert "<script src=\"main-" in html
+        assert '<script src="main-' in html
 
     def test_buttons_are_angular_components(self):
         """Buttons should be rendered by Angular."""

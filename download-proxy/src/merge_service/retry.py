@@ -1,6 +1,5 @@
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
-
 import aiohttp
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 retry_policy = retry(
     stop=stop_after_attempt(3),

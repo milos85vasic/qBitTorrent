@@ -23,8 +23,8 @@ if str(_SRC) not in sys.path:
 
 os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost")
 
-from merge_service.deduplicator import Deduplicator  # noqa: E402
-from merge_service.search import SearchResult  # noqa: E402
+from merge_service.deduplicator import Deduplicator
+from merge_service.search import SearchResult
 
 pytestmark = pytest.mark.property
 
@@ -70,10 +70,7 @@ def test_merge_is_order_invariant(results):
     dedup = Deduplicator()
 
     def _sigs(merged):
-        return sorted(
-            tuple(sorted(r.tracker + ":" + r.link for r in m.original_results))
-            for m in merged
-        )
+        return sorted(tuple(sorted(r.tracker + ":" + r.link for r in m.original_results)) for m in merged)
 
     reversed_results = list(reversed(results))
     assert _sigs(dedup.merge_results(results)) == _sigs(dedup.merge_results(reversed_results))

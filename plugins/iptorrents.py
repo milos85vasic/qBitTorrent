@@ -35,20 +35,14 @@ class iptorrents(object):
     }
 
     def __init__(self):
-        self.ua = (
-            "Mozilla/5.0 (X11; Linux x86_64; rv:102.0) Gecko/20100101 Firefox/102.0"
-        )
+        self.ua = "Mozilla/5.0 (X11; Linux x86_64; rv:102.0) Gecko/20100101 Firefox/102.0"
         self.session = None
         self._load_credentials()
         self._login()
 
     def _load_credentials(self):
-        self.username = os.environ.get("IPTORRENTS_USERNAME", "") or os.environ.get(
-            "IPTORRENTS_USER", ""
-        )
-        self.password = os.environ.get("IPTORRENTS_PASSWORD", "") or os.environ.get(
-            "IPTORRENTS_PASS", ""
-        )
+        self.username = os.environ.get("IPTORRENTS_USERNAME", "") or os.environ.get("IPTORRENTS_USER", "")
+        self.password = os.environ.get("IPTORRENTS_PASSWORD", "") or os.environ.get("IPTORRENTS_PASS", "")
         self._load_env_file()
 
     def _load_env_file(self):
@@ -58,12 +52,8 @@ class iptorrents(object):
             from env_loader import load_env_files
 
             load_env_files()
-            self.username = os.environ.get("IPTORRENTS_USERNAME", "") or os.environ.get(
-                "IPTORRENTS_USER", ""
-            )
-            self.password = os.environ.get("IPTORRENTS_PASSWORD", "") or os.environ.get(
-                "IPTORRENTS_PASS", ""
-            )
+            self.username = os.environ.get("IPTORRENTS_USERNAME", "") or os.environ.get("IPTORRENTS_USER", "")
+            self.password = os.environ.get("IPTORRENTS_PASSWORD", "") or os.environ.get("IPTORRENTS_PASS", "")
         except ImportError:
             for env_path in [
                 os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"),
@@ -139,11 +129,7 @@ class iptorrents(object):
         )
 
         for result in row_pattern.finditer(tor_table):
-            is_freeleech = bool(
-                re.search(
-                    r'<span\s+class="free"[^>]*>.*?</span>', result.group(0), re.I
-                )
-            )
+            is_freeleech = bool(re.search(r'<span\s+class="free"[^>]*>.*?</span>', result.group(0), re.I))
 
             name = result.group("name")
             tracker_tag = "IPTorrents"

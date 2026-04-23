@@ -44,9 +44,7 @@ def _reimport_streaming():
     fake_api = type(sys)("api")
     fake_api.__path__ = [os.path.join(_SRC_PATH, "api")]
     sys.modules["api"] = fake_api
-    spec = importlib.util.spec_from_file_location(
-        "api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py")
-    )
+    spec = importlib.util.spec_from_file_location("api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules["api.streaming"] = mod
     spec.loader.exec_module(mod)
@@ -73,9 +71,7 @@ async def test_search_stream_exits_on_task_cancel():
     streaming_mod = _reimport_streaming()
     SSEHandler = streaming_mod.SSEHandler
 
-    gen = SSEHandler.search_results_stream(
-        "sid-cancel", _RunningOrch(), poll_interval=0.1
-    )
+    gen = SSEHandler.search_results_stream("sid-cancel", _RunningOrch(), poll_interval=0.1)
 
     collected: list[str] = []
 

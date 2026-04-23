@@ -23,9 +23,7 @@ REQUIRED_DIAGRAMS = [
 
 
 def test_architecture_directory_exists():
-    assert DIAGRAMS_DIR.is_dir(), (
-        f"docs/architecture/ is missing — expected at {DIAGRAMS_DIR}"
-    )
+    assert DIAGRAMS_DIR.is_dir(), f"docs/architecture/ is missing — expected at {DIAGRAMS_DIR}"
 
 
 def test_every_required_diagram_is_present():
@@ -68,6 +66,4 @@ def test_diagrams_declare_a_mermaid_directive():
         first_line = path.read_text().lstrip().splitlines()[0] if path.read_text().strip() else ""
         if not any(first_line.startswith(prefix) for prefix in valid_starts):
             broken.append(filename)
-    assert broken == [], (
-        f"diagrams missing a Mermaid directive on the first non-blank line: {broken}"
-    )
+    assert broken == [], f"diagrams missing a Mermaid directive on the first non-blank line: {broken}"

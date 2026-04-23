@@ -48,9 +48,7 @@ REQUIRED_TOKENS = (
 )
 
 HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-RGBA_RE = re.compile(
-    r"^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([0-9]*\.?[0-9]+)\s*\)$"
-)
+RGBA_RE = re.compile(r"^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([0-9]*\.?[0-9]+)\s*\)$")
 
 
 def _slice_palettes_array(text: str) -> str:
@@ -288,9 +286,7 @@ def _get_palette_ids_for_param() -> list[str]:
 
 
 @pytest.mark.parametrize("palette_id", _get_palette_ids_for_param())
-def test_palette_has_light_and_dark_with_all_valid_tokens(
-    palette_id: str, palettes: list[dict[str, Any]]
-) -> None:
+def test_palette_has_light_and_dark_with_all_valid_tokens(palette_id: str, palettes: list[dict[str, Any]]) -> None:
     p = next(x for x in palettes if x["id"] == palette_id)
     # Name + source sanity.
     assert p.get("name"), f"{palette_id}: missing name"
@@ -302,6 +298,4 @@ def test_palette_has_light_and_dark_with_all_valid_tokens(
         for key in REQUIRED_TOKENS:
             assert key in tokens, f"{palette_id}.{variant}: missing token {key!r}"
             value = tokens[key]
-            assert _is_valid_css_colour(
-                value
-            ), f"{palette_id}.{variant}.{key}={value!r} is not a valid CSS colour"
+            assert _is_valid_css_colour(value), f"{palette_id}.{variant}.{key}={value!r} is not a valid CSS colour"

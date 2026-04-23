@@ -67,24 +67,16 @@ class pirateiro(object):
                 torrent_page.replace("	", "").replace("\n", "").replace("\r", ""),
             )
             if dl_link and dl_link.groups():
-                self.download_torrent(
-                    dl_link.groups()[0].replace("kickasstorrents", "katcr")
-                )
+                self.download_torrent(dl_link.groups()[0].replace("kickasstorrents", "katcr"))
             else:
                 raise Exception("Error, please fill a bug report!")
 
     def search(self, what, cat="all"):
         what = what.replace("%20", "+")
         parser = self.HTMLParser(self.url)
-        cat_str = (
-            ""
-            if cat == "all"
-            else "&category={0}".format(self.supported_categories[cat])
-        )
+        cat_str = "" if cat == "all" else "&category={0}".format(self.supported_categories[cat])
         for currPage in range(1, self.max_pages):
-            url = "{0}search?query={1}&page={2}{3}".format(
-                self.url, what, currPage, cat_str
-            )
+            url = "{0}search?query={1}&page={2}{3}".format(self.url, what, currPage, cat_str)
             html = re.sub(r"\s+", " ", retrieve_url(url)).strip()
             parser.feed(html)
             if parser.noTorrents:

@@ -19,6 +19,4 @@ def test_community_plugins_compile():
 
 def test_community_plugin_names_match_files():
     for plugin_path in _community_plugins():
-        assert plugin_path.stem.isidentifier(), (
-            f"Plugin filename {plugin_path.name} is not a valid Python identifier"
-        )
+        assert plugin_path.stem.isidentifier(), f"Plugin filename {plugin_path.name} is not a valid Python identifier"

@@ -2,7 +2,6 @@
 Tests for button functionality: Magnet, qBit, Download
 """
 
-
 import pytest
 import requests
 
@@ -27,17 +26,15 @@ class TestButtonFunctions:
             headers={"Content-Type": "application/json"},
             timeout=300,
         )
-        assert resp.status_code == 200, (
-            f"search failed: {resp.status_code} {resp.text[:200]}"
-        )
+        assert resp.status_code == 200, f"search failed: {resp.status_code} {resp.text[:200]}"
         return resp.json().get("results", [])
 
     def test_dashboard_is_angular_app(self):
         """Dashboard should be the Angular SPA."""
         html = self.session.get(self.base_url).text
         assert "<app-root>" in html or "<app-root></app-root>" in html
-        assert "<base href=\"/\">" in html
-        assert "<script src=\"main-" in html
+        assert '<base href="/">' in html
+        assert '<script src="main-' in html
 
     def test_api_download_endpoint_exists(self):
         """Download API endpoint should exist."""

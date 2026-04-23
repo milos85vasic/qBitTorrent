@@ -54,9 +54,7 @@ class torrentproject:
                 "pub_date": "-1",
             }
 
-        def handle_starttag(
-            self, tag: str, attrs: List[Tuple[str, Union[str, None]]]
-        ) -> None:
+        def handle_starttag(self, tag: str, attrs: List[Tuple[str, Union[str, None]]]) -> None:
             def getStr(d: Mapping[str, Union[str, None]], key: str) -> str:
                 value = d.get(key, "")
                 return value if value is not None else ""
@@ -66,27 +64,15 @@ class torrentproject:
                 self.pageComplete = True
             if tag == "div" and attributes.get("id", "") == "similarfiles":
                 self.insideResults = True
-            if (
-                tag == "div"
-                and self.insideResults
-                and "gac_bb" not in getStr(attributes, "class")
-            ):
+            if tag == "div" and self.insideResults and "gac_bb" not in getStr(attributes, "class"):
                 self.insideDataDiv = True
-            elif (
-                tag == "span"
-                and self.insideDataDiv
-                and "verified" != attributes.get("title", "")
-            ):
+            elif tag == "span" and self.insideDataDiv and "verified" != attributes.get("title", ""):
                 self.spanCount += 1
             if self.insideDataDiv and tag == "a" and len(attrs) > 0:
                 if self.infoMap["torrLink"] == self.spanCount and "href" in attributes:
-                    self.singleResData["_info_link"] = self.url + getStr(
-                        attributes, "href"
-                    )
+                    self.singleResData["_info_link"] = self.url + getStr(attributes, "href")
                 if self.infoMap["name"] == self.spanCount and "href" in attributes:
-                    self.singleResData["desc_link"] = self.url + getStr(
-                        attributes, "href"
-                    )
+                    self.singleResData["desc_link"] = self.url + getStr(attributes, "href")
 
         def handle_endtag(self, tag: str) -> None:
             if not self.pageComplete:
@@ -99,27 +85,18 @@ class torrentproject:
                             and self.singleResData["size"] != "-1"
                             and self.singleResData["name"].lower() != "nome"
                         ):
-                            if (
-                                self.singleResData["desc_link"] != "-1"
-                                or "_info_link" in self.singleResData
-                            ):
+                            if self.singleResData["desc_link"] != "-1" or "_info_link" in self.singleResData:
                                 try:
                                     date_string = self.singleResData["pub_date"]
-                                    date = datetime.strptime(
-                                        date_string, "%Y-%m-%d %H:%M:%S"
-                                    )
-                                    self.singleResData["pub_date"] = int(
-                                        date.timestamp()
-                                    )
+                                    date = datetime.strptime(date_string, "%Y-%m-%d %H:%M:%S")
+                                    self.singleResData["pub_date"] = int(date.timestamp())
                                 except Exception:
                                     pass
 
                                 info_link = self.singleResData.pop("_info_link", "")
                                 magnet_link = ""
                                 if info_link:
-                                    magnet_link = self.parent._fetch_magnet_from_page(
-                                        info_link
-                                    )
+                                    magnet_link = self.parent._fetch_magnet_from_page(info_link)
 
                                 if magnet_link:
                                     self.singleResData["link"] = magnet_link

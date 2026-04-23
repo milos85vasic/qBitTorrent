@@ -10,48 +10,48 @@ from helpers import retrieve_url
 
 class megapeer:
     """MegaPeer Russian torrent tracker plugin."""
-    
-    url = 'https://megapeer.vip'
-    name = 'MegaPeer'
+
+    url = "https://megapeer.vip"
+    name = "MegaPeer"
     supported_categories = {
-        'all': '0',
-        'movies': '1',
-        'tv': '4',
-        'music': '2',
-        'games': '7',
-        'software': '8',
-        'books': '11'
+        "all": "0",
+        "movies": "1",
+        "tv": "4",
+        "music": "2",
+        "games": "7",
+        "software": "8",
+        "books": "11",
     }
-    
-    def search(self, what, cat='all'):
+
+    def search(self, what, cat="all"):
         """Search for torrents."""
         what = unquote(what)
-        category = self.supported_categories.get(cat, '0')
-        
+        category = self.supported_categories.get(cat, "0")
+
         # Build search URL
         search_term = quote(what)
         url = f"{self.url}/search/?q={search_term}&c={category}"
-        
+
         try:
             html = retrieve_url(url)
             self._parse_results(html)
         except Exception as e:
-            print(f"Search error: {e}", file=__import__('sys').stderr)
-    
+            print(f"Search error: {e}", file=__import__("sys").stderr)
+
     def _parse_results(self, html):
         """Parse search results from HTML."""
         # MegaPeer uses a table format
         pattern = re.compile(
-            r'<tr[^>]*>.*?'
+            r"<tr[^>]*>.*?"
             r'<a[^>]*href="(/torrent/[^"]+)"[^>]*>([^<]+)</a>.*?'
-            r'<td[^>]*>([^<]+)</td>.*?'
-            r'<td[^>]*>([^<]+)</td>.*?'
-            r'<td[^>]*>([^<]+)</td>.*?'
-            r'<td[^>]*>([^<]+)</td>.*?'
-            r'</tr>',
-            re.S | re.I
+            r"<td[^>]*>([^<]+)</td>.*?"
+            r"<td[^>]*>([^<]+)</td>.*?"
+            r"<td[^>]*>([^<]+)</td>.*?"
+            r"<td[^>]*>([^<]+)</td>.*?"
+            r"</tr>",
+            re.S | re.I,
         )
-        
+
         matches = pattern.findall(html)
         for match in matches:
             try:
@@ -60,51 +60,45 @@ class megapeer:
                 size = match[2].strip()
                 seeds = match[3].strip()
                 leech = match[4].strip()
-                
+
                 # Convert size to bytes
                 size_bytes = self._parse_size(size)
-                
+
                 result = {
-                    'link': desc_link,
-                    'name': name,
-                    'size': str(size_bytes),
-                    'seeds': seeds if seeds.isdigit() else '0',
-                    'leech': leech if leech.isdigit() else '0',
-                    'engine_url': self.url,
-                    'desc_link': desc_link,
-                    'pub_date': str(int(time.time()))
+                    "link": desc_link,
+                    "name": name,
+                    "size": str(size_bytes),
+                    "seeds": seeds if seeds.isdigit() else "0",
+                    "leech": leech if leech.isdigit() else "0",
+                    "engine_url": self.url,
+                    "desc_link": desc_link,
+                    "pub_date": str(int(time.time())),
                 }
                 prettyPrinter(result)
             except Exception as e:
                 continue
-    
+
     def _parse_size(self, size_str):
         """Convert size string to bytes."""
         size_str = size_str.upper().strip()
-        multipliers = {
-            'B': 1,
-            'KB': 1024,
-            'MB': 1024**2,
-            'GB': 1024**3,
-            'TB': 1024**4
-        }
-        
+        multipliers = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
+
         for unit, mult in multipliers.items():
             if unit in size_str:
                 try:
-                    num = float(size_str.replace(unit, '').replace(',', '').strip())
+                    num = float(size_str.replace(unit, "").replace(",", "").strip())
                     return int(num * mult)
                 except:
                     return 0
         return 0
-    
+
     def download_torrent(self, url):
         """Download torrent file or magnet link."""
         import sys
-        
+
         try:
             html = retrieve_url(url)
-            
+
             # Look for magnet link
             magnet_match = re.search(r'href="(magnet:\?xt=[^"]+)"', html)
             if magnet_match:
@@ -112,7 +106,7 @@ class megapeer:
                 print(magnet + " " + url)
                 sys.stdout.flush()
                 return
-            
+
             # Look for .torrent download
             torrent_match = re.search(r'href="(/download\.php\?[^"]+)"', html)
             if torrent_match:
@@ -120,7 +114,7 @@ class megapeer:
                 print(torrent_url + " " + url)
                 sys.stdout.flush()
                 return
-                
+
         except Exception as e:
             print(f"Download error: {e}", file=sys.stderr)
             sys.exit(1)
@@ -129,6 +123,6 @@ class megapeer:
 # Module reference
 megapeer = megapeer
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     a = megapeer()
-    a.search('фильм', 'movies')
+    a.search("фильм", "movies")

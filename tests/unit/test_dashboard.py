@@ -113,5 +113,5 @@ class TestQBitAuthEndpoint:
     def test_angular_scripts_loaded(self):
         response = client.get("/dashboard")
         html = response.text
-        assert "<script src=\"main-" in html or 'src="main-' in html
+        assert '<script src="main-' in html or 'src="main-' in html
         assert "</body>" in html

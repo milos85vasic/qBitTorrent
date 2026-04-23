@@ -91,9 +91,7 @@ except ImportError:
         spec.loader.exec_module(novaprinter)
 
 
-logging.basicConfig(
-    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 RUTRACKER_TRACKERS = [
@@ -285,27 +283,17 @@ class RuTracker(object):
         result["pub_date"] = torrent_data["pub_date"]
         return result
 
-    def _open_url(
-        self, url: str, post_params: dict[str, str] = None, log_errors: bool = True
-    ) -> bytes:
+    def _open_url(self, url: str, post_params: dict[str, str] = None, log_errors: bool = True) -> bytes:
         """URL request open wrapper returning response bytes if successful."""
-        encoded_params = (
-            urlencode(post_params, encoding=self.encoding).encode()
-            if post_params
-            else None
-        )
+        encoded_params = urlencode(post_params, encoding=self.encoding).encode() if post_params else None
         try:
             with self.opener.open(url, encoded_params or None) as response:
-                logger.debug(
-                    "HTTP request: {} | status: {}".format(url, response.getcode())
-                )
+                logger.debug("HTTP request: {} | status: {}".format(url, response.getcode()))
                 if response.getcode() != 200:
                     raise HTTPError(
                         response.geturl(),
                         response.getcode(),
-                        "HTTP request to {} failed with status: {}".format(
-                            url, response.getcode()
-                        ),
+                        "HTTP request to {} failed with status: {}".format(url, response.getcode()),
                         response.info(),
                         None,
                     )
@@ -351,9 +339,7 @@ class RuTracker(object):
                     pass
                 raise ValueError("Downloaded data is not a valid torrent file")
 
-            file_handle, temp_path = tempfile.mkstemp(
-                suffix=".torrent", prefix="rutracker_"
-            )
+            file_handle, temp_path = tempfile.mkstemp(suffix=".torrent", prefix="rutracker_")
 
             try:
                 with os.fdopen(file_handle, "wb") as f:

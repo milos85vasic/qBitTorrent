@@ -33,8 +33,8 @@ class TestLoginModal:
         """Dashboard should be Angular SPA."""
         html = self.session.get(self.base_url).text
         assert "<app-root>" in html or "<app-root></app-root>" in html
-        assert "<base href=\"/\">" in html
-        assert "<script src=\"main-" in html
+        assert '<base href="/">' in html
+        assert '<script src="main-' in html
 
 
 class TestLoginAuthentication:
@@ -85,8 +85,7 @@ class TestCredentialsPersistence:
             timeout=30,
         )
         data = resp.json()
-        assert data.get("status") in ["authenticated", "saved"], \
-            f"qBittorrent auth failed, cannot test save: {data}"
+        assert data.get("status") in ["authenticated", "saved"], f"qBittorrent auth failed, cannot test save: {data}"
 
 
 class TestMagnetDialog:

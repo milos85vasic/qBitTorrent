@@ -81,9 +81,7 @@ def _probe(ep: ServiceEndpoint, timeout: float = _DEFAULT_TIMEOUT, retries: int 
             if resp.status_code < 400:
                 if ep.expect_substring is None or ep.expect_substring in resp.text:
                     return
-                last_err = AssertionError(
-                    f"expected substring {ep.expect_substring!r} not in body of {ep.health_url}"
-                )
+                last_err = AssertionError(f"expected substring {ep.expect_substring!r} not in body of {ep.health_url}")
             else:
                 last_err = AssertionError(f"HTTP {resp.status_code} from {ep.health_url}")
         except requests.RequestException as exc:
@@ -179,7 +177,7 @@ def webui_bridge_process() -> str:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "webui-bridge.py"
     if not script.exists():
-        raise RuntimeError(f"webui‑bridge script not found at {script}")
+        raise RuntimeError(f"webui-bridge script not found at {script}")
     proc = subprocess.Popen(
         [sys.executable, str(script)],
         stdout=subprocess.PIPE,
@@ -191,9 +189,8 @@ def webui_bridge_process() -> str:
     if not _is_port_listening(port):
         proc.terminate()
         stdout, _ = proc.communicate(timeout=2)
-        raise RuntimeError(
-            f"webui‑bridge failed to start on port {port}. Output:\n{stdout}"
-        )
+        raise RuntimeError(f"webui-bridge failed to start on port {port}. Output:\n{stdout}")
+
     # Register cleanup.
     def _cleanup():
         if proc.poll() is None:
@@ -202,6 +199,7 @@ def webui_bridge_process() -> str:
                 proc.wait(timeout=2)
             except subprocess.TimeoutExpired:
                 proc.kill()
+
     atexit.register(_cleanup)
     return f"http://localhost:{port}"
 

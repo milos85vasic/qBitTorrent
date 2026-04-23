@@ -14,6 +14,7 @@ Rules:
   barrel ``index.ts``, and ``*.d.ts`` declaration files.
 - The project must ship at least 12 spec files (the Phase-5 baseline).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -59,17 +60,15 @@ def test_every_production_ts_has_sibling_spec() -> None:
         spec = _expected_spec_for(src)
         if not spec.is_file():
             missing.append((src.relative_to(PROJECT_ROOT), spec.relative_to(PROJECT_ROOT)))
-    assert not missing, (
-        "Production TS files missing a sibling .spec.ts:\n"
-        + "\n".join(f"  {src} -> missing {spec}" for src, spec in missing)
+    assert not missing, "Production TS files missing a sibling .spec.ts:\n" + "\n".join(
+        f"  {src} -> missing {spec}" for src, spec in missing
     )
 
 
 def test_spec_count_meets_baseline() -> None:
     specs = list(APP_ROOT.rglob("*.spec.ts"))
     assert len(specs) >= MIN_SPEC_COUNT, (
-        f"Expected at least {MIN_SPEC_COUNT} spec files under {APP_ROOT}, "
-        f"found {len(specs)}."
+        f"Expected at least {MIN_SPEC_COUNT} spec files under {APP_ROOT}, found {len(specs)}."
     )
 
 
@@ -80,7 +79,4 @@ def test_specs_are_non_trivial() -> None:
         text = spec.read_text(encoding="utf-8")
         if "it(" not in text and "test(" not in text:
             empty.append(spec.relative_to(PROJECT_ROOT))
-    assert not empty, (
-        "Spec files without any it()/test() blocks:\n"
-        + "\n".join(f"  {p}" for p in empty)
-    )
+    assert not empty, "Spec files without any it()/test() blocks:\n" + "\n".join(f"  {p}" for p in empty)

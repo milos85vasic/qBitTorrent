@@ -25,14 +25,14 @@ class TestWebUIBridge:
 
     def test_import_webui_bridge(self):
         """webui-bridge.py should be loadable as a module."""
-        assert hasattr(webui_bridge, 'WebUIBridgeHandler')
-        assert hasattr(webui_bridge, 'run_bridge')
+        assert hasattr(webui_bridge, "WebUIBridgeHandler")
+        assert hasattr(webui_bridge, "run_bridge")
 
     def test_handler_has_required_methods(self):
         """WebUIBridgeHandler should have required HTTP methods."""
-        assert hasattr(webui_bridge.WebUIBridgeHandler, 'do_GET')
-        assert hasattr(webui_bridge.WebUIBridgeHandler, 'do_POST')
-        assert hasattr(webui_bridge.WebUIBridgeHandler, 'handle_request')
+        assert hasattr(webui_bridge.WebUIBridgeHandler, "do_GET")
+        assert hasattr(webui_bridge.WebUIBridgeHandler, "do_POST")
+        assert hasattr(webui_bridge.WebUIBridgeHandler, "handle_request")
 
     def test_identify_plugin_known_trackers(self):
         """identify_plugin should recognize known tracker URLs."""
@@ -60,13 +60,13 @@ class TestWebUIBridge:
     def test_port_configuration(self):
         """Bridge should have configurable port."""
         # Check that the module defines a port
-        assert hasattr(webui_bridge, 'PORT') or hasattr(webui_bridge, 'PROXY_PORT') or True
+        assert hasattr(webui_bridge, "PORT") or hasattr(webui_bridge, "PROXY_PORT") or True
 
     def test_qbittorrent_url_configurable(self):
         """qBittorrent URL should be configurable."""
-        assert hasattr(webui_bridge, 'QBITTORRENT_URL') or hasattr(webui_bridge, 'QBIT_URL') or True
+        assert hasattr(webui_bridge, "QBITTORRENT_URL") or hasattr(webui_bridge, "QBIT_URL") or True
 
     def test_handler_log_message_suppressed(self):
         """log_message should be overridden to reduce noise."""
         # The handler should have a custom log_message
-        assert hasattr(webui_bridge.WebUIBridgeHandler, 'log_message')
+        assert hasattr(webui_bridge.WebUIBridgeHandler, "log_message")

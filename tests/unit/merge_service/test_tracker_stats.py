@@ -28,9 +28,7 @@ sys.modules["merge_service"].__path__ = [_MS_PATH]
 
 
 def _import_search_module():
-    spec = importlib.util.spec_from_file_location(
-        "merge_service.search", os.path.join(_MS_PATH, "search.py")
-    )
+    spec = importlib.util.spec_from_file_location("merge_service.search", os.path.join(_MS_PATH, "search.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules["merge_service.search"] = mod
     spec.loader.exec_module(mod)
@@ -43,10 +41,7 @@ def search_mod():
 
 
 def _fake_trackers(search_mod, names):
-    return [
-        search_mod.TrackerSource(name=n, url=f"https://{n}.example", enabled=True)
-        for n in names
-    ]
+    return [search_mod.TrackerSource(name=n, url=f"https://{n}.example", enabled=True) for n in names]
 
 
 def test_tracker_stat_dataclass_defaults(search_mod):
@@ -92,15 +87,9 @@ async def test_tracker_stat_transitions_to_success_when_results_returned(search_
 
     async def fake_search_tracker(tracker, query, category):
         return [
-            search_mod.SearchResult(
-                name="a", link="m1", size="1 MB", seeds=1, leechers=0, engine_url="u"
-            ),
-            search_mod.SearchResult(
-                name="b", link="m2", size="2 MB", seeds=2, leechers=0, engine_url="u"
-            ),
-            search_mod.SearchResult(
-                name="c", link="m3", size="3 MB", seeds=3, leechers=0, engine_url="u"
-            ),
+            search_mod.SearchResult(name="a", link="m1", size="1 MB", seeds=1, leechers=0, engine_url="u"),
+            search_mod.SearchResult(name="b", link="m2", size="2 MB", seeds=2, leechers=0, engine_url="u"),
+            search_mod.SearchResult(name="c", link="m3", size="3 MB", seeds=3, leechers=0, engine_url="u"),
         ]
 
     orch._search_tracker = fake_search_tracker
@@ -199,9 +188,7 @@ def test_tracker_stat_serialises_none_timestamps(search_mod):
 
 def test_search_metadata_to_dict_includes_sorted_tracker_stats(search_mod):
     orch = search_mod.SearchOrchestrator()
-    orch._get_enabled_trackers = lambda: _fake_trackers(
-        search_mod, ["zeta", "alpha", "mike"]
-    )
+    orch._get_enabled_trackers = lambda: _fake_trackers(search_mod, ["zeta", "alpha", "mike"])
     metadata = orch.start_search(query="q", category="all")
     stats = metadata.to_dict()["tracker_stats"]
     names = [s["name"] for s in stats]
@@ -239,9 +226,7 @@ async def test_tracker_stats_survive_exception_and_still_complete(search_mod):
         if tracker.name == "bad":
             raise ValueError("nope")
         return [
-            search_mod.SearchResult(
-                name="r", link="m", size="1 MB", seeds=1, leechers=0, engine_url="u"
-            ),
+            search_mod.SearchResult(name="r", link="m", size="1 MB", seeds=1, leechers=0, engine_url="u"),
         ]
 
     orch._search_tracker = fake_search_tracker

@@ -27,9 +27,7 @@ class snowfl(object):
         def feed(self, collection):
             for torrent in collection:
                 data = {
-                    "link": torrent["magnet"]
-                    if "magnet" in torrent
-                    else urllib.parse.quote(torrent["url"]),
+                    "link": torrent["magnet"] if "magnet" in torrent else urllib.parse.quote(torrent["url"]),
                     "name": torrent["name"],
                     "size": torrent["size"],
                     "seeds": torrent["seeder"],
@@ -44,15 +42,11 @@ class snowfl(object):
             file_name = re.findall(r".+?\"(b.min.js\?.+)\"", index_html)[0]
             script = retrieve_url(self.url + file_name)
             # Retrieving the token
-            token = re.findall(
-                r"\"([a-zA-Z0-9]+)\";\$\(\(function\(\){var e,t,n,r,o,a,i=", script
-            )[0]
+            token = re.findall(r"\"([a-zA-Z0-9]+)\";\$\(\(function\(\){var e,t,n,r,o,a,i=", script)[0]
             return token
 
         def generateQuery(self, what):
-            random_str = "".join(
-                random.choice(string.ascii_lowercase + string.digits) for _ in range(8)
-            )
+            random_str = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))
             return "{0}/{1}/{2}/{3}/0/SEED/NONE/1?_={4}".format(
                 self.url, self.token, what, random_str, str(int(time.time() * 1000))
             )

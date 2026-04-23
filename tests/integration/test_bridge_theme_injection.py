@@ -44,12 +44,10 @@ def test_shared_theme_injector_module_exists() -> None:
 
 
 def test_bridge_imports_theme_injector(bridge_src: str) -> None:
-    assert "import theme_injector" in bridge_src, (
-        "webui-bridge.py must import theme_injector from plugins/"
-    )
+    assert "import theme_injector" in bridge_src, "webui-bridge.py must import theme_injector from plugins/"
     # Confirm the sys.path injection is there — without it the import
     # would fail since webui-bridge.py lives at repo root.
-    assert 'sys.path.insert(0, _PLUGINS_DIR)' in bridge_src
+    assert "sys.path.insert(0, _PLUGINS_DIR)" in bridge_src
 
 
 def test_bridge_serves_theme_assets_locally(bridge_src: str) -> None:
@@ -85,9 +83,7 @@ def test_bridge_injects_theme_on_html_responses(bridge_src: str) -> None:
 
 @pytest.mark.timeout(15)
 def test_bridge_serves_skin_css_live(webui_bridge_live: str) -> None:
-    with urllib.request.urlopen(
-        f"{webui_bridge_live}/__qbit_theme__/skin.css", timeout=10
-    ) as resp:
+    with urllib.request.urlopen(f"{webui_bridge_live}/__qbit_theme__/skin.css", timeout=10) as resp:
         assert resp.status == 200
         body = resp.read().decode("utf-8")
         assert "--color-accent" in body
@@ -96,9 +92,7 @@ def test_bridge_serves_skin_css_live(webui_bridge_live: str) -> None:
 
 @pytest.mark.timeout(15)
 def test_bridge_serves_bootstrap_js_live(webui_bridge_live: str) -> None:
-    with urllib.request.urlopen(
-        f"{webui_bridge_live}/__qbit_theme__/bootstrap.js", timeout=10
-    ) as resp:
+    with urllib.request.urlopen(f"{webui_bridge_live}/__qbit_theme__/bootstrap.js", timeout=10) as resp:
         assert resp.status == 200
         body = resp.read().decode("utf-8")
         # Palette catalog must be inlined.
@@ -115,6 +109,7 @@ def test_bridge_html_response_contains_injected_tags_live(webui_bridge_live: str
     """
     # Post credentials + keep cookie.
     import http.cookiejar
+
     jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
     data = urllib.parse.urlencode({"username": "admin", "password": "admin"}).encode()
@@ -137,9 +132,5 @@ def test_bridge_html_response_contains_injected_tags_live(webui_bridge_live: str
     )
     with opener.open(req2, timeout=5) as resp:
         body = resp.read().decode("utf-8", errors="ignore")
-    assert "/__qbit_theme__/skin.css" in body, (
-        "bridge did not inject skin.css <link> tag"
-    )
-    assert "/__qbit_theme__/bootstrap.js" in body, (
-        "bridge did not inject bootstrap.js <script> tag"
-    )
+    assert "/__qbit_theme__/skin.css" in body, "bridge did not inject skin.css <link> tag"
+    assert "/__qbit_theme__/bootstrap.js" in body, "bridge did not inject bootstrap.js <script> tag"

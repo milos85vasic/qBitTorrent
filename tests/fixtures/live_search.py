@@ -91,6 +91,7 @@ def live_search_result(
     Combined with the ``_file_lock()`` below, this keeps
     ``MAX_CONCURRENT_SEARCHES`` saturation out of the test suite.
     """
+
     def _search(query: str = "linux", limit: int = 5) -> dict:
         # NOTE: we do NOT take ``_file_lock()`` here — the
         # autouse ``_serialize_live_searches`` fixture in the
@@ -122,7 +123,7 @@ def live_search_result(
             _live_search_cache[key] = data
             return data
         raise RuntimeError(
-            f"live_search_result({query!r}, {limit}) failed after "
-            f"{attempts} attempts — last error: {last_err}"
+            f"live_search_result({query!r}, {limit}) failed after {attempts} attempts — last error: {last_err}"
         )
+
     return _search

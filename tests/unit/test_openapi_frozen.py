@@ -12,7 +12,9 @@ def _set_env(monkeypatch):
     monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost")
 
 
-@pytest.mark.skipif(not os.path.exists(FROZEN_SPEC), reason="Frozen OpenAPI spec not found — run scripts/freeze-openapi.sh first")
+@pytest.mark.skipif(
+    not os.path.exists(FROZEN_SPEC), reason="Frozen OpenAPI spec not found — run scripts/freeze-openapi.sh first"
+)
 def test_openapi_spec_matches_frozen():
     sys.path.insert(0, os.path.join(REPO_ROOT, "download-proxy", "src"))
     try:
@@ -50,7 +52,4 @@ def test_openapi_spec_matches_frozen():
     if new_schemas:
         errors.append(f"New schemas not in frozen spec: {sorted(new_schemas)}")
 
-    assert not errors, (
-        "OpenAPI spec drift detected. Run scripts/freeze-openapi.sh to update.\n"
-        + "\n".join(errors)
-    )
+    assert not errors, "OpenAPI spec drift detected. Run scripts/freeze-openapi.sh to update.\n" + "\n".join(errors)

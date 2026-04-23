@@ -91,13 +91,9 @@ def test_bridge_uses_threaded_http_server(src: str) -> None:
         r"from http\.server import[^\n]+",
         src,
     )
-    assert any("ThreadingHTTPServer" in m for m in import_matches), (
-        "import site must name ThreadingHTTPServer"
-    )
+    assert any("ThreadingHTTPServer" in m for m in import_matches), "import site must name ThreadingHTTPServer"
     # Construction site must use the threaded class too.
-    assert re.search(r"ThreadingHTTPServer\s*\(", src), (
-        "server construction must use ThreadingHTTPServer(...)"
-    )
+    assert re.search(r"ThreadingHTTPServer\s*\(", src), "server construction must use ThreadingHTTPServer(...)"
     # And the non-threaded class must not be used.
     assert not re.search(r"\bHTTPServer\s*\(", src.replace("ThreadingHTTPServer", "")), (
         "no remaining HTTPServer(...) construction sites — must be ThreadingHTTPServer"

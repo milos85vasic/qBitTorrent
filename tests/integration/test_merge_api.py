@@ -21,7 +21,7 @@ sys.path.insert(0, _SRC_PATH)
 # — and produced "coroutine was never awaited" / KeyError cascades in
 # pytest-asyncio teardown. We now merely ensure the module is
 # importable + point __path__ at the download-proxy source tree.
-import merge_service as _ms  # noqa: E402
+import merge_service as _ms
 
 _ms_path = os.path.join(_SRC_PATH, "merge_service")
 if _ms_path not in _ms.__path__:
@@ -429,7 +429,10 @@ class TestDownloadEndpoint:
 
         resp = client.post(
             "/api/v1/download",
-            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:e9bb4ead5d7ed51aa7d310d7cfef92b9b273a77f"]},
+            json={
+                "result_id": "test-1",
+                "download_urls": ["magnet:?xt=urn:btih:e9bb4ead5d7ed51aa7d310d7cfef92b9b273a77f"],
+            },
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -469,7 +472,10 @@ class TestDownloadEndpoint:
 
         resp = client.post(
             "/api/v1/download",
-            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:e9bb4ead5d7ed51aa7d310d7cfef92b9b273a77f"]},
+            json={
+                "result_id": "test-1",
+                "download_urls": ["magnet:?xt=urn:btih:e9bb4ead5d7ed51aa7d310d7cfef92b9b273a77f"],
+            },
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -512,7 +518,10 @@ class TestDownloadEndpoint:
 
         resp = client.post(
             "/api/v1/download",
-            json={"result_id": "test-1", "download_urls": ["magnet:?xt=urn:btih:e9bb4ead5d7ed51aa7d310d7cfef92b9b273a77f"]},
+            json={
+                "result_id": "test-1",
+                "download_urls": ["magnet:?xt=urn:btih:e9bb4ead5d7ed51aa7d310d7cfef92b9b273a77f"],
+            },
         )
         assert resp.status_code == 200
         data = resp.json()

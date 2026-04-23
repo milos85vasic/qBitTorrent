@@ -40,9 +40,7 @@ class TestDemoScriptSyntax:
                 capture_output=True,
                 text=True,
             )
-            assert result.returncode == 0, (
-                f"bash -n failed for {demo}: {result.stderr}"
-            )
+            assert result.returncode == 0, f"bash -n failed for {demo}: {result.stderr}"
 
 
 class TestDemoScriptForbiddenPatterns:
@@ -51,14 +49,10 @@ class TestDemoScriptForbiddenPatterns:
             demo = course_dir / "demo.sh"
             content = demo.read_text()
             for pattern in FORBIDDEN_PATTERNS:
-                assert pattern not in content, (
-                    f"Forbidden pattern '{pattern}' found in {demo}"
-                )
+                assert pattern not in content, f"Forbidden pattern '{pattern}' found in {demo}"
 
     def test_has_set_euo_pipefail(self) -> None:
         for course_dir in COURSE_DIRS:
             demo = course_dir / "demo.sh"
             content = demo.read_text()
-            assert "set -euo pipefail" in content, (
-                f"Missing 'set -euo pipefail' in {demo}"
-            )
+            assert "set -euo pipefail" in content, f"Missing 'set -euo pipefail' in {demo}"

@@ -76,9 +76,11 @@ class TestRutrackerAuthStatus:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("api.auth._get_orchestrator", return_value=mock_orch), \
-             patch("aiohttp.ClientSession", return_value=mock_session), \
-             patch("aiohttp.ClientTimeout", return_value=None):
+        with (
+            patch("api.auth._get_orchestrator", return_value=mock_orch),
+            patch("aiohttp.ClientSession", return_value=mock_session),
+            patch("aiohttp.ClientTimeout", return_value=None),
+        ):
             result = await rutracker_auth_status()
             assert result["authenticated"] is True
             assert result["status"] == "active"
@@ -105,9 +107,11 @@ class TestRutrackerAuthStatus:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("api.auth._get_orchestrator", return_value=mock_orch), \
-             patch("aiohttp.ClientSession", return_value=mock_session), \
-             patch("aiohttp.ClientTimeout", return_value=None):
+        with (
+            patch("api.auth._get_orchestrator", return_value=mock_orch),
+            patch("aiohttp.ClientSession", return_value=mock_session),
+            patch("aiohttp.ClientTimeout", return_value=None),
+        ):
             result = await rutracker_auth_status()
             assert result["authenticated"] is False
             assert result["status"] == "expired"
@@ -124,8 +128,10 @@ class TestRutrackerAuthStatus:
             }
         }
 
-        with patch("api.auth._get_orchestrator", return_value=mock_orch), \
-             patch("aiohttp.ClientSession", side_effect=Exception("network error")):
+        with (
+            patch("api.auth._get_orchestrator", return_value=mock_orch),
+            patch("aiohttp.ClientSession", side_effect=Exception("network error")),
+        ):
             result = await rutracker_auth_status()
             assert result["authenticated"] is False
             assert result["status"] == "error"
@@ -160,9 +166,11 @@ class TestRutrackerCookieLogin:
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
         req = CookieLoginRequest(cookie_string="bb_session=abc123")
-        with patch("api.auth._get_orchestrator", return_value=mock_orch), \
-             patch("aiohttp.ClientSession", return_value=mock_session), \
-             patch("aiohttp.ClientTimeout", return_value=None):
+        with (
+            patch("api.auth._get_orchestrator", return_value=mock_orch),
+            patch("aiohttp.ClientSession", return_value=mock_session),
+            patch("aiohttp.ClientTimeout", return_value=None),
+        ):
             with pytest.raises(Exception) as exc_info:
                 await rutracker_cookie_login(req)
             assert exc_info.value.status_code == 401
@@ -186,9 +194,11 @@ class TestRutrackerCookieLogin:
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
         req = CookieLoginRequest(cookie_string="bb_session=abc123")
-        with patch("api.auth._get_orchestrator", return_value=mock_orch), \
-             patch("aiohttp.ClientSession", return_value=mock_session), \
-             patch("aiohttp.ClientTimeout", return_value=None):
+        with (
+            patch("api.auth._get_orchestrator", return_value=mock_orch),
+            patch("aiohttp.ClientSession", return_value=mock_session),
+            patch("aiohttp.ClientTimeout", return_value=None),
+        ):
             result = await rutracker_cookie_login(req)
             assert result["authenticated"] is True
 
@@ -213,10 +223,12 @@ class TestAllTrackersAuthStatus:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("api.auth._get_orchestrator", return_value=mock_orch), \
-             patch("api.auth._load_qbit_credentials", return_value={"username": "admin", "password": "admin"}), \
-             patch("aiohttp.ClientSession", return_value=mock_session), \
-             patch("aiohttp.ClientTimeout", return_value=None):
+        with (
+            patch("api.auth._get_orchestrator", return_value=mock_orch),
+            patch("api.auth._load_qbit_credentials", return_value={"username": "admin", "password": "admin"}),
+            patch("aiohttp.ClientSession", return_value=mock_session),
+            patch("aiohttp.ClientTimeout", return_value=None),
+        ):
             result = await all_trackers_auth_status()
             assert "trackers" in result
             assert result["trackers"]["rutracker"]["has_session"] is True
@@ -229,8 +241,10 @@ class TestAllTrackersAuthStatus:
         mock_orch = MagicMock()
         mock_orch._tracker_sessions = {}
 
-        with patch("api.auth._get_orchestrator", return_value=mock_orch), \
-             patch("api.auth._load_qbit_credentials", return_value=None):
+        with (
+            patch("api.auth._get_orchestrator", return_value=mock_orch),
+            patch("api.auth._load_qbit_credentials", return_value=None),
+        ):
             result = await all_trackers_auth_status()
             assert result["trackers"]["qbittorrent"]["has_session"] is False
 
@@ -240,8 +254,7 @@ class TestQbittorrentLogout:
     async def test_logout_success(self):
         from api.auth import qbittorrent_logout
 
-        with patch("os.path.exists", return_value=True), \
-             patch("os.remove"):
+        with patch("os.path.exists", return_value=True), patch("os.remove"):
             result = await qbittorrent_logout()
             assert result["status"] == "logged_out"
 
@@ -257,8 +270,7 @@ class TestQbittorrentLogout:
     async def test_logout_error(self):
         from api.auth import qbittorrent_logout
 
-        with patch("os.path.exists", return_value=True), \
-             patch("os.remove", side_effect=PermissionError("denied")):
+        with patch("os.path.exists", return_value=True), patch("os.remove", side_effect=PermissionError("denied")):
             result = await qbittorrent_logout()
             assert result["status"] == "error"
 
@@ -267,8 +279,7 @@ class TestLoadQbitCredentialsEdge:
     def test_corrupt_json_file(self):
         from api.auth import _load_qbit_credentials
 
-        with patch("os.path.exists", return_value=True), \
-             patch("builtins.open", side_effect=Exception("read error")):
+        with patch("os.path.exists", return_value=True), patch("builtins.open", side_effect=Exception("read error")):
             with patch.dict(os.environ, {"QBITTORRENT_USER": "u", "QBITTORRENT_PASS": "p"}, clear=False):
                 creds = _load_qbit_credentials()
                 assert creds is not None
@@ -277,7 +288,9 @@ class TestLoadQbitCredentialsEdge:
     def test_fallback_to_env_vars(self):
         from api.auth import _load_qbit_credentials
 
-        with patch("os.path.exists", return_value=False), \
-             patch.dict(os.environ, {"QBITTORRENT_USERNAME": "envu", "QBITTORRENT_PASSWORD": "envp"}, clear=False):
+        with (
+            patch("os.path.exists", return_value=False),
+            patch.dict(os.environ, {"QBITTORRENT_USERNAME": "envu", "QBITTORRENT_PASSWORD": "envp"}, clear=False),
+        ):
             creds = _load_qbit_credentials()
             assert creds == {"username": "envu", "password": "envp"}

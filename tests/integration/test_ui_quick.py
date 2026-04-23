@@ -67,20 +67,20 @@ class TestUIValidation:
     def test_ui_is_angular_app(self):
         r = requests.get(f"{self.base_url}/", timeout=30).text
         assert "<app-root>" in r or "<app-root></app-root>" in r
-        assert "<base href=\"/\">" in r
-        assert "<script src=\"main-" in r
+        assert '<base href="/">' in r
+        assert '<script src="main-' in r
         print("✓ Angular app present")
 
     def test_buttons_are_angular_components(self):
         r = requests.get(f"{self.base_url}/", timeout=30).text
         assert "<app-root>" in r or "<app-root></app-root>" in r
-        assert "<script src=\"main-" in r
+        assert '<script src="main-' in r
         print("✓ Angular buttons present")
 
     def test_sorting_is_angular(self):
         r = requests.get(f"{self.base_url}/", timeout=30).text
         assert "<app-root>" in r or "<app-root></app-root>" in r
-        assert "<script src=\"main-" in r
+        assert '<script src="main-' in r
         print("✓ Angular sorting present")
 
     def test_config_endpoint(self):

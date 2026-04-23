@@ -51,9 +51,7 @@ def _reimport_streaming():
     fake_api = type(sys)("api")
     fake_api.__path__ = [os.path.join(_SRC_PATH, "api")]  # type: ignore[attr-defined]
     sys.modules["api"] = fake_api
-    spec = importlib.util.spec_from_file_location(
-        "api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py")
-    )
+    spec = importlib.util.spec_from_file_location("api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules["api.streaming"] = mod
     spec.loader.exec_module(mod)
@@ -85,18 +83,14 @@ async def test_search_stream_exits_after_disconnect():
     # Sequence: False, False, True -> exit on the third check.
     request = SimpleNamespace(is_disconnected=AsyncMock(side_effect=[False, False, True]))
 
-    gen = SSEHandler.search_results_stream(
-        "sid-x", _RunningOrch(), poll_interval=0.001, request=request
-    )
+    gen = SSEHandler.search_results_stream("sid-x", _RunningOrch(), poll_interval=0.001, request=request)
 
     events = []
     async for evt in gen:
         events.append(evt)
 
     # Generator must have terminated (no infinite loop).
-    assert any("event: close" in e for e in events), (
-        f"expected a trailing 'event: close' sentinel, got: {events!r}"
-    )
+    assert any("event: close" in e for e in events), f"expected a trailing 'event: close' sentinel, got: {events!r}"
 
     # is_disconnected was consulted until it returned True.
     assert request.is_disconnected.await_count >= 3
@@ -138,9 +132,7 @@ async def test_download_progress_stream_exits_on_disconnect():
         # Never complete — only the disconnect should end the loop.
         return {"complete": False, "percent": 10}
 
-    gen = SSEHandler.download_progress_stream(
-        "dl-1", get_progress, poll_interval=0.001, request=request
-    )
+    gen = SSEHandler.download_progress_stream("dl-1", get_progress, poll_interval=0.001, request=request)
     events = [e async for e in gen]
     assert any("event: close" in e for e in events)
     assert request.is_disconnected.await_count >= 2

@@ -10,7 +10,6 @@ Tests:
 6. Auth state persists across page refreshes
 """
 
-
 import pytest
 import requests
 
@@ -39,8 +38,8 @@ class TestAuthStateUI:
         """Dashboard should be the Angular SPA."""
         html = self.session.get(self.base_url).text
         assert "<app-root>" in html or "<app-root></app-root>" in html, "Angular app-root should exist"
-        assert "<base href=\"/\">" in html, "Angular base href should exist"
-        assert "<script src=\"main-" in html, "Angular main script should exist"
+        assert '<base href="/">' in html, "Angular base href should exist"
+        assert '<script src="main-' in html, "Angular main script should exist"
 
     def test_login_api_exists(self):
         """Login API should exist."""

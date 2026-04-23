@@ -32,22 +32,19 @@ def _purge_qbittorrent_torrents(qbit_url: str = "http://localhost:7186") -> None
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
         data = urllib.parse.urlencode({"username": "admin", "password": "admin"}).encode()
         opener.open(
-            urllib.request.Request(
-                f"{qbit_url}/api/v2/auth/login", data=data, method="POST"
-            ),
+            urllib.request.Request(f"{qbit_url}/api/v2/auth/login", data=data, method="POST"),
             timeout=10,
         )
         resp = opener.open(f"{qbit_url}/api/v2/torrents/info", timeout=10)
         import json as _json
+
         torrents = _json.loads(resp.read().decode("utf-8"))
         hashes = "|".join(t["hash"] for t in torrents)
         if hashes:
             opener.open(
                 urllib.request.Request(
                     f"{qbit_url}/api/v2/torrents/delete",
-                    data=urllib.parse.urlencode(
-                        {"hashes": hashes, "deleteFiles": "false"}
-                    ).encode(),
+                    data=urllib.parse.urlencode({"hashes": hashes, "deleteFiles": "false"}).encode(),
                     method="POST",
                 ),
                 timeout=15,
@@ -113,8 +110,7 @@ class TestSearchStress:
         # failures are the bad outcome.
         accepted = success + queued
         assert accepted >= 40, (
-            f"Only {accepted}/50 rapid searches got a response "
-            f"(200={success}, 429={queued}, fail={failure})"
+            f"Only {accepted}/50 rapid searches got a response (200={success}, 429={queued}, fail={failure})"
         )
         # Service should still be healthy
         health = requests.get(f"{self.base_url}/health", timeout=10)
@@ -151,10 +147,7 @@ class TestSearchStress:
                     results.append(-1)
 
         responded = sum(1 for r in results if r in (200, 429))
-        assert responded >= 15, (
-            f"Only {responded}/20 burst searches got a response "
-            f"(statuses={results})"
-        )
+        assert responded >= 15, f"Only {responded}/20 burst searches got a response (statuses={results})"
 
     @pytest.mark.timeout(180)
     def test_sustained_load(self):
@@ -182,16 +175,14 @@ class TestSearchStress:
                 failure += 1
             time.sleep(0.3)
 
-        assert responded >= 20, (
-            f"Only {responded} sustained requests got a response "
-            f"(failures={failure})"
-        )
+        assert responded >= 20, f"Only {responded} sustained requests got a response (failures={failure})"
         health = requests.get(f"{self.base_url}/health", timeout=10)
         assert health.status_code == 200
 
     @pytest.mark.timeout(180)
     def test_search_with_abort_under_stress(self):
         """Aborting searches under stress should not cause issues."""
+
         # Start many searches that might be aborted
         def search_and_maybe_abort(i):
             try:
@@ -217,6 +208,7 @@ class TestSearchStress:
     @pytest.mark.timeout(240)
     def test_stats_endpoint_under_stress(self):
         """Stats endpoint should remain accurate under load."""
+
         # Run some searches
         def search(i):
             requests.post(
@@ -245,6 +237,7 @@ class TestSearchStress:
         background fan-outs from hogging the loop so /health stays
         responsive.
         """
+
         # Many concurrent connections
         def connect(i):
             try:

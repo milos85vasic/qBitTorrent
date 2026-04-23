@@ -45,9 +45,10 @@ audit_file() {
     local f="$1"
     local category="$2"
     local action="$3"
-    local name="$(basename "$f" .py)"
-    local mod=$(stat -c '%Y' "$f")
-    local date=$(date -d "@$mod" '+%Y-%m-%d')
+    local name mod date
+    name="$(basename "$f" .py)"
+    mod=$(stat -c '%Y' "$f")
+    date=$(date -d "@$mod" '+%Y-%m-%d')
 
     local compile_status="PASS"
     python3 -m py_compile "$f" 2>/dev/null || compile_status="FAIL"

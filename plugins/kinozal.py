@@ -34,9 +34,7 @@ FILE = Path(__file__)
 BASEDIR = FILE.parent.absolute()
 
 FILENAME = FILE.stem
-FILE_J, FILE_C, FILE_L = [
-    BASEDIR / (FILENAME + fl) for fl in (".json", ".cookie", ".log")
-]
+FILE_J, FILE_C, FILE_L = [BASEDIR / (FILENAME + fl) for fl in (".json", ".cookie", ".log")]
 
 RE_TORRENTS = re.compile(
     r'nam"><a\s+?href="/(?P<desc_link>.+?)"\s+?class="r\d">(?P<name>.+?)'
@@ -223,9 +221,7 @@ class Kinozal:
         for tor in RE_TORRENTS.finditer(html):
             prettyPrinter(
                 {
-                    "link": "{}download.php?id={}".format(
-                        self.url_dl, tor.group("desc_link").split("=")[-1]
-                    ),
+                    "link": "{}download.php?id={}".format(self.url_dl, tor.group("desc_link").split("=")[-1]),
                     "name": unescape(tor.group("name")),
                     "size": tor.group("size").translate(table),
                     "seeds": int(tor.group("seeds")),

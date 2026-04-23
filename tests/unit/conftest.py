@@ -17,10 +17,10 @@ def _ensure_angular_stub():
     os.makedirs(_angular_dist_path, exist_ok=True)
     stub_html = (
         "<!doctype html>\n"
-        "<html><head><meta charset=\"utf-8\"></head>\n"
+        '<html><head><meta charset="utf-8"></head>\n'
         "<body>\n"
         "<app-root></app-root>\n"
-        "<script src=\"main-ABC123.js\" type=\"module\"></script>\n"
+        '<script src="main-ABC123.js" type="module"></script>\n'
         "</body></html>"
     )
     with open(_angular_index_path, "w") as f:

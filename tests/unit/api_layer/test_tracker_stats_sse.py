@@ -43,9 +43,7 @@ def _reimport_streaming():
     fake_api = type(sys)("api")
     fake_api.__path__ = [os.path.join(_SRC_PATH, "api")]  # type: ignore[attr-defined]
     sys.modules["api"] = fake_api
-    spec = importlib.util.spec_from_file_location(
-        "api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py")
-    )
+    spec = importlib.util.spec_from_file_location("api.streaming", os.path.join(_SRC_PATH, "api", "streaming.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules["api.streaming"] = mod
     spec.loader.exec_module(mod)

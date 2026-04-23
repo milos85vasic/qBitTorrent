@@ -150,13 +150,14 @@ verify_installation() {
             print_success "$plugin: Installed"
             
             # Check file permissions
-            local perms=$(stat -c "%a" "$plugin_file" 2>/dev/null || stat -f "%A" "$plugin_file" 2>/dev/null)
+            local perms size
+            perms=$(stat -c "%a" "$plugin_file" 2>/dev/null || stat -f "%A" "$plugin_file" 2>/dev/null)
             if [[ -n "$perms" ]]; then
                 print_info "  Permissions: $perms"
             fi
-            
+
             # Check file size
-            local size=$(stat -c "%s" "$plugin_file" 2>/dev/null || stat -f "%z" "$plugin_file" 2>/dev/null)
+            size=$(stat -c "%s" "$plugin_file" 2>/dev/null || stat -f "%z" "$plugin_file" 2>/dev/null)
             if [[ $size -gt 0 ]]; then
                 print_info "  Size: $size bytes"
             fi
@@ -238,7 +239,7 @@ fi
 
 # Validate plugin names
 for plugin in "${SELECTED_PLUGINS[@]}"; do
-    if [[ ! " ${PLUGINS[*]} " =~ " ${plugin} " ]]; then
+    if [[ ! " ${PLUGINS[*]} " =~ \ ${plugin}\  ]]; then
         print_error "Unknown plugin: $plugin"
         print_info "Available plugins: ${PLUGINS[*]}"
         exit 1

@@ -6,9 +6,7 @@ import os
 import sys
 from unittest.mock import patch
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src")
-)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "src"))
 
 
 class TestAuthRouter:
@@ -58,26 +56,14 @@ class TestTrackerDomains:
     def test_iptorrents_detected_as_tracker(self):
         from api.routes import _is_tracker_url
 
-        assert (
-            _is_tracker_url(
-                "https://iptorrents.com/download.php/12345/filename.torrent"
-            )
-            == "iptorrents"
-        )
-        assert (
-            _is_tracker_url("https://iptorrents.me/details.php?id=12345")
-            == "iptorrents"
-        )
+        assert _is_tracker_url("https://iptorrents.com/download.php/12345/filename.torrent") == "iptorrents"
+        assert _is_tracker_url("https://iptorrents.me/details.php?id=12345") == "iptorrents"
 
     def test_rutracker_still_detected(self):
         from api.routes import _is_tracker_url
 
-        assert (
-            _is_tracker_url("https://rutracker.org/forum/dl.php?t=12345") == "rutracker"
-        )
-        assert (
-            _is_tracker_url("https://rutracker.nl/forum/dl.php?t=12345") == "rutracker"
-        )
+        assert _is_tracker_url("https://rutracker.org/forum/dl.php?t=12345") == "rutracker"
+        assert _is_tracker_url("https://rutracker.nl/forum/dl.php?t=12345") == "rutracker"
 
     def test_kinozal_still_detected(self):
         from api.routes import _is_tracker_url
@@ -101,9 +87,7 @@ class TestCaptchaParsing:
         import re
 
         html = '<img src="https://static.rutracker.cc/captcha/12345.png" alt="captcha">'
-        match = re.search(
-            r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"', html
-        )
+        match = re.search(r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"', html)
         assert match is not None
         assert "static.rutracker.cc/captcha/" in match.group(1)
 
@@ -127,9 +111,7 @@ class TestCaptchaParsing:
         import re
 
         html = "<html><body>No captcha here</body></html>"
-        match = re.search(
-            r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"', html
-        )
+        match = re.search(r'<img[^>]+src="(https://static\.rutracker\.cc/captcha/[^"]+)"', html)
         assert match is None
 
 
@@ -151,8 +133,10 @@ class TestQbitCredentialsFallback:
 
         json_data = json.dumps({"username": "jsonuser", "password": "jsonpass"})
 
-        with patch("api.auth.os.path.exists", return_value=True), \
-             patch("builtins.open", return_value=StringIO(json_data)):
+        with (
+            patch("api.auth.os.path.exists", return_value=True),
+            patch("builtins.open", return_value=StringIO(json_data)),
+        ):
             creds = _load_qbit_credentials()
             assert creds["username"] == "jsonuser"
             assert creds["password"] == "jsonpass"
@@ -160,7 +144,6 @@ class TestQbitCredentialsFallback:
     def test_load_qbit_credentials_returns_none_when_no_source(self):
         from api.auth import _load_qbit_credentials
 
-        with patch("api.auth.os.path.exists", return_value=False), \
-             patch("api.auth.os.getenv", return_value=None):
+        with patch("api.auth.os.path.exists", return_value=False), patch("api.auth.os.getenv", return_value=None):
             creds = _load_qbit_credentials()
             assert creds is None

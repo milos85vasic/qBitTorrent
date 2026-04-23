@@ -47,9 +47,7 @@ async def test_20_parallel_extend_no_data_loss():
     hooks._execution_logs.clear()
 
     async def extender(batch_id):
-        await hooks.extend_hook_logs(
-            [{"batch": batch_id, "j": j} for j in range(10)]
-        )
+        await hooks.extend_hook_logs([{"batch": batch_id, "j": j} for j in range(10)])
 
     await asyncio.gather(*[extender(i) for i in range(20)])
 

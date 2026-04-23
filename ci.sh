@@ -16,7 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 QUICK=false
 TESTS_ONLY=false
-VERBOSE=false
+# VERBOSE is reserved for future use
 PASS=0
 FAIL=0
 SKIP=0
@@ -25,7 +25,7 @@ for arg in "$@"; do
     case "$arg" in
         --quick) QUICK=true ;;
         --tests-only) TESTS_ONLY=true ;;
-        --verbose) VERBOSE=true ;;
+        --verbose) : ;;  # reserved for future use
         --help|-h) echo "Usage: $0 [--quick] [--tests-only] [--verbose]"; exit 0 ;;
     esac
 done
@@ -110,13 +110,13 @@ if [[ "$TESTS_ONLY" == "false" ]]; then
     step "Python syntax check (py_compile)"
     PY_FAIL=0
     PY_TOTAL=0
-    for f in $(find "$SCRIPT_DIR" -name '*.py' -not -path '*/__pycache__/*' -not -path '*/.git/*' -not -path '*/venv/*' -not -path '*/node_modules/*' -not -path '*/config/download-proxy/*'); do
+    while IFS= read -r -d '' f; do
         ((PY_TOTAL++)) || true
         if ! python3 -m py_compile "$f" 2>/dev/null; then
             fail "$f"
             ((PY_FAIL++)) || true
         fi
-    done
+    done < <(find "$SCRIPT_DIR" -name '*.py' -not -path '*/__pycache__/*' -not -path '*/.git/*' -not -path '*/venv/*' -not -path '*/node_modules/*' -not -path '*/config/download-proxy/*' -print0)
     if [[ $PY_FAIL -eq 0 ]]; then
         pass "All $PY_TOTAL Python files compile"
     fi

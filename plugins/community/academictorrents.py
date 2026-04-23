@@ -6,10 +6,11 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import date, datetime
 from pathlib import Path
+from typing import ClassVar
 from urllib import request
 
-from helpers import retrieve_url, download_file
-from novaprinter import prettyPrinter, SearchResults
+from helpers import download_file, retrieve_url
+from novaprinter import SearchResults, prettyPrinter
 
 DATABASE_URL = "https://academictorrents.com/database.xml"
 home = str(Path.home())
@@ -21,15 +22,15 @@ system_paths = {
 cache_path = Path(f"{system_paths[sys.platform]}/qbit_plugins_data/academic_cache.xml")
 
 
-class academictorrents(object):
+class academictorrents:
     url = "https://academictorrents.com/"
     name = "AcademicTorrents"
-    """ 
+    """
     ***TLDR; It is safer to force an 'all' research***
         AcademicTorrents categories are very specific
         qBittorrent does not provide enough categories to implement a good filtering.
     """
-    supported_categories = {"all": "0"}
+    supported_categories: ClassVar[dict[str, str]] = {"all": "0"}
 
     def __init__(self, output=True):
         self.output = output
@@ -38,10 +39,7 @@ class academictorrents(object):
     def _torrent_filter(self, item) -> bool:
         title: str = item.findtext("title").lower()
         desc: str = item.findtext("description").lower()
-        for f in self.filters:
-            if f in title or f in desc:
-                return True
-        return False
+        return any(f in title or f in desc for f in self.filters)
 
     def _retrieve_database(self):
         folder_path = Path(f"{system_paths[sys.platform]}/qbit_plugins_data")
@@ -63,10 +61,9 @@ class academictorrents(object):
                     return
         req = request.urlopen(DATABASE_URL)
         db_local_text = req.read().decode("utf-8")
-        f = open(cache_path, "w", encoding="utf-8")
-        f.write(f"{str(date.today())}\n")
-        f.write(db_local_text)
-        f.close()
+        with open(cache_path, "w", encoding="utf-8") as f:
+            f.write(f"{date.today()!s}\n")
+            f.write(db_local_text)
         req.close()
 
     def resolve_search_result(self, torrent) -> SearchResults:
@@ -88,9 +85,7 @@ class academictorrents(object):
         else:
             data["leech"] = -1
             data["seeds"] = -1
-        added_date_data = re.search(
-            "<tr><td>Added</td><td>([^<]+)</td></tr>", torrent_desc
-        )
+        added_date_data = re.search("<tr><td>Added</td><td>([^<]+)</td></tr>", torrent_desc)
         date_str = added_date_data.group(1)
         data["pub_date"] = int(datetime.fromisoformat(date_str).timestamp())
         return SearchResults(**data)

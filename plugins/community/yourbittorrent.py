@@ -56,9 +56,7 @@ class yourbittorrent(object):
             # raised IndexError and propagated out as an unhandled
             # plugin exception. Guard with a miss → return [] so the
             # orchestrator sees "empty" instead of a crash.
-            table_matches = re.findall(
-                r"<div class=\"table-responsive\">.+?</table></div>", html
-            )
+            table_matches = re.findall(r"<div class=\"table-responsive\">.+?</table></div>", html)
             if len(table_matches) < 2:
                 return torrents
             html = table_matches[1]
@@ -72,9 +70,7 @@ class yourbittorrent(object):
                 if url_titles:
                     torrents.append(
                         [
-                            urllib.parse.quote(
-                                "{0}{1}".format(self.url, url_titles.group(1))
-                            ),
+                            urllib.parse.quote("{0}{1}".format(self.url, url_titles.group(1))),
                             url_titles.group(2)
                             .replace("<b>", "")
                             .replace("</b>", "")

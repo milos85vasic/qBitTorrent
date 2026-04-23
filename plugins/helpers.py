@@ -72,9 +72,7 @@ def enable_socks_proxy(enable: bool) -> None:
             parts = urllib.parse.urlsplit(socksURL)
             resolveHostname = (parts.scheme == "socks4a") or (parts.scheme == "socks5h")
             if (parts.scheme == "socks4") or (parts.scheme == "socks4a"):
-                socks.setdefaultproxy(
-                    socks.PROXY_TYPE_SOCKS4, parts.hostname, parts.port, resolveHostname
-                )
+                socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS4, parts.hostname, parts.port, resolveHostname)
                 socket.socket = cast(type[socket.socket], socks.socksocket)  # type: ignore[misc]
             elif (parts.scheme == "socks5") or (parts.scheme == "socks5h"):
                 socks.setdefaultproxy(
@@ -180,9 +178,7 @@ DEFAULT_TRACKERS = [
 ]
 
 
-def build_magnet_link(
-    info_hash: str, name: str, trackers: Optional[list] = None
-) -> str:
+def build_magnet_link(info_hash: str, name: str, trackers: Optional[list] = None) -> str:
     """Build a magnet link from info hash and name.
 
     Args:

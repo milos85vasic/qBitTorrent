@@ -63,7 +63,7 @@ try:
 except NotImplementedError:
     MAX_THREADS = 1  # pyright: ignore[reportConstantRedefinition]
 
-Category = Enum('Category', ['all', 'anime', 'books', 'games', 'movies', 'music', 'pictures', 'software', 'tv'])
+Category = Enum("Category", ["all", "anime", "books", "games", "movies", "music", "pictures", "software", "tv"])
 
 
 ################################################################################
@@ -85,7 +85,7 @@ class Engine(ABC):
 
     @abstractmethod
     def search(self, query: str, category: str = Category.all.name) -> None:
-        #novaprinter.prettyPrinter()
+        # novaprinter.prettyPrinter()
         raise NotImplementedError
 
     """
@@ -100,17 +100,17 @@ engine_dict: dict[EngineModuleName, Optional[type[Engine]]] = {}
 
 
 def list_engines() -> list[EngineModuleName]:
-    """ List all engines,
-        including broken engines that would fail on import
+    """List all engines,
+    including broken engines that would fail on import
 
-        Return list of all engines' module name
+    Return list of all engines' module name
     """
 
     names: list[EngineModuleName] = []
 
-    for engine_path in glob(path.join(path.dirname(__file__), 'engines', '*.py')):
-        engine_module_name = path.basename(engine_path).split('.')[0].strip()
-        if len(engine_module_name) == 0 or engine_module_name.startswith('_'):
+    for engine_path in glob(path.join(path.dirname(__file__), "engines", "*.py")):
+        engine_module_name = path.basename(engine_path).split(".")[0].strip()
+        if len(engine_module_name) == 0 or engine_module_name.startswith("_"):
             continue
         names.append(engine_module_name)
 
@@ -146,7 +146,7 @@ def get_capabilities(engines: Iterable[EngineModuleName]) -> str:
     </capabilities>
     """
 
-    capabilities_element = ET.Element('capabilities')
+    capabilities_element = ET.Element("capabilities")
 
     for engine_module_name in engines:
         engine_class = import_engine(engine_module_name)
@@ -155,34 +155,34 @@ def get_capabilities(engines: Iterable[EngineModuleName]) -> str:
 
         engine_module_element = ET.SubElement(capabilities_element, engine_module_name)
 
-        ET.SubElement(engine_module_element, 'name').text = engine_class.name
-        ET.SubElement(engine_module_element, 'url').text = engine_class.url
+        ET.SubElement(engine_module_element, "name").text = engine_class.name
+        ET.SubElement(engine_module_element, "url").text = engine_class.url
 
         supported_categories = ""
         if hasattr(engine_class, "supported_categories"):
-            supported_categories = " ".join((key
-                                             for key in sorted(engine_class.supported_categories.keys())
-                                             if key != Category.all.name))
-        ET.SubElement(engine_module_element, 'categories').text = supported_categories
+            supported_categories = " ".join(
+                (key for key in sorted(engine_class.supported_categories.keys()) if key != Category.all.name)
+            )
+        ET.SubElement(engine_module_element, "categories").text = supported_categories
 
     ET.indent(capabilities_element)
-    return ET.tostring(capabilities_element, 'unicode')
+    return ET.tostring(capabilities_element, "unicode")
 
 
 def run_search(search_params: tuple[type[Engine], str, Category]) -> bool:
-    """ Run search in engine
+    """Run search in engine
 
-        @param search_params Tuple with engine, query and category
+    @param search_params Tuple with engine, query and category
 
-        @retval False if any exceptions occurred
-        @retval True  otherwise
+    @retval False if any exceptions occurred
+    @retval True  otherwise
     """
 
     engine_class, what, cat = search_params
     try:
         engine = engine_class()
         # avoid exceptions due to invalid category
-        if hasattr(engine, 'supported_categories'):
+        if hasattr(engine, "supported_categories"):
             if cat.name in engine.supported_categories:
                 engine.search(what, cat.name)
         else:
@@ -194,6 +194,7 @@ def run_search(search_params: tuple[type[Engine], str, Category]) -> bool:
 
 
 if __name__ == "__main__":
+
     def main() -> int:
         # https://docs.python.org/3/library/sys.html#sys.exit
         class ExitCode(Enum):
@@ -204,9 +205,11 @@ if __name__ == "__main__":
         found_engines = list_engines()
 
         prog_name = sys.argv[0]
-        prog_usage = (f"Usage: {prog_name} all|engine1[,engine2]* <category> <keywords>\n"
-                      f"To list available engines: {prog_name} --capabilities [--names]\n"
-                      f"Found engines: {','.join(found_engines)}")
+        prog_usage = (
+            f"Usage: {prog_name} all|engine1[,engine2]* <category> <keywords>\n"
+            f"To list available engines: {prog_name} --capabilities [--names]\n"
+            f"Found engines: {','.join(found_engines)}"
+        )
 
         if "--capabilities" in sys.argv:
             if "--names" in sys.argv:
@@ -220,8 +223,8 @@ if __name__ == "__main__":
             return ExitCode.ArgError.value
 
         # get unique engines
-        engs = set(arg.strip().lower() for arg in sys.argv[1].split(','))
-        engines = found_engines if 'all' in engs else [e for e in found_engines if e in engs]
+        engs = set(arg.strip().lower() for arg in sys.argv[1].split(","))
+        engines = found_engines if "all" in engs else [e for e in found_engines if e in engs]
 
         cat = sys.argv[2].lower()
         try:
@@ -230,7 +233,7 @@ if __name__ == "__main__":
             print(f"Invalid category: {cat}", file=sys.stderr)
             return ExitCode.ArgError.value
 
-        what = urllib.parse.quote(' '.join(sys.argv[3:]))
+        what = urllib.parse.quote(" ".join(sys.argv[3:]))
         params = ((engine_class, what, category) for e in engines if (engine_class := import_engine(e)) is not None)
 
         search_success = False

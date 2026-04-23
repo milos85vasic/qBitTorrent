@@ -54,6 +54,7 @@ def _preflight() -> None:
 
     # 2) Dashboard bundle has the theme picker.
     import re as _re
+
     m = _re.search(r"main-[A-Z0-9]+\.js", body)
     assert m, (
         "Could not locate main-*.js in the index HTML — rebuild the "
@@ -62,8 +63,7 @@ def _preflight() -> None:
     with urllib.request.urlopen(f"{DASHBOARD_URL}/{m.group(0)}", timeout=10) as r:
         bundle = r.read().decode("utf-8", errors="ignore")
     assert "theme-picker" in bundle or "palette-dropdown" in bundle, (
-        "Dashboard bundle does not include the theme-picker — rebuild + "
-        "restart qbittorrent-proxy and re-run"
+        "Dashboard bundle does not include the theme-picker — rebuild + restart qbittorrent-proxy and re-run"
     )
 
     # 3) Proxy reachable.
@@ -98,6 +98,7 @@ def test_crossapp_theme_sync_nord_then_gruvbox() -> None:
     # ``NORD_DARK_BG`` / ``GRUVBOX_DARK_BG`` assertions fail because
     # the palette's LIGHT bg-primary is what the bridge applies.
     import json as _json
+
     req = urllib.request.Request(
         f"{DASHBOARD_URL}/api/v1/theme",
         data=_json.dumps({"paletteId": "nord", "mode": "dark"}).encode(),

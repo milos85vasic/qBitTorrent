@@ -172,8 +172,10 @@ class TestFullPipeline:
                 )
             ]
 
-        with patch.object(orch, "_get_enabled_trackers", return_value=sample_trackers), \
-             patch.object(orch, "_search_tracker", side_effect=_fake_search_tracker):
+        with (
+            patch.object(orch, "_get_enabled_trackers", return_value=sample_trackers),
+            patch.object(orch, "_search_tracker", side_effect=_fake_search_tracker),
+        ):
             metadata = orch.start_search("Ubuntu", category="linux")
             await orch._run_search(metadata.search_id, "Ubuntu", "linux")
 

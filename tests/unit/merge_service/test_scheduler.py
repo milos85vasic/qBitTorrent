@@ -17,9 +17,7 @@ sys.modules["merge_service"].__path__ = [_MS_PATH]
 
 import importlib.util
 
-_sched_spec = importlib.util.spec_from_file_location(
-    "merge_service.scheduler", os.path.join(_MS_PATH, "scheduler.py")
-)
+_sched_spec = importlib.util.spec_from_file_location("merge_service.scheduler", os.path.join(_MS_PATH, "scheduler.py"))
 _sched_mod = importlib.util.module_from_spec(_sched_spec)
 sys.modules["merge_service.scheduler"] = _sched_mod
 _sched_spec.loader.exec_module(_sched_mod)

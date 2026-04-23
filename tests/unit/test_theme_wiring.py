@@ -17,17 +17,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 STYLES_SCSS = REPO_ROOT / "frontend" / "src" / "styles.scss"
-DASHBOARD_SCSS = (
-    REPO_ROOT / "frontend" / "src" / "app" / "components" / "dashboard" / "dashboard.component.scss"
-)
-DASHBOARD_HTML = (
-    REPO_ROOT / "frontend" / "src" / "app" / "components" / "dashboard" / "dashboard.component.html"
-)
+DASHBOARD_SCSS = REPO_ROOT / "frontend" / "src" / "app" / "components" / "dashboard" / "dashboard.component.scss"
+DASHBOARD_HTML = REPO_ROOT / "frontend" / "src" / "app" / "components" / "dashboard" / "dashboard.component.html"
 THEME_SERVICE = REPO_ROOT / "frontend" / "src" / "app" / "services" / "theme.service.ts"
 PALETTE_MODEL = REPO_ROOT / "frontend" / "src" / "app" / "models" / "palette.model.ts"
-THEME_PICKER_DIR = (
-    REPO_ROOT / "frontend" / "src" / "app" / "components" / "theme-picker"
-)
+THEME_PICKER_DIR = REPO_ROOT / "frontend" / "src" / "app" / "components" / "theme-picker"
 
 REQUIRED_CSS_VARS = (
     "--color-bg-primary",
@@ -77,9 +71,9 @@ def test_dashboard_template_includes_theme_picker() -> None:
 
 
 def test_dashboard_component_imports_theme_picker() -> None:
-    ts = (
-        REPO_ROOT / "frontend" / "src" / "app" / "components" / "dashboard" / "dashboard.component.ts"
-    ).read_text(encoding="utf-8")
+    ts = (REPO_ROOT / "frontend" / "src" / "app" / "components" / "dashboard" / "dashboard.component.ts").read_text(
+        encoding="utf-8"
+    )
     assert "ThemePickerComponent" in ts
     assert "from '../theme-picker/theme-picker.component'" in ts
 

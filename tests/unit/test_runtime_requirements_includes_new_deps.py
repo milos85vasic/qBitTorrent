@@ -55,8 +55,7 @@ def test_runtime_requirements_has_phase3_deps():
 
     missing = [pkg for pkg in REQUIRED if pkg not in parsed]
     assert not missing, (
-        f"download-proxy/requirements.txt is missing phase-3 deps: {missing!r}. "
-        f"Have: {sorted(parsed)!r}"
+        f"download-proxy/requirements.txt is missing phase-3 deps: {missing!r}. Have: {sorted(parsed)!r}"
     )
 
 

@@ -133,8 +133,15 @@ class TestUISearchVariety:
     def test_content_type_detection(self):
         """Content type should be detected and returned as a valid known type."""
         valid_types = {
-            "movie", "tv", "music", "game", "anime", "software",
-            "audiobook", "ebook", "unknown",
+            "movie",
+            "tv",
+            "music",
+            "game",
+            "anime",
+            "software",
+            "audiobook",
+            "ebook",
+            "unknown",
         }
 
         for query in self.QUICK_QUERIES[:3]:
@@ -162,18 +169,13 @@ class TestUISearchVariety:
                 qualities_seen.add(q)
 
         print(f"\n=== Qualities detected: {qualities_seen} ===")
-        assert len(qualities_seen) > 0, (
-            "No results had a quality field — check plugin output + "
-            "enricher pipeline"
-        )
+        assert len(qualities_seen) > 0, "No results had a quality field — check plugin output + enricher pipeline"
 
     @pytest.mark.timeout(240)
     def test_sources_merged(self):
         """Sources should be tracked and merged correctly."""
         data = self.search("linux")
-        assert data.get("results"), (
-            "linux search must return results for the merge check"
-        )
+        assert data.get("results"), "linux search must return results for the merge check"
 
         merged_count = 0
         for r in data.get("results", [])[:5]:
@@ -195,8 +197,8 @@ class TestUISearchVariety:
         # Check for Angular app presence
         checks = [
             ("<app-root" in html or "<app-root></app-root>" in html, "Angular app-root"),
-            ("<base href=\"/\">" in html, "Angular base href"),
-            ("<script src=\"main-" in html, "Angular main script"),
+            ('<base href="/">' in html, "Angular base href"),
+            ('<script src="main-' in html, "Angular main script"),
             ("styles-" in html, "Angular styles bundle"),
         ]
 
@@ -217,7 +219,7 @@ class TestUISearchVariety:
 
         # Check Angular app loads
         assert "<app-root" in html or "<app-root></app-root>" in html, "Angular app-root not found"
-        assert "<script src=\"main-" in html, "Angular main script not found"
+        assert '<script src="main-' in html, "Angular main script not found"
 
         print("\n=== Sorting functions present in Angular: YES ===")
 
@@ -228,7 +230,7 @@ class TestUISearchVariety:
 
         checks = [
             ("<app-root" in html or "<app-root></app-root>" in html, "Angular app-root"),
-            ("<script src=\"main-" in html, "Angular main script"),
+            ('<script src="main-' in html, "Angular main script"),
         ]
 
         print("\n=== Button checks ===")

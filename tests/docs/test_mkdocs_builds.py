@@ -3,9 +3,7 @@ import subprocess
 
 import pytest
 
-REPO_ROOT = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
-)
+REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 SITE_DIR = os.path.join(REPO_ROOT, "website", "site")
 
 
@@ -31,8 +29,7 @@ def test_mkdocs_build_succeeds():
         timeout=120,
     )
     assert result.returncode == 0, (
-        f"mkdocs build failed (exit {result.returncode}):\n"
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        f"mkdocs build failed (exit {result.returncode}):\nstdout: {result.stdout}\nstderr: {result.stderr}"
     )
 
 

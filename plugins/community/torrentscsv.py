@@ -34,26 +34,26 @@ from novaprinter import prettyPrinter
 
 
 class torrentscsv:
-    url = 'https://torrents-csv.com'
-    name = 'torrents-csv'
-    supported_categories = {'all': ''}
+    url = "https://torrents-csv.com"
+    name = "torrents-csv"
+    supported_categories = {"all": ""}
 
     # initialize trackers for magnet links
     trackers_list = [
-        'udp://tracker.internetwarriors.net:1337/announce',
-        'udp://tracker.opentrackr.org:1337/announce',
-        'udp://p4p.arenabg.ch:1337/announce',
-        'udp://tracker.openbittorrent.com:6969/announce',
-        'udp://www.torrent.eu.org:451/announce',
-        'udp://tracker.torrent.eu.org:451/announce',
-        'udp://retracker.lanta-net.ru:2710/announce',
-        'udp://open.stealth.si:80/announce',
-        'udp://exodus.desync.com:6969/announce',
-        'udp://tracker.tiny-vps.com:6969/announce'
+        "udp://tracker.internetwarriors.net:1337/announce",
+        "udp://tracker.opentrackr.org:1337/announce",
+        "udp://p4p.arenabg.ch:1337/announce",
+        "udp://tracker.openbittorrent.com:6969/announce",
+        "udp://www.torrent.eu.org:451/announce",
+        "udp://tracker.torrent.eu.org:451/announce",
+        "udp://retracker.lanta-net.ru:2710/announce",
+        "udp://open.stealth.si:80/announce",
+        "udp://exodus.desync.com:6969/announce",
+        "udp://tracker.tiny-vps.com:6969/announce",
     ]
-    trackers = '&'.join(urlencode({'tr': tracker}) for tracker in trackers_list)
+    trackers = "&".join(urlencode({"tr": tracker}) for tracker in trackers_list)
 
-    def search(self, what: str, cat: str = 'all') -> None:
+    def search(self, what: str, cat: str = "all") -> None:
         search_url = f"{self.url}/service/search?size=100&q={what}"
         desc_url = f"{self.url}/#/search/torrent/{what}/1"
 
@@ -63,19 +63,21 @@ class torrentscsv:
 
         # parse results
         for result in response_json["torrents"]:
-            prettyPrinter({
-                'link': self.download_link(result),
-                'name': result['name'],
-                'size': str(result['size_bytes']) + " B",
-                'seeds': result['seeders'],
-                'leech': result['leechers'],
-                'engine_url': self.url,
-                'desc_link': desc_url,
-                'pub_date': result['created_unix']
-            })
+            prettyPrinter(
+                {
+                    "link": self.download_link(result),
+                    "name": result["name"],
+                    "size": str(result["size_bytes"]) + " B",
+                    "seeds": result["seeders"],
+                    "leech": result["leechers"],
+                    "engine_url": self.url,
+                    "desc_link": desc_url,
+                    "pub_date": result["created_unix"],
+                }
+            )
 
     def download_link(self, result: Mapping[str, str]) -> str:
-        dn = urlencode({'dn': result['name']})
+        dn = urlencode({"dn": result["name"]})
         return f"magnet:?xt=urn:btih:{result['infohash']}&{dn}&{self.trackers}"
 
     def download_torrent(self, url):
@@ -84,34 +86,33 @@ class torrentscsv:
         import sys
         import tempfile
         import urllib.request
-        
+
         try:
             # Handle magnet links
-            if url.startswith('magnet:'):
+            if url.startswith("magnet:"):
                 print(url + " " + url)
                 sys.stdout.flush()
                 return
-            
+
             # Download the file
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=30) as response:
                 data = response.read()
-            
+
             # Verify it's a torrent file (starts with 'd')
-            if not data.startswith(b'd'):
+            if not data.startswith(b"d"):
                 print(f"Error: Not a valid torrent file", file=sys.stderr)
                 sys.exit(1)
-            
+
             # Save to temp file
             fd, path = tempfile.mkstemp(suffix=".torrent")
             with os.fdopen(fd, "wb") as f:
                 f.write(data)
-            
+
             os.chmod(path, 0o644)
             print(path + " " + url)
             sys.stdout.flush()
-            
+
         except Exception as e:
             print(f"Error downloading torrent: {e}", file=sys.stderr)
             sys.exit(1)
-

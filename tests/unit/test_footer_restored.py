@@ -117,14 +117,11 @@ def test_footer_appears_in_served_bundle(merge_service_live: str) -> None:
     m = re.search(r"main-[A-Z0-9]+\.js", body)
     assert m, "main-*.js bundle link must be in served index.html"
 
-    with urllib.request.urlopen(
-        f"{merge_service_live}/{m.group(0)}", timeout=10
-    ) as r:
+    with urllib.request.urlopen(f"{merge_service_live}/{m.group(0)}", timeout=10) as r:
         bundle = r.read().decode("utf-8", errors="ignore")
 
     assert "site-footer" in bundle or "www.vasic.digital" in bundle, (
-        "Served bundle predates the footer restoration — rebuild + "
-        "restart qbittorrent-proxy and re-run"
+        "Served bundle predates the footer restoration — rebuild + restart qbittorrent-proxy and re-run"
     )
     assert "www.vasic.digital" in bundle, "footer URL must be in the compiled bundle"
     assert "Vasic Digital" in bundle, "footer brand text must be in the compiled bundle"

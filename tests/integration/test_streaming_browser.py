@@ -36,7 +36,7 @@ class TestStreamingBrowser:
 
         # Check HTML contains Angular app-root
         html = self.page.content()
-        assert '<app-root' in html or "<app-root></app-root>" in html, "Dashboard should have Angular app-root"
+        assert "<app-root" in html or "<app-root></app-root>" in html, "Dashboard should have Angular app-root"
 
         print("\n[PASS] Dashboard loads as Angular app")
 
@@ -118,9 +118,7 @@ class TestStreamingBrowser:
         status = {}
         for _ in range(150):
             time.sleep(2)
-            status_resp = requests.get(
-                f"{BASE_URL}/api/v1/search/{search_id}", timeout=30
-            )
+            status_resp = requests.get(f"{BASE_URL}/api/v1/search/{search_id}", timeout=30)
             status = status_resp.json()
 
             if status.get("status") == "completed":

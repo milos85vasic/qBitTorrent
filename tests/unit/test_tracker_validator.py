@@ -51,7 +51,7 @@ class TestTrackerValidator:
         mock_session.get = MagicMock(return_value=mock_cm)
         mock_session.closed = False
 
-        with patch.object(validator, '_get_session', AsyncMock(return_value=mock_session)):
+        with patch.object(validator, "_get_session", AsyncMock(return_value=mock_session)):
             result = await validator._http_scrape("http://tracker.example.com:8080/announce")
             assert result.status == TrackerStatus.HEALTHY
             assert result.seeds == 100
@@ -66,7 +66,7 @@ class TestTrackerValidator:
         mock_session.get = MagicMock(return_value=mock_cm)
         mock_session.closed = False
 
-        with patch.object(validator, '_get_session', AsyncMock(return_value=mock_session)):
+        with patch.object(validator, "_get_session", AsyncMock(return_value=mock_session)):
             result = await validator._http_scrape("http://tracker.example.com:8080/announce")
             assert result.status == TrackerStatus.OFFLINE
 
@@ -77,7 +77,7 @@ class TestTrackerValidator:
         mock_session.get = MagicMock(side_effect=TimeoutError())
         mock_session.closed = False
 
-        with patch.object(validator, '_get_session', AsyncMock(return_value=mock_session)):
+        with patch.object(validator, "_get_session", AsyncMock(return_value=mock_session)):
             result = await validator._http_scrape("http://tracker.example.com:8080/announce")
             assert result.status == TrackerStatus.OFFLINE
             assert "Timeout" in result.error
@@ -101,7 +101,7 @@ class TestTrackerValidator:
         mock_session.get = MagicMock(side_effect=ConnectionRefusedError())
         mock_session.closed = False
 
-        with patch.object(validator, '_get_session', AsyncMock(return_value=mock_session)):
+        with patch.object(validator, "_get_session", AsyncMock(return_value=mock_session)):
             result = await validator._http_scrape("http://localhost:99999/announce")
             assert result.status == TrackerStatus.OFFLINE
 
@@ -115,7 +115,7 @@ class TestTrackerValidator:
         mock_session.get = MagicMock(return_value=mock_cm)
         mock_session.closed = False
 
-        with patch.object(validator, '_get_session', AsyncMock(return_value=mock_session)):
+        with patch.object(validator, "_get_session", AsyncMock(return_value=mock_session)):
             result = await validator.validate_tracker("http://tracker.example.com/announce")
             assert result is not None
             assert result.tracker == "http://tracker.example.com/announce"
@@ -130,10 +130,19 @@ class TestTrackerValidator:
             leechers=5,
         )
 
-        with patch.object(validator, '_http_scrape', AsyncMock(return_value=ScrapeResult(
-            tracker="udp://tracker.example.com:1337",
-            status=TrackerStatus.OFFLINE,
-        ))), patch.object(validator, '_udp_scrape', AsyncMock(return_value=mock_udp_result)) as mock_udp:
+        with (
+            patch.object(
+                validator,
+                "_http_scrape",
+                AsyncMock(
+                    return_value=ScrapeResult(
+                        tracker="udp://tracker.example.com:1337",
+                        status=TrackerStatus.OFFLINE,
+                    )
+                ),
+            ),
+            patch.object(validator, "_udp_scrape", AsyncMock(return_value=mock_udp_result)) as mock_udp,
+        ):
             result = await validator.validate_tracker("udp://tracker.example.com:1337")
             mock_udp.assert_called_once()
             assert result.status == TrackerStatus.HEALTHY
@@ -171,11 +180,13 @@ class TestTrackerValidator:
         mock_session.get = MagicMock(return_value=mock_cm)
         mock_session.closed = False
 
-        with patch.object(validator, '_get_session', AsyncMock(return_value=mock_session)):
-            results = await validator.validate_multiple([
-                "http://tracker1.com/announce",
-                "http://tracker2.com/announce",
-            ])
+        with patch.object(validator, "_get_session", AsyncMock(return_value=mock_session)):
+            results = await validator.validate_multiple(
+                [
+                    "http://tracker1.com/announce",
+                    "http://tracker2.com/announce",
+                ]
+            )
             assert len(results) == 2
             for r in results:
                 assert isinstance(r, ScrapeResult)
@@ -190,7 +201,7 @@ class TestTrackerValidator:
         mock_session.get = MagicMock(return_value=mock_cm)
         mock_session.closed = False
 
-        with patch.object(validator, '_get_session', AsyncMock(return_value=mock_session)):
+        with patch.object(validator, "_get_session", AsyncMock(return_value=mock_session)):
             result1 = await validator.validate_tracker("http://tracker.example.com/announce")
             cached = validator.get_cached_result("http://tracker.example.com/announce")
             assert cached is not None

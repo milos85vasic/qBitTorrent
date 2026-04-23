@@ -53,9 +53,7 @@ class rockbox(object):
                     tr,
                 )
                 if url_titles:
-                    timestamp = int(
-                        datetime.strptime(url_titles.group(4), "%d/%m/%Y").timestamp()
-                    )
+                    timestamp = int(datetime.strptime(url_titles.group(4), "%d/%m/%Y").timestamp())
                     torrents.append(
                         [
                             quote("{0}{1}".format(self.url, url_titles.group(3))),
@@ -78,9 +76,7 @@ class rockbox(object):
         parser = self.HTMLParser(self.url)
         counter: int = 0
         while True:
-            url = "{0}torrents.php?active=0&search={1}&options=0&order=data&page={2}".format(
-                self.url, what, counter
-            )
+            url = "{0}torrents.php?active=0&search={1}&options=0&order=data&page={2}".format(self.url, what, counter)
             html = re.sub(r"\s+", " ", retrieve_url(url)).strip()
             parser.feed(html)
             if parser.noTorrents:

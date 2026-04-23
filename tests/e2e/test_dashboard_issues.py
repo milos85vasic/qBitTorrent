@@ -50,6 +50,7 @@ class TestE2EIssue1DownloadMergedSources:
     def test_merged_magnet_contains_all_trackers(self):
         """Magnet generation should include trackers from all source URLs."""
         import re
+
         urls = [
             "magnet:?xt=urn:btih:abc123def4567890abc123def4567890abc12345&tr=udp://t1:1337",
             "magnet:?xt=urn:btih:abc123def4567890abc123def4567890abc12345&tr=udp://t2:6969",
@@ -95,7 +96,9 @@ class TestE2EIssue2TypeAndSeeds:
     def test_deduplication_sums_seeds_and_leechers(self):
         """Merged result should sum seeds and leechers from sources."""
         results = [
-            SearchResult(name="Test", link="magnet:x", size="1 GB", seeds=100, leechers=10, engine_url="a", tracker="a"),
+            SearchResult(
+                name="Test", link="magnet:x", size="1 GB", seeds=100, leechers=10, engine_url="a", tracker="a"
+            ),
             SearchResult(name="Test", link="magnet:x", size="1 GB", seeds=50, leechers=5, engine_url="b", tracker="b"),
         ]
         dedup = Deduplicator()
@@ -136,11 +139,12 @@ class TestE2EIssue4SearchCompletes:
     def test_subprocess_script_contains_tracker_name(self):
         """The generated script must hardcode the tracker name."""
         import inspect
+
         source = inspect.getsource(SearchOrchestrator._search_public_tracker)
         # The buggy code used {{tracker_name}} which appeared as {tracker_name} in subprocess
         assert "{{tracker_name}}" not in source, "Bug: subprocess uses unresolved {{tracker_name}}"
         # The fixed code uses single braces for f-string interpolation
-        assert "'{tracker_name}'" in source or f'"{tracker_name}"' in source, "Fix: tracker name must be interpolated"
+        assert "'{tracker_name}'" in source or '"{tracker_name}"' in source, "Fix: tracker name must be interpolated"
 
 
 class TestE2EIssue5Sorting:
@@ -148,12 +152,14 @@ class TestE2EIssue5Sorting:
 
     def test_backend_sort_by_name_ascending(self):
         from api.routes import SearchRequest
+
         req = SearchRequest(query="test", sort_by="name", sort_order="asc")
         assert req.sort_by == "name"
         assert req.sort_order == "asc"
 
     def test_backend_default_sort_is_seeds_desc(self):
         from api.routes import SearchRequest
+
         req = SearchRequest(query="test")
         assert req.sort_by == "seeds"
         assert req.sort_order == "desc"

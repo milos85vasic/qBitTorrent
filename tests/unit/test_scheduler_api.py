@@ -19,9 +19,7 @@ sys.modules["api"].__path__ = [_API_PATH]
 
 import importlib.util
 
-_sched_api_spec = importlib.util.spec_from_file_location(
-    "api.scheduler", os.path.join(_API_PATH, "scheduler.py")
-)
+_sched_api_spec = importlib.util.spec_from_file_location("api.scheduler", os.path.join(_API_PATH, "scheduler.py"))
 _sched_api_mod = importlib.util.module_from_spec(_sched_api_spec)
 sys.modules["api.scheduler"] = _sched_api_mod
 _sched_api_spec.loader.exec_module(_sched_api_mod)

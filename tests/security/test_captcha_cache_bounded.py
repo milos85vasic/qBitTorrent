@@ -9,9 +9,9 @@ _src = os.path.join(os.path.dirname(__file__), "..", "..", "download-proxy", "sr
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from cachetools import TTLCache  # noqa: E402
+from cachetools import TTLCache
 
-from api.auth import (  # noqa: E402
+from api.auth import (
     _PENDING_CAPTCHAS_MAX,
     _PENDING_CAPTCHAS_TTL,
     _pending_captchas,

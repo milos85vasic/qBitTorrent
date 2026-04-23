@@ -34,9 +34,7 @@ def _reimport_search():
         if k == "merge_service":
             continue
         del sys.modules[k]
-    spec = importlib.util.spec_from_file_location(
-        "merge_service.search", os.path.join(_MS_PATH, "search.py")
-    )
+    spec = importlib.util.spec_from_file_location("merge_service.search", os.path.join(_MS_PATH, "search.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules["merge_service.search"] = mod
     spec.loader.exec_module(mod)
@@ -46,9 +44,7 @@ def _reimport_search():
 def _reimport_auth():
     for k in [k for k in list(sys.modules) if k == "api" or k.startswith("api.")]:
         del sys.modules[k]
-    spec = importlib.util.spec_from_file_location(
-        "api.auth", os.path.join(_SRC_PATH, "api", "auth.py")
-    )
+    spec = importlib.util.spec_from_file_location("api.auth", os.path.join(_SRC_PATH, "api", "auth.py"))
     mod = importlib.util.module_from_spec(spec)
     # Parent package shim so relative imports work if any.
     sys.modules.setdefault("api", type(sys)("api"))

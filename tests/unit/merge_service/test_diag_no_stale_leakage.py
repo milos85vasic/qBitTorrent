@@ -29,9 +29,7 @@ _MS_PATH = REPO / "download-proxy" / "src" / "merge_service"
 
 sys.modules.setdefault("merge_service", type(sys)("merge_service"))
 sys.modules["merge_service"].__path__ = [str(_MS_PATH)]  # type: ignore[attr-defined]
-_spec = importlib.util.spec_from_file_location(
-    "merge_service.search", str(_MS_PATH / "search.py")
-)
+_spec = importlib.util.spec_from_file_location("merge_service.search", str(_MS_PATH / "search.py"))
 _search = importlib.util.module_from_spec(_spec)
 sys.modules["merge_service.search"] = _search
 _spec.loader.exec_module(_search)  # type: ignore[union-attr]
@@ -100,8 +98,7 @@ def test_diag_is_popped_not_lingering_after_search_one() -> None:
     # (The orchestrator pops the diag in `_search_one` after each tracker
     # completes.)
     assert orch._last_public_tracker_diag == {}, (
-        f"Diag left behind: {orch._last_public_tracker_diag}. The fan-out "
-        "must drain the side-channel."
+        f"Diag left behind: {orch._last_public_tracker_diag}. The fan-out must drain the side-channel."
     )
 
     # The diagnostic info should have landed on the stat instead.

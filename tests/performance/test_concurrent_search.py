@@ -116,6 +116,7 @@ class TestConcurrentSearch:
     @pytest.mark.timeout(300)
     def test_dashboard_under_load(self):
         """Dashboard should remain accessible during search load."""
+
         # Start a slow search in background
         def slow_search():
             requests.post(
@@ -139,6 +140,7 @@ class TestConcurrentSearch:
     @pytest.mark.timeout(180)
     def test_health_endpoint_under_load(self):
         """Health endpoint should always respond quickly."""
+
         # Start multiple searches
         def search():
             requests.post(

@@ -28,7 +28,9 @@ REPO = Path(__file__).resolve().parents[2]
 STYLES = REPO / "frontend" / "src" / "styles.scss"
 DASHBOARD = REPO / "frontend" / "src" / "app" / "components" / "dashboard" / "dashboard.component.scss"
 FOOTER = REPO / "frontend" / "src" / "app" / "components" / "site-footer" / "site-footer.component.ts"
-TRACKER_DIALOG = REPO / "frontend" / "src" / "app" / "components" / "tracker-stat-dialog" / "tracker-stat-dialog.component.scss"
+TRACKER_DIALOG = (
+    REPO / "frontend" / "src" / "app" / "components" / "tracker-stat-dialog" / "tracker-stat-dialog.component.scss"
+)
 CONFIRM = REPO / "frontend" / "src" / "app" / "components" / "confirm-dialog" / "confirm-dialog.component.ts"
 MAGNET = REPO / "frontend" / "src" / "app" / "components" / "magnet-dialog" / "magnet-dialog.component.ts"
 QBIT_LOGIN = REPO / "frontend" / "src" / "app" / "components" / "qbit-login-dialog" / "qbit-login-dialog.component.ts"
@@ -76,10 +78,8 @@ def test_styles_scss_overrides_shadow_token_for_light_mode(token: str, styles: s
         styles,
         re.DOTALL,
     )
-    assert m is not None, "styles.scss must contain an html[data-mode=\"light\"] block"
-    assert re.search(rf"{re.escape(token)}\s*:", m.group(1)), (
-        f"{token} must be redefined in html[data-mode=\"light\"]"
-    )
+    assert m is not None, 'styles.scss must contain an html[data-mode="light"] block'
+    assert re.search(rf"{re.escape(token)}\s*:", m.group(1)), f'{token} must be redefined in html[data-mode="light"]'
 
 
 def test_shadow_tokens_are_always_black(styles: str) -> None:
@@ -94,18 +94,16 @@ def test_shadow_tokens_are_always_black(styles: str) -> None:
         rhs = ln.split(":", 1)[1]
         # Every rgba(...) on the RHS must be black.
         for rgba in re.findall(r"rgba\([^)]+\)", rhs):
-            assert colour_only.fullmatch(rgba), (
-                f"shadow token uses a non-black rgba: {rgba!r} in line {ln.strip()!r}"
-            )
+            assert colour_only.fullmatch(rgba), f"shadow token uses a non-black rgba: {rgba!r} in line {ln.strip()!r}"
 
 
 @pytest.mark.parametrize(
     "selector,expected_token",
     [
         ("h1 {", "--shadow-text-lg"),
-        ("  h2 {", "--shadow-text-md"),          # h2 inside .card
+        ("  h2 {", "--shadow-text-md"),  # h2 inside .card
         (".stat-value", "--shadow-text-lg"),
-        (".tab {", "--shadow-text-sm"),           # .tab.active label
+        (".tab {", "--shadow-text-sm"),  # .tab.active label
         (".auth-indicator {", "--shadow-glow-dot"),
         (".card {", "--shadow-elev-3"),
         (".stat-item {", "--shadow-elev-1"),
@@ -137,9 +135,7 @@ def test_dashboard_applies_shadow_on(selector: str, expected_token: str, dashboa
                 break
         i += 1
     body = dashboard_scss[body_start : i + 1]
-    assert expected_token in body, (
-        f"{selector!r} rule body should reference {expected_token}; got {body[:200]!r}..."
-    )
+    assert expected_token in body, f"{selector!r} rule body should reference {expected_token}; got {body[:200]!r}..."
 
 
 def test_search_form_button_lifts_on_hover(dashboard_scss: str) -> None:
@@ -169,7 +165,7 @@ def test_footer_heart_and_link_have_text_shadow() -> None:
 @pytest.mark.parametrize(
     "path,marker",
     [
-        (TRACKER_DIALOG, "--shadow-elev-3"),   # .modal
+        (TRACKER_DIALOG, "--shadow-elev-3"),  # .modal
         (TRACKER_DIALOG, "--shadow-text-md"),  # h3
         (CONFIRM, "--shadow-elev-3"),
         (CONFIRM, "--shadow-text-md"),

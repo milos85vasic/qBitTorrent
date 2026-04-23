@@ -12,14 +12,12 @@ License: Apache 2.0
 """
 
 import os
-import sys
-import json
-import time
-import threading
 import subprocess
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-import urllib.request
+import sys
+import time
 import urllib.parse
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # Share the theme-bridge helpers with the sibling download-proxy so
 # the qBittorrent WebUI picks up our Darcula (or whatever is active)
@@ -81,6 +79,7 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
             if path == "/health":
                 import http.client as _http
                 import json as _json
+
                 backend_status = "unknown"
                 try:
                     conn = _http.HTTPConnection("localhost", 7185, timeout=2)
@@ -91,11 +90,13 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
                 except Exception as exc:
                     backend_status = f"unreachable:{type(exc).__name__}"
                 overall = "healthy" if backend_status == "ok" else "degraded"
-                payload = _json.dumps({
-                    "status": overall,
-                    "service": "webui-bridge",
-                    "backend": backend_status,
-                }).encode()
+                payload = _json.dumps(
+                    {
+                        "status": overall,
+                        "service": "webui-bridge",
+                        "backend": backend_status,
+                    }
+                ).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
@@ -224,7 +225,7 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
 
             body = b"\r\n".join(body)
 
-            req = urllib.request.Request(
+            req = urllib.request.Request(  # noqa: S310
                 url,
                 data=body,
                 headers={
@@ -233,7 +234,7 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
                 },
             )
 
-            with urllib.request.urlopen(req, timeout=30) as response:
+            with urllib.request.urlopen(req, timeout=30) as response:  # noqa: S310
                 return response.status == 200
 
         except Exception as e:
@@ -263,20 +264,18 @@ class WebUIBridgeHandler(BaseHTTPRequestHandler):
                 if length > 0:
                     body = self.rfile.read(length)
 
-            req = urllib.request.Request(target, data=body, method=self.command)
+            req = urllib.request.Request(target, data=body, method=self.command)  # noqa: S310
 
             qbit_origin = f"http://localhost:{QBITTORRENT_PORT}"
             for header, value in self.headers.items():
                 header_lower = header.lower()
                 if header_lower in ("host", "content-length"):
                     continue
-                if header_lower == "referer":
-                    value = qbit_origin
-                elif header_lower == "origin":
+                if header_lower == "referer" or header_lower == "origin":
                     value = qbit_origin
                 req.add_header(header, value)
 
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
                 raw_body = resp.read()
                 # Collect upstream headers so we can rewrite them before
                 # echoing. We need to strip transfer-encoding and rewrite

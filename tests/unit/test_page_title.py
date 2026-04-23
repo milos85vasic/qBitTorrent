@@ -31,9 +31,7 @@ def index_html() -> str:
 def test_index_html_title_is_exact(index_html: str) -> None:
     m = re.search(r"<title>([^<]+)</title>", index_html)
     assert m is not None, "index.html must have a <title>"
-    assert m.group(1) == EXPECTED_TITLE, (
-        f"<title> must be exactly {EXPECTED_TITLE!r}, got {m.group(1)!r}"
-    )
+    assert m.group(1) == EXPECTED_TITLE, f"<title> must be exactly {EXPECTED_TITLE!r}, got {m.group(1)!r}"
 
 
 def test_index_html_has_no_qbittorrent_fixed_leak(index_html: str) -> None:

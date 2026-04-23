@@ -47,9 +47,7 @@ def _run_and_signal(script_path: str, sig: int, startup: float = 0.5) -> subproc
 
 def test_sigterm_graceful_exit():
     """Process should exit with code 0 on SIGTERM (graceful shutdown)."""
-    script = _write_script(
-        _pattern_from_main()
-    )
+    script = _write_script(_pattern_from_main())
     try:
         result = _run_and_signal(script, signal.SIGTERM)
         assert result.returncode == 0, (
@@ -62,9 +60,7 @@ def test_sigterm_graceful_exit():
 
 def test_sigint_graceful_exit():
     """Process should exit with code 0 on SIGINT (Ctrl-C)."""
-    script = _write_script(
-        _pattern_from_main()
-    )
+    script = _write_script(_pattern_from_main())
     try:
         result = _run_and_signal(script, signal.SIGINT)
         assert result.returncode == 0, (

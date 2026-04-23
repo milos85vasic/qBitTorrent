@@ -28,32 +28,34 @@ import re
 from typing import TypedDict
 from typing_extensions import NotRequired
 
-SearchResults = TypedDict('SearchResults', {
-    'link': str,
-    'name': str,
-    'size': float | int | str,
-    'seeds': int,
-    'leech': int,
-    'engine_url': str,
-    'desc_link': NotRequired[str],
-    'pub_date': NotRequired[int]
-})
+
+class SearchResults(TypedDict):
+    link: str
+    name: str
+    size: float | int | str
+    seeds: int
+    leech: int
+    engine_url: str
+    desc_link: NotRequired[str]
+    pub_date: NotRequired[int]
 
 
 def prettyPrinter(dictionary: SearchResults) -> None:
-    outtext = "|".join((
-        dictionary["link"],
-        dictionary["name"].replace("|", " "),
-        str(anySizeToBytes(dictionary['size'])),
-        str(dictionary["seeds"]),
-        str(dictionary["leech"]),
-        dictionary["engine_url"],
-        dictionary.get("desc_link", ""),  # Optional
-        str(dictionary.get("pub_date", -1))  # Optional
-    ))
+    outtext = "|".join(
+        (
+            dictionary["link"],
+            dictionary["name"].replace("|", " "),
+            str(anySizeToBytes(dictionary["size"])),
+            str(dictionary["seeds"]),
+            str(dictionary["leech"]),
+            dictionary["engine_url"],
+            dictionary.get("desc_link", ""),  # Optional
+            str(dictionary.get("pub_date", -1)),  # Optional
+        )
+    )
 
     # fd 1 is stdout
-    with open(1, 'w', encoding='utf-8', closefd=False) as utf8stdout:
+    with open(1, "w", encoding="utf-8", closefd=False) as utf8stdout:
         print(outtext, file=utf8stdout)
 
 
@@ -77,11 +79,11 @@ def anySizeToBytes(size_string: float | int | str) -> int:
     if match is None:
         return -1
 
-    size = float(match.group('size'))  # need to match decimals
-    unit = match.group('unit')
+    size = float(match.group("size"))  # need to match decimals
+    unit = match.group("unit")
 
     if unit is not None:
-        units_exponents = {'T': 40, 'G': 30, 'M': 20, 'K': 10}
+        units_exponents = {"T": 40, "G": 30, "M": 20, "K": 10}
         exponent = units_exponents.get(unit[0].upper(), 0)
         size *= 2**exponent
 
