@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { TrackerStatDialogComponent } from './tracker-stat-dialog.component';
 import type { TrackerSearchStat } from '../../models/search.model';
@@ -28,6 +28,8 @@ describe('TrackerStatDialogComponent', () => {
   let fx: ComponentFixture<TrackerStatDialogComponent>;
   let cmp: TrackerStatDialogComponent;
 
+  const originalClipboard = (globalThis as any).navigator?.clipboard;
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [TrackerStatDialogComponent],
@@ -35,6 +37,18 @@ describe('TrackerStatDialogComponent', () => {
     fx = TestBed.createComponent(TrackerStatDialogComponent);
     cmp = fx.componentInstance;
     fx.detectChanges();
+  });
+
+  afterEach(() => {
+    // Restore clipboard so we don't leak a navigator object missing prototype
+    // getters (e.g. userAgent) to later tests in the same worker.
+    try {
+      Object.defineProperty(globalThis.navigator, 'clipboard', {
+        value: originalClipboard,
+        configurable: true,
+        writable: true,
+      });
+    } catch { /* ignore */ }
   });
 
   it('is hidden by default', () => {
@@ -129,7 +143,11 @@ describe('TrackerStatDialogComponent', () => {
   it('copyJson writes serialised payload to the clipboard', async () => {
     const writeSpy = vi.fn().mockResolvedValue(undefined);
     // jsdom / happy-dom do not give us a real clipboard — install a shim.
-    (globalThis as any).navigator = { ...(globalThis as any).navigator, clipboard: { writeText: writeSpy } };
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      value: { writeText: writeSpy },
+      configurable: true,
+      writable: true,
+    });
     cmp.open(makeStat());
     fx.detectChanges();
     cmp.copyJson();
@@ -145,7 +163,11 @@ describe('TrackerStatDialogComponent', () => {
     const execSpy = vi.fn().mockReturnValue(true);
     document.execCommand = execSpy as any;
     // Kill the clipboard API for this test.
-    (globalThis as any).navigator = { ...(globalThis as any).navigator, clipboard: undefined };
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
     cmp.open(makeStat());
     fx.detectChanges();
     cmp.copyJson();
