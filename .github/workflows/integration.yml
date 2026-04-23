@@ -43,6 +43,9 @@ jobs:
           npm ci
           npx ng build --configuration production
 
+      - name: install Playwright browsers
+        run: npx playwright install chromium
+
       - name: detect container runtime
         id: runtime
         run: |
@@ -52,17 +55,28 @@ jobs:
             echo "runtime=docker" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: install plugins
-        run: |
-          mkdir -p config/qBittorrent/nova3/engines
-          cp plugins/*.py config/qBittorrent/nova3/engines/
-          chmod 644 config/qBittorrent/nova3/engines/*.py
-
       - name: start stack
         run: |
           set -euo pipefail
           # GitHub runners ship Docker Compose v2 via `docker compose`.
-          docker compose -f docker-compose.yml up -d --build
+          # Start qbittorrent first so it creates nova3/ search infrastructure.
+          docker compose -f docker-compose.yml up -d --build qbittorrent
+          # Wait for qbittorrent to be healthy and create nova3/ files.
+          for i in {1..60}; do
+            if curl -sf http://localhost:7185/ >/dev/null 2>&1; then
+              echo "qbittorrent ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          # Give qBittorrent time to create nova3/ novaprinter.py etc.
+          sleep 5
+          # Copy plugins into engines/ now that nova3/ exists.
+          mkdir -p config/qBittorrent/nova3/engines
+          cp plugins/*.py config/qBittorrent/nova3/engines/
+          chmod 644 config/qBittorrent/nova3/engines/*.py
+          # Start download-proxy (depends on qbittorrent health).
+          docker compose -f docker-compose.yml up -d download-proxy
           # Wait for all required ports before running tests.
           wait_for_port() {
             local port=$1
@@ -77,7 +91,6 @@ jobs:
             echo "port ${port} did not become ready within 60s" >&2
             return 1
           }
-          wait_for_port 7185 "/" || exit 1
           wait_for_port 7186 "/" || exit 1
           wait_for_port 7187 "/health" || exit 1
 

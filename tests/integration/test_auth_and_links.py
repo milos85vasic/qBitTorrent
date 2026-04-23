@@ -9,8 +9,24 @@ Covers:
 - Dashboard auth handling
 """
 
+import os
+import subprocess
+
 import pytest
 import requests
+
+
+def _container_runtime() -> str:
+    env = os.environ.get("CONTAINER_RUNTIME")
+    if env:
+        return env
+    for cmd in ("podman", "docker"):
+        try:
+            subprocess.run([cmd, "version"], capture_output=True, timeout=5, check=True)
+            return cmd
+        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            continue
+    return "docker"
 
 
 class TestQbitDefaultPassword:
@@ -79,7 +95,8 @@ class TestQbitDefaultPassword:
             f.write('{"username":"admin","password":"wrongwrong"}')
             tmp_path = f.name
 
-        os.system(f"podman cp {tmp_path} qbittorrent-proxy:/config/download-proxy/qbittorrent_creds.json")
+        runtime = _container_runtime()
+        os.system(f"{runtime} cp {tmp_path} qbittorrent-proxy:/config/download-proxy/qbittorrent_creds.json")
         os.unlink(tmp_path)
 
         status = requests.get(f"{self.base_url}/api/v1/auth/status", timeout=30).json()
@@ -170,7 +187,8 @@ class TestAuthEndpointBehavior:
             f.write('{"username":"admin","password":"wrong"}')
             tmp_path = f.name
 
-        os.system(f"podman cp {tmp_path} qbittorrent-proxy:/config/download-proxy/qbittorrent_creds.json")
+        runtime = _container_runtime()
+        os.system(f"{runtime} cp {tmp_path} qbittorrent-proxy:/config/download-proxy/qbittorrent_creds.json")
         os.unlink(tmp_path)
 
         resp = requests.post(
