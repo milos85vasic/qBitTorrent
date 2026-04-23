@@ -103,7 +103,9 @@ class TestStatsEndpoint:
     async def test_stats_no_orchestrator(self):
         from api import app, stats
 
-        with patch.object(app.state, "_state", {}):
+        # Use patch.dict on the underlying _state dict directly to bypass
+        # Starlette State.__setattr__ interception.
+        with patch.dict(app.state._state, clear=True):
             result = await stats()
             assert result["active_searches"] == 0
             assert result["completed_searches"] == 0
