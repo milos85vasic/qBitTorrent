@@ -14,8 +14,10 @@ import pytest
 _PLUGINS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "plugins"))
 
 CANONICAL_PLUGINS = [
-    "eztv",
+    "bitsearch",
+    "gamestorrents",
     "iptorrents",
+    "kickass",
     "kinozal",
     "limetorrents",
     "nnmclub",
@@ -23,7 +25,7 @@ CANONICAL_PLUGINS = [
     "piratebay",
     "rutor",
     "rutracker",
-    "solidtorrents",
+    "torlock",
     "torrentgalaxy",
     "yts",
 ]

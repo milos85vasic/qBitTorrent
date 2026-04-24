@@ -28,6 +28,7 @@ PLUGINS=(
   "bitru"
   "bt4g"
   "btsow"
+  "bitsearch"
   "extratorrent"
   "eztv"
   "gamestorrents"
@@ -256,20 +257,24 @@ for plugin in "${SELECTED_PLUGINS[@]}"; do
     plugin_icon="plugins/${plugin}.png"
     
     if [[ ! -f "$plugin_file" ]]; then
-        print_error "Plugin file not found: $plugin_file"
-        continue
+        plugin_file="plugins/community/${plugin}.py"
+        plugin_icon="plugins/community/${plugin}.png"
+        if [[ ! -f "$plugin_file" ]]; then
+            print_error "Plugin file not found: plugins/${plugin}.py or plugins/community/${plugin}.py"
+            continue
+        fi
     fi
     
     print_info "Installing ${plugin}..."
     
     # Copy plugin file
     cp "$plugin_file" "$ENGINES_DIR/"
-    chmod 644 "$ENGINES_DIR/$(basename "$plugin_file")"
+    chmod 644 "$ENGINES_DIR/$(basename "$plugin_file")" 2>/dev/null || true
     
     # Copy icon if exists
     if [[ -f "$plugin_icon" ]]; then
         cp "$plugin_icon" "$ENGINES_DIR/"
-        chmod 644 "$ENGINES_DIR/$(basename "$plugin_icon")"
+        chmod 644 "$ENGINES_DIR/$(basename "$plugin_icon")" 2>/dev/null || true
     fi
     
     print_success "${plugin} installed"

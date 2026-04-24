@@ -17,6 +17,8 @@ enough to warrant investigation.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 import requests
 
@@ -122,35 +124,34 @@ def test_deadline_hit_is_surfaced_on_slow_trackers(linux_search: dict) -> None:
         )
 
 
+@pytest.mark.skipif(
+    os.getenv("ENABLE_DEAD_TRACKERS", "0") == "1" or open(".env").read().find("ENABLE_DEAD_TRACKERS=1") != -1,
+    reason="Dead trackers are intentionally enabled via ENABLE_DEAD_TRACKERS=1",
+)
 def test_dead_trackers_excluded_from_fan_out(linux_search: dict) -> None:
-    """The 20 known-dead public trackers must NOT appear in
+    """The 17 known-dead public trackers must NOT appear in
     tracker_stats by default. Otherwise the dashboard drowns in
     permanently-red chips that can never go green.
     """
     stat_names = {t["name"] for t in linux_search.get("tracker_stats", [])}
     dead = {
-        "eztv",
-        "kickass",
-        "bt4g",
-        "extratorrent",
-        "one337x",
-        "bitru",
-        "megapeer",
-        "nyaa",
-        "audiobookbay",
-        "torlock",
-        "pctorrent",
-        "yihua",
-        "torrentgalaxy",
-        "xfsub",
+        "ali213",
         "anilibra",
+        "audiobookbay",
+        "bitru",
+        "bt4g",
+        "btsow",
+        "extratorrent",
+        "eztv",
+        "megapeer",
+        "one337x",
+        "pctorrent",
         "solidtorrents",
         "therarbg",
         "torrentfunk",
-        "ali213",
-        "btsow",
-        "gamestorrents",
         "torrentkitty",
+        "xfsub",
+        "yihua",
     }
     leaked = stat_names & dead
     assert not leaked, (

@@ -31,7 +31,7 @@ class TestPublicTrackersRegistry:
             assert url.startswith("http"), f"{name} has invalid URL: {url}"
 
     def test_expected_public_tracker_count(self):
-        assert len(PUBLIC_TRACKERS) == 37
+        assert len(PUBLIC_TRACKERS) == 38
 
     def test_specific_trackers_present(self):
         expected = [

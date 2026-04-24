@@ -158,8 +158,8 @@ class TestSearchOrchestratorTrackerCount:
         assert len(found) >= 5, f"Too few live public trackers enabled: {found}"
 
     def test_get_enabled_trackers_count(self):
-        """Public-tracker count after dead-bucket filter is ~15 plugins
-        (37 public minus 22 dead). Keep the floor loose so the test
+        """Public-tracker count after dead-bucket filter is ~21 plugins
+        (38 public minus 17 dead). Keep the floor loose so the test
         doesn't break if we add a new tracker or move one in/out of
         the dead bucket.
         """

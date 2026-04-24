@@ -18,7 +18,7 @@ from helpers import retrieve_url
 
 
 class yts(object):
-    url = "https://movies-api.accel.li"
+    url = "https://yts.lt"
     name = "YTS"
     supported_categories = {"all": "All", "movies": "Movie"}
 

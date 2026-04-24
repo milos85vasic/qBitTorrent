@@ -1,149 +1,100 @@
-# VERSION: 0.08
-# AUTHORS: nindogo (nindogo@gmail.com)
+# VERSION: 1.0
+# AUTHORS: LightDestory (https://github.com/LightDestory)
 
-# LICENSING INFORMATION
 
 import re
-import math
-import time
-import threading
-from helpers import retrieve_url
+from helpers import download_file, retrieve_url
 from novaprinter import prettyPrinter
-
-# some other imports if necessary
-try:
-    # Python 3
-    from html.parser import HTMLParser
-except ImportError:
-    # Python 2
-    from HTMLParser import HTMLParser
+from time import sleep
+from datetime import datetime
 
 
 class torrentgalaxy(object):
-    url = "https://torrentgalaxy.to"
+    url = "https://torrentgalaxy.one/"
     name = "TorrentGalaxy"
     supported_categories = {
         "all": "",
-        "movies": "c3=1&c46=1&c45=1&c42=1&c4=1&c1=1&",
-        "tv": "c41=1&c5=1&c6=1&c7=1&",
-        "music": "c23=1&c24=1&c25=1&c26=1&c17=1&",
-        "games": "c43=1&c10=1&",
-        "anime": "c28=1&",
-        "software": "c20=1&c21=1&c18=1&",
-        "pictures": "c37=1&",
-        "books": "c13=1&c19=1&c12=1&c14=1&c15=1&",
+        "movies": "Movies",
+        "tv": "TV",
+        "music": "Music",
+        "games": "Games",
+        "anime": "Anime",
+        "software": "Apps",
+        "books": "Books",
     }
 
-    class TorrentGalaxyParser(HTMLParser):
-        (
-            DIV,
-            A,
-            SPAN,
-            FONT,
-            SMALL,
-        ) = "div", "a", "span", "font", "small"
-        (count_div,) = (-1,)
-        get_size, get_seeds, get_leechs, get_pub_date0, get_pub_date = False, False, False, False, False
-        this_record = {}
-        url = "https://torrentgalaxy.to"
+    class HTMLParser:
+        def __init__(self, url):
+            self.url = url
+            self.noTorrents = False
 
-        def handle_starttag(self, tag, attrs):
-            if tag == self.DIV:
-                my_attrs = dict(attrs)
-                # if (my_attrs.get('class') == 'tgxtablerow txlight'):
-                if my_attrs.get("class") and "tgxtablerow" in my_attrs.get("class"):
-                    self.count_div = 0
-                    self.this_record = {}
-                    self.this_record["engine_url"] = self.url
-                if my_attrs.get("class") and ("tgxtablecell" in my_attrs.get("class")) and self.count_div >= 0:
-                    self.count_div += 1
-                if my_attrs.get("style") and ("text-align:right" in my_attrs.get("style")) and self.count_div >= 0:
-                    self.get_pub_date0 = True
+        def feed(self, html):
+            self.noTorrents = False
+            torrents = self.__findTorrents(html)
+            if len(torrents) == 0:
+                self.noTorrents = True
+                return
+            for torrent in range(len(torrents)):
+                data = {
+                    "link": torrents[torrent][0],
+                    "name": torrents[torrent][1],
+                    "size": torrents[torrent][2],
+                    "seeds": torrents[torrent][3],
+                    "leech": torrents[torrent][4],
+                    "engine_url": self.url,
+                    "desc_link": torrents[torrent][5],
+                    "pub_date": torrents[torrent][6],
+                }
+                prettyPrinter(data)
 
-            if tag == self.A and self.count_div < 13:
-                my_attrs = dict(attrs)
-                if (
-                    "title" in my_attrs
-                    and ("class" in my_attrs)
-                    and "txlight" in my_attrs.get("class")
-                    and not my_attrs.get("id")
-                ):
-                    self.this_record["name"] = my_attrs["title"]
-                    self.this_record["desc_link"] = self.url + my_attrs["href"]
-                if "role" in my_attrs and my_attrs.get("role") == "button":
-                    self.this_record["link"] = my_attrs["href"]
+        def __findTorrents(self, html):
+            torrents = []
+            trs = re.findall(
+                r"<div class=\"tgxtablerow txlight\".+?</table>\s?</div>", html
+            )
+            for tr in trs:
+                url_titles = re.search(
+                    r"<b>(.+?)</b>.+?href=\"(.+?)\".+?([0-9\,\.]+ (?:TB|GB|MB|KB)).+?green\".+?([0-9.,]+).+?>([0-9.,]+)",
+                    tr,
+                )
+                if url_titles:
+                    # Get Unix timestamp if possible using datetime.timestamp() function, otherwise set it to -1
+                    timestamp = -1
+                    generic_url = "{0}{1}".format(self.url[:-1], url_titles.group(2))
+                    torrent_data = [
+                        generic_url,
+                        url_titles.group(1),
+                        url_titles.group(3),
+                        url_titles.group(4),
+                        url_titles.group(5),
+                        generic_url,
+                        timestamp,
+                    ]
+                    torrents.append(torrent_data)
+            return torrents
 
-            if tag == self.SPAN:
-                my_attrs = dict(attrs)
-                if "class" in my_attrs and "badge badge-secondary" in my_attrs.get("class"):
-                    self.get_size = True
-
-            if tag == self.FONT:
-                my_attrs = dict(attrs)
-                if my_attrs.get("color") == "green":
-                    self.get_seeds = True
-                elif my_attrs.get("color") == "#ff0000":
-                    self.get_leechs = True
-
-            if self.count_div == 13 and tag == self.SMALL:
-                prettyPrinter(self.this_record)
-                self.this_record = {}
-                self.count_div = -1
-
-            if self.get_pub_date0 and tag == self.SMALL:
-                self.get_pub_date = True
-
-        def handle_data(self, data):
-            if self.get_size is True and self.count_div < 13:
-                self.this_record["size"] = data.strip().replace(",", "")
-                self.get_size = False
-            if self.get_seeds is True:
-                self.this_record["seeds"] = data.strip().replace(",", "")
-                self.get_seeds = False
-            if self.get_leechs is True:
-                self.this_record["leech"] = data.strip().replace(",", "")
-                self.get_leechs = False
-            if self.get_pub_date is True:
-                self.this_record["pub_date"] = str(int(time.mktime(time.strptime(data.strip(), "%d/%m/%y %H:%M"))))
-                self.get_pub_date, self.get_pub_date0 = False, False
-
-    def do_search(self, url):
-        webpage = retrieve_url(url)
-        tgParser = self.TorrentGalaxyParser()
-        tgParser.feed(webpage)
+    def download_torrent(self, info):
+        torrent_page = re.sub(r"\s+", " ", retrieve_url(info)).strip()
+        download_link = re.search(
+            r"href=\"(https?://itorrents.+?)\?.+?\"", torrent_page
+        )
+        if download_link:
+            print(download_file(download_link.groups(1)[0]))
+        else:
+            raise Exception("Download link not found")
 
     def search(self, what, cat="all"):
-        query = str(what).replace(r" ", "+")
-        search_url = "https://torrentgalaxy.to/torrents.php?"
-        full_url = search_url + self.supported_categories[cat.lower()] + "sort=seeders&order=desc&search=" + query
-
-        webpage = retrieve_url(full_url)
-        tgParser = self.TorrentGalaxyParser()
-        tgParser.feed(webpage)
-
-        all_results_re = re.compile(r"steelblue[^>]+>(.*?)<")
-        all_results = all_results_re.findall(webpage)[0]
-        all_results = all_results.replace(" ", "")
-        pages = math.ceil(int(all_results) / 50)
-        threads = []
-        for page in range(1, pages):
-            this_url = full_url + "&page=" + str(page)
-            t = threading.Thread(args=(this_url,), target=self.do_search)
-            threads.append(t)
-            t.start()
-            # self.do_search(this_url)
-
-        for thread in threads:
-            thread.join()
-
-    def download_torrent(self, url):
-        """Download torrent - returns magnet link directly."""
-        import sys
-
-        print(url + " " + url)
-        sys.stdout.flush()
-
-
-if __name__ == "__main__":
-    a = torrentgalaxy()
-    a.search("ncis new", "all")
+        cat = "" if cat == "all" else f":category:{self.supported_categories[cat]}"
+        parser = self.HTMLParser(self.url)
+        current_page = 1
+        while True:
+            url = "{0}get-posts/keywords:{1}{2}/?page={3}".format(
+                self.url, what, cat, current_page
+            )
+            html = re.sub(r"\s+", " ", retrieve_url(url)).strip()
+            parser.feed(html)
+            if parser.noTorrents:
+                break
+            current_page += 1
+            # Always set a sleep(3) after each request to the search engine website, otherwise you might get banned by the search engine.
+            sleep(3)

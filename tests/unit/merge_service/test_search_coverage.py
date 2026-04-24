@@ -363,7 +363,7 @@ class TestOrchestratorGetEnabledTrackers:
             trackers = orch._get_enabled_trackers()
             names = [t.name for t in trackers]
             assert "eztv" not in names
-            assert "kickass" not in names
+            assert "ali213" not in names
 
     def test_dead_trackers_included_when_enabled(self):
         orch = SearchOrchestrator()
@@ -371,6 +371,7 @@ class TestOrchestratorGetEnabledTrackers:
             trackers = orch._get_enabled_trackers()
             names = [t.name for t in trackers]
             assert "eztv" in names
+            assert "ali213" in names
 
 
 class TestIsTrackerAuthenticated:
