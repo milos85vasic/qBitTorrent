@@ -64,21 +64,21 @@ jobs:
           # generate a random password.  The container mounts ./config → /config.
           mkdir -p config/qBittorrent
           cat > config/qBittorrent/qBittorrent.conf << 'EOF'
-[LegalNotice]
-Accepted=true
-[Preferences]
-WebUI\Enabled=true
-WebUI\Port=7185
-WebUI\Address=*
-WebUI\Username=admin
-WebUI\Password_PBKDF2="@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)"
-WebUI\LocalHostAuth=false
-WebUI\AuthSubnetWhitelistEnabled=true
-WebUI\AuthSubnetWhitelist=127.0.0.1/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
-WebUI\MaxAuthenticationFailCount=1000000
-WebUI\BanDuration=1
-WebUI\ServerDomains=*
-EOF
+          [LegalNotice]
+          Accepted=true
+          [Preferences]
+          WebUI\Enabled=true
+          WebUI\Port=7185
+          WebUI\Address=*
+          WebUI\Username=admin
+          WebUI\Password_PBKDF2="@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)"
+          WebUI\LocalHostAuth=false
+          WebUI\AuthSubnetWhitelistEnabled=true
+          WebUI\AuthSubnetWhitelist=127.0.0.1/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+          WebUI\MaxAuthenticationFailCount=1000000
+          WebUI\BanDuration=1
+          WebUI\ServerDomains=*
+          EOF
           # GitHub runners ship Docker Compose v2 via `docker compose`.
           # Start qbittorrent first so it creates nova3/ search infrastructure.
           docker compose -f docker-compose.yml up -d --build qbittorrent
