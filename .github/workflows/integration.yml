@@ -138,6 +138,8 @@ jobs:
           python -m pytest tests/integration/ tests/e2e/ \
             -v --import-mode=importlib \
             -p no:cacheprovider \
+            -p no:randomly \
+            --timeout=120 \
             --cov=download-proxy/src \
             --cov-append \
             --cov-report=xml \

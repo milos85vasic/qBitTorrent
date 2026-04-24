@@ -46,6 +46,7 @@ pybreaker>=1.2.0            # circuit breaker
 
 # --- Browser e2e (optional; install with `pip install playwright && playwright install chromium`) ---
 playwright>=1.44.0
+pytest-playwright>=0.5.0
 
 # --- Load / stress ---
 locust>=2.29.0

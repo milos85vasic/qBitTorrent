@@ -176,7 +176,7 @@ else
     section "PHASE 4: Integration Tests"
 
     step "pytest — integration tests"
-    if python3 -m pytest "$SCRIPT_DIR/tests/integration/" -v --import-mode=importlib --tb=short 2>&1 | tail -3; then
+    if python3 -m pytest "$SCRIPT_DIR/tests/integration/" -v --import-mode=importlib --tb=short --timeout=120 2>&1 | tail -3; then
         pass "Integration tests"
     else
         fail "Integration tests"
@@ -188,7 +188,7 @@ else
     section "PHASE 5: E2E Tests"
 
     step "pytest — e2e tests"
-    if python3 -m pytest "$SCRIPT_DIR/tests/e2e/" -v --import-mode=importlib --tb=short 2>&1 | tail -3; then
+    if python3 -m pytest "$SCRIPT_DIR/tests/e2e/" -v --import-mode=importlib --tb=short --timeout=120 2>&1 | tail -3; then
         pass "E2E tests"
     else
         fail "E2E tests"
