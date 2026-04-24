@@ -141,8 +141,9 @@ _ensure_webui_credentials() {
     # test suite's repeated login probes and leaves every subsequent
     # connection 403'd. Force the settings in even on configs that
     # predate them.
-    _enforce_config_line "$config_file" "WebUI\\\\LocalHostAuth" "true" "[Preferences]"
-    _enforce_config_line "$config_file" "WebUI\\\\AuthSubnetWhitelistEnabled" "false" "[Preferences]"
+    _enforce_config_line "$config_file" "WebUI\\\\LocalHostAuth" "false" "[Preferences]"
+    _enforce_config_line "$config_file" "WebUI\\\\AuthSubnetWhitelistEnabled" "true" "[Preferences]"
+    _enforce_config_line "$config_file" "WebUI\\\\AuthSubnetWhitelist" "127.0.0.1/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16" "[Preferences]"
     _enforce_config_line "$config_file" "WebUI\\\\MaxAuthenticationFailCount" "1000000" "[Preferences]"
     _enforce_config_line "$config_file" "WebUI\\\\BanDuration" "1" "[Preferences]"
 
@@ -238,8 +239,9 @@ WebUI\Port=${WEBUI_PORT:-7185}
 WebUI\Address=*
 WebUI\Username=admin
 WebUI\Password_PBKDF2="@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)"
-WebUI\LocalHostAuth=true
-WebUI\AuthSubnetWhitelistEnabled=false
+WebUI\LocalHostAuth=false
+WebUI\AuthSubnetWhitelistEnabled=true
+WebUI\AuthSubnetWhitelist=127.0.0.1/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 WebUI\MaxAuthenticationFailCount=1000000
 WebUI\BanDuration=1
 WebUI\ServerDomains=*
