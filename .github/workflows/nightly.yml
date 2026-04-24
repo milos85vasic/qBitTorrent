@@ -5,6 +5,8 @@ on:
     - cron: "0 2 * * *"
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 permissions:
   contents: read
 
@@ -27,6 +29,26 @@ jobs:
           pip install -r tests/requirements.txt
           pip install -r download-proxy/requirements.txt
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: build Angular dashboard
+        run: |
+          cd frontend
+          npm ci
+          npx ng build --configuration production
+
+      - name: prepare proxy infrastructure
+        run: |
+          mkdir -p config/qBittorrent/nova3/engines
+          cp plugins/download_proxy.py config/qBittorrent/nova3/engines/
+          cp plugins/env_loader.py config/qBittorrent/nova3/engines/
+          cp plugins/helpers.py config/qBittorrent/nova3/engines/
+          cp plugins/novaprinter.py config/qBittorrent/nova3/novaprinter.py
+
       - name: start stack
         run: |
           set -euo pipefail
@@ -37,6 +59,8 @@ jobs:
           done
 
       - name: full CI suite
+        env:
+          CONTAINER_RUNTIME: docker
         run: ./ci.sh
 
       - name: stop stack

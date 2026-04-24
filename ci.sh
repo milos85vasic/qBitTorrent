@@ -110,13 +110,31 @@ if [[ "$TESTS_ONLY" == "false" ]]; then
     step "Python syntax check (py_compile)"
     PY_FAIL=0
     PY_TOTAL=0
-    while IFS= read -r -d '' f; do
+    # When inside a git repo, only check tracked files (avoids generated
+    # artefacts, worktrees, and untracked scratch files).
+    if git rev-parse --git-dir >/dev/null 2>&1; then
+        mapfile -t py_files < <(git ls-files '*.py')
+    else
+        mapfile -t py_files < <(find "$SCRIPT_DIR" -name '*.py' \
+            -not -path '*/__pycache__/*' \
+            -not -path '*/.git/*' \
+            -not -path '*/.worktrees/*' \
+            -not -path '*/.specify/*' \
+            -not -path '*/venv/*' \
+            -not -path '*/node_modules/*' \
+            -not -path '*/tmp/*' \
+            -not -path '*/config/download-proxy/*')
+    fi
+    for f in "${py_files[@]}"; do
+        [[ -f "$f" ]] || continue
         ((PY_TOTAL++)) || true
         if ! python3 -m py_compile "$f" 2>/dev/null; then
+            # Show stderr so the actual syntax error is visible in logs
+            python3 -m py_compile "$f" 2>&1 || true
             fail "$f"
             ((PY_FAIL++)) || true
         fi
-    done < <(find "$SCRIPT_DIR" -name '*.py' -not -path '*/__pycache__/*' -not -path '*/.git/*' -not -path '*/venv/*' -not -path '*/node_modules/*' -not -path '*/config/download-proxy/*' -print0)
+    done
     if [[ $PY_FAIL -eq 0 ]]; then
         pass "All $PY_TOTAL Python files compile"
     fi
@@ -143,7 +161,7 @@ fi
 section "PHASE 3: Unit Tests"
 
 step "pytest — unit tests"
-if python3 -m pytest "$SCRIPT_DIR/tests/unit/" -v --import-mode=importlib --tb=short 2>&1 | tail -3; then
+if python3 -m pytest "$SCRIPT_DIR/tests/unit/" -v --import-mode=importlib --tb=short -m "not requires_compose" 2>&1 | tail -3; then
     pass "Unit tests"
 else
     fail "Unit tests"
@@ -181,7 +199,7 @@ else
     # =====================================================================
     section "PHASE 6: Container Health"
 
-    RUNTIME=$(command -v podman 2>/dev/null || command -v docker 2>/dev/null || echo "")
+    RUNTIME="${CONTAINER_RUNTIME:-$(command -v podman 2>/dev/null || command -v docker 2>/dev/null || echo "")}"
 
     if [[ -n "$RUNTIME" ]]; then
         step "Check container status"

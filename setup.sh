@@ -122,6 +122,14 @@ for file in helpers.py nova2.py novaprinter.py socks.py; do
     fi
 done
 
+# Copy infrastructure modules required by the proxy entrypoint and plugins
+for file in download_proxy.py env_loader.py; do
+    if [[ -f "plugins/${file}" ]]; then
+        cp "plugins/${file}" config/qBittorrent/nova3/engines/
+        print_success "Installed: ${file}"
+    fi
+done
+
 # Set permissions
 chmod 644 config/qBittorrent/nova3/engines/*.py 2>/dev/null || true
 
