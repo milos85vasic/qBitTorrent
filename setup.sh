@@ -112,6 +112,10 @@ for plugin in "${PLUGINS[@]}"; do
     else
         print_warning "Plugin not found: ${plugin}.py"
     fi
+    if [[ -f "plugins/${plugin}.json" ]]; then
+        cp "plugins/${plugin}.json" config/qBittorrent/nova3/engines/
+        print_success "Installed: ${plugin}.json"
+    fi
 done
 
 # Copy support files

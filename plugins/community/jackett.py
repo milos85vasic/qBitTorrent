@@ -76,6 +76,14 @@ def load_configuration() -> None:
         # if file doesn't exist, we create it
         save_configuration()
 
+    # allow environment overrides for containerised/auto-discovered setups
+    env_api_key = os.environ.get("JACKETT_API_KEY")
+    if env_api_key:
+        CONFIG_DATA["api_key"] = env_api_key
+    env_url = os.environ.get("JACKETT_URL")
+    if env_url:
+        CONFIG_DATA["url"] = env_url
+
     # do some checks
     if any(item not in CONFIG_DATA for item in ["api_key", "tracker_first", "url"]):
         CONFIG_DATA["malformed"] = True

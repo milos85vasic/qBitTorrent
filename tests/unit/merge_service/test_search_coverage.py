@@ -373,6 +373,27 @@ class TestOrchestratorGetEnabledTrackers:
             assert "eztv" in names
             assert "ali213" in names
 
+    def test_jackett_included_when_api_key_set(self):
+        orch = SearchOrchestrator()
+        with patch.dict(os.environ, {"JACKETT_API_KEY": "real-key-123"}, clear=False):
+            trackers = orch._get_enabled_trackers()
+            names = [t.name for t in trackers]
+            assert "jackett" in names
+
+    def test_jackett_excluded_when_placeholder_key(self):
+        orch = SearchOrchestrator()
+        with patch.dict(os.environ, {"JACKETT_API_KEY": "YOUR_API_KEY_HERE"}, clear=False):
+            trackers = orch._get_enabled_trackers()
+            names = [t.name for t in trackers]
+            assert "jackett" not in names
+
+    def test_jackett_excluded_when_no_key(self):
+        orch = SearchOrchestrator()
+        with patch.dict(os.environ, {}, clear=True):
+            trackers = orch._get_enabled_trackers()
+            names = [t.name for t in trackers]
+            assert "jackett" not in names
+
 
 class TestIsTrackerAuthenticated:
     def test_public_tracker_not_authenticated(self):

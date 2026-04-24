@@ -153,3 +153,4 @@ artifacts/
 qBitTorrent-go/qbittorrent-proxy
 qBitTorrent-go/webui-bridge
 shellcheck-v0.11.0/
+config/jackett/

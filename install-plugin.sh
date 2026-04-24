@@ -276,7 +276,18 @@ for plugin in "${SELECTED_PLUGINS[@]}"; do
         cp "$plugin_icon" "$ENGINES_DIR/"
         chmod 644 "$ENGINES_DIR/$(basename "$plugin_icon")" 2>/dev/null || true
     fi
-    
+
+    # Copy JSON config if exists (e.g. jackett.json, kinozal.json)
+    plugin_json="plugins/${plugin}.json"
+    if [[ ! -f "$plugin_json" ]]; then
+        plugin_json="plugins/community/${plugin}.json"
+    fi
+    if [[ -f "$plugin_json" ]]; then
+        cp "$plugin_json" "$ENGINES_DIR/"
+        chmod 644 "$ENGINES_DIR/$(basename "$plugin_json")" 2>/dev/null || true
+        print_info "  Config: $(basename "$plugin_json") copied"
+    fi
+
     print_success "${plugin} installed"
 done
 

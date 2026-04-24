@@ -80,7 +80,7 @@ can use an API key for rate-limit uplift:
 
 | Variable | Used by | Required | Register |
 |---|---|---|---|
-| `JACKETT_API_KEY` | `plugins/jackett.py` | Optional — required only if you front public trackers through a local Jackett server | [https://github.com/Jackett/Jackett#installation](https://github.com/Jackett/Jackett#installation) → Admin → Jackett API Key |
+| `JACKETT_API_KEY` | `plugins/jackett.py` | **Auto-discovered** — `start.sh` extracts it from Jackett's config automatically. Manual override optional. | [https://github.com/Jackett/Jackett#installation](https://github.com/Jackett/Jackett#installation) → Admin → Jackett API Key |
 | `JACKETT_URL` | `plugins/jackett.py` | Optional (default `http://localhost:9117`) | Your Jackett host |
 | `TORRENTSCSV_API_KEY` | `plugins/torrentscsv.py` | Optional | [https://torrents-csv.com/](https://torrents-csv.com/) (no auth typically) |
 

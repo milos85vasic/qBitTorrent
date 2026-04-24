@@ -217,6 +217,14 @@ class TestSearchTrackerRouting:
             mock.assert_called_once_with("test", "all")
 
     @pytest.mark.asyncio
+    async def test_jackett_routes_to_public_tracker(self):
+        with patch.object(self.orch, "_search_public_tracker", new_callable=AsyncMock) as mock:
+            mock.return_value = []
+            tracker = TrackerSource(name="jackett", url="http://localhost:9117")
+            await self.orch._search_tracker(tracker, "test", "all")
+            mock.assert_called_once_with("jackett", "test", "all")
+
+    @pytest.mark.asyncio
     async def test_unknown_tracker_returns_empty(self):
         tracker = TrackerSource(name="nonexistent_tracker", url="http://x")
         results = await self.orch._search_tracker(tracker, "test", "all")

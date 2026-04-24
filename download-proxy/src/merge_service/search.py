@@ -843,6 +843,8 @@ class SearchOrchestrator:
             trackers.append(TrackerSource(name="nnmclub", url="https://nnm-club.me", enabled=True))
         if os.getenv("IPTORRENTS_USERNAME") and os.getenv("IPTORRENTS_PASSWORD"):
             trackers.append(TrackerSource(name="iptorrents", url="https://iptorrents.com", enabled=True))
+        if os.getenv("JACKETT_API_KEY") and os.getenv("JACKETT_API_KEY") != "YOUR_API_KEY_HERE":
+            trackers.append(TrackerSource(name="jackett", url="http://localhost:9117", enabled=True))
 
         include_dead = os.getenv("ENABLE_DEAD_TRACKERS", "0") == "1"
         for name, url in sorted(PUBLIC_TRACKERS.items()):
@@ -877,7 +879,7 @@ class SearchOrchestrator:
                 results = await self._search_nnmclub(query, category)
             elif tracker.name == "iptorrents":
                 results = await self._search_iptorrents(query, category)
-            elif tracker.name in PUBLIC_TRACKERS:
+            elif tracker.name in PUBLIC_TRACKERS or tracker.name == "jackett":
                 results = await self._search_public_tracker(tracker.name, query, category)
         except Exception as e:
             logger.error(f"Error searching {tracker.name}: {e}")
@@ -949,7 +951,7 @@ class SearchOrchestrator:
                         link=r.get("link", ""),
                         desc_link=r.get("desc_link", ""),
                         tracker=tracker_name,
-                        engine_url=PUBLIC_TRACKERS.get(tracker_name, ""),
+                        engine_url=PUBLIC_TRACKERS.get(tracker_name, tracker_name == "jackett" and "http://localhost:9117" or ""),
                         content_type=ct,
                         quality=q,
                     )

@@ -357,6 +357,30 @@ copy_plugins() {
             $copy_cmd "$icon" "$engines_dir/"
         fi
     done
+    
+    # Copy JSON configs (jackett, kinozal, nnmclub)
+    for cfg in plugins/*.json; do
+        if [[ -f "$cfg" ]]; then
+            $copy_cmd "$cfg" "$engines_dir/"
+            print_success "Installed: $(basename "$cfg")"
+        fi
+    done
+    
+    # Copy community plugins and their configs
+    if [[ -d "plugins/community" ]]; then
+        for plugin in plugins/community/*.py; do
+            if [[ -f "$plugin" ]]; then
+                $copy_cmd "$plugin" "$engines_dir/"
+                print_success "Installed: $(basename "$plugin")"
+            fi
+        done
+        for cfg in plugins/community/*.json; do
+            if [[ -f "$cfg" ]]; then
+                $copy_cmd "$cfg" "$engines_dir/"
+                print_success "Installed: $(basename "$cfg")"
+            fi
+        done
+    fi
 }
 
 start_container() {
@@ -387,6 +411,87 @@ wait_for_container() {
     
     print_warning "Container may not be fully ready yet"
     return 0
+}
+
+wait_for_jackett() {
+    print_info "Waiting for Jackett to be ready..."
+    local max_attempts=60
+    local attempt=0
+    
+    while [[ $attempt -lt $max_attempts ]]; do
+        if curl -sf "http://localhost:9117/health" > /dev/null 2>&1; then
+            print_success "Jackett is ready"
+            return 0
+        fi
+        ((attempt++))
+        sleep 1
+    done
+    
+    print_warning "Jackett may not be fully ready yet"
+    return 0
+}
+
+extract_jackett_key() {
+    local config_file="$SCRIPT_DIR/config/jackett/Jackett/ServerConfig.json"
+    if [[ ! -f "$config_file" ]]; then
+        return 0
+    fi
+    
+    local key
+    key=$(python3 -c "
+import json, sys
+try:
+    with open('$config_file') as f:
+        data = json.load(f)
+    key = data.get('APIKey', '')
+    if key and key.strip().lower() != 'your_api_key_here':
+        print(key.strip())
+except Exception:
+    pass
+" 2>/dev/null)
+    
+    if [[ -z "$key" ]]; then
+        return 0
+    fi
+    
+    echo "$key"
+}
+
+update_env_jackett_key() {
+    local key="$1"
+    local env_file="$SCRIPT_DIR/.env"
+    
+    if [[ -z "$key" ]]; then
+        return 0
+    fi
+    
+    if [[ ! -f "$env_file" ]]; then
+        return 0
+    fi
+    
+    # only update if missing or still placeholder
+    if grep -q "^JACKETT_API_KEY=YOUR_API_KEY_HERE" "$env_file" 2>/dev/null || ! grep -q "^JACKETT_API_KEY=" "$env_file" 2>/dev/null; then
+        if grep -q "^JACKETT_API_KEY=" "$env_file" 2>/dev/null; then
+            sed -i "s|^JACKETT_API_KEY=.*|JACKETT_API_KEY=$key|" "$env_file"
+        else
+            echo "JACKETT_API_KEY=$key" >> "$env_file"
+        fi
+        print_success "Jackett API key auto-configured in .env"
+    fi
+    
+    # also update plugins/jackett.json for local installs
+    local plugin_json="$SCRIPT_DIR/config/qBittorrent/nova3/engines/jackett.json"
+    if [[ -f "$plugin_json" ]]; then
+        python3 -c "
+import json, sys
+with open('$plugin_json') as f:
+    data = json.load(f)
+if data.get('api_key') in (None, '', 'YOUR_API_KEY_HERE'):
+    data['api_key'] = '$key'
+    with open('$plugin_json', 'w') as f:
+        json.dump(data, f, indent=4, sort_keys=True)
+" 2>/dev/null || true
+    fi
 }
 
 ensure_webui_password() {
@@ -445,6 +550,7 @@ show_status() {
     echo ""
     print_success "qBitTorrent Web UI: http://localhost:${WEBUI_PORT:-7185}"
     print_success "Боба Dashboard: http://localhost:${MERGE_SERVICE_PORT:-7187}/"
+    print_success "Jackett Admin: http://localhost:9117/UI/Dashboard"
     print_info "Default credentials: admin / admin"
     print_warning "Remember to change the default password!"
     echo ""
@@ -578,6 +684,12 @@ main() {
     fi
 
     start_container
+    wait_for_jackett
+    local jackett_key
+    jackett_key=$(extract_jackett_key)
+    if [[ -n "$jackett_key" ]]; then
+        update_env_jackett_key "$jackett_key"
+    fi
     wait_for_container
     ensure_webui_password
     show_status

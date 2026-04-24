@@ -7,6 +7,8 @@ For deeper narrative docs see `CLAUDE.md`, `docs/USER_MANUAL.md`, `docs/PLUGINS.
 
 qBittorrent enhancement: multi-tracker search, authenticated download proxy, and a Merge Search Service. **Not a Python package** -- no installable distribution. Runtime is container-based. Config is unified in `pyproject.toml`. A Go/Gin backend is available as an opt-in replacement (`--profile go`).
 
+Jackett is fully auto-configured: `start.sh` starts the Jackett container, waits for it to generate its API key, extracts it from `config/jackett/Jackett/ServerConfig.json`, and injects it into the proxy containers via `JACKETT_API_KEY`. No manual configuration is required. See `docs/JACKETT_INTEGRATION.md` for details.
+
 The project provides:
 - **Merge Search Service** (FastAPI on `:7187`) -- fans out searches across 40+ public and private trackers, deduplicates and enriches results, streams real-time updates via SSE.
 - **Download Proxy** (Python HTTP server on `:7186`) -- proxies qBittorrent WebUI and handles authenticated downloads for private trackers.
@@ -344,7 +346,7 @@ Key variables:
 - `LOG_LEVEL` -- default `INFO`
 - `OMDB_API_KEY`, `TMDB_API_KEY`, `TVDB_API_KEY` -- metadata enrichment
 - `ANILIST_CLIENT_ID` -- anime metadata
-- `JACKETT_API_KEY` -- public tracker uplift
+- `JACKETT_API_KEY` -- public tracker uplift (auto-discovered from Jackett container config; manual override optional)
 - `SNYK_TOKEN`, `SONAR_TOKEN` -- scanner tokens (opt-in)
 
 ## Plugin System
