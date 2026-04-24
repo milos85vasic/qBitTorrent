@@ -143,7 +143,6 @@ def test_dead_trackers_excluded_from_fan_out(linux_search: dict) -> None:
         "btsow",
         "extratorrent",
         "eztv",
-        "megapeer",
         "one337x",
         "pctorrent",
         "solidtorrents",

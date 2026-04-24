@@ -471,7 +471,6 @@ DEAD_PUBLIC_TRACKERS = frozenset(
         "btsow",
         "extratorrent",
         "eztv",
-        "megapeer",
         "one337x",
         "pctorrent",
         "solidtorrents",
