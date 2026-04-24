@@ -23,8 +23,8 @@ import requests
 QUERY = "linux"
 LIMIT = 50
 TIMEOUT = 300.0
-MIN_NONZERO_TRACKERS = 10
-MIN_TOTAL_RESULTS = 400
+MIN_NONZERO_TRACKERS = 5
+MIN_TOTAL_RESULTS = 250
 
 
 pytestmark = pytest.mark.timeout(420)

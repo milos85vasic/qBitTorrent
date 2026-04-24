@@ -30,9 +30,6 @@ if _ms_path not in _ms.__path__:
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.hooks import router as hooks_router
-from api.routes import router as api_router
-
 
 def _create_test_client():
     app = FastAPI()
@@ -40,6 +37,9 @@ def _create_test_client():
     @app.get("/health")
     async def health_check():
         return {"status": "healthy", "service": "merge-search", "version": "1.0.0"}
+
+    from api.hooks import router as hooks_router
+    from api.routes import router as api_router
 
     app.include_router(api_router, prefix="/api/v1")
     app.include_router(hooks_router, prefix="/api/v1/hooks")
@@ -278,8 +278,15 @@ class TestAbortSearchEndpoint:
     def test_abort_existing_search(self, mock_get_orch, client):
         orch = MagicMock()
         orch.is_search_queue_full.return_value = False
-        orch._active_searches = {"search-123": MagicMock(status="running")}
+        search_obj = MagicMock(status="running")
+        orch._active_searches = {"search-123": search_obj}
         mock_get_orch.return_value = orch
+
+        def _cancel(sid):
+            if sid in orch._active_searches:
+                orch._active_searches[sid].status = "aborted"
+
+        orch.cancel_search = _cancel
 
         resp = client.post("/api/v1/search/search-123/abort")
         assert resp.status_code == 200

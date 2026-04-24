@@ -38,26 +38,26 @@ case "$mode" in
         exec python3 -m pytest "${hermetic_dirs[@]}" \
             --import-mode=importlib \
             "${COVERAGE_FLAGS[@]}" \
-            -q --timeout=120 -p no:randomly "$@"
+            -q --timeout=120 -p no:randomly -p no:anyio "$@"
         ;;
     live)
         echo ">> Running live-service suites (integration + e2e)"
         exec python3 -m pytest "${live_dirs[@]}" \
             --import-mode=importlib \
-            --timeout=300 -p no:randomly -q "$@"
+            --timeout=300 -p no:randomly -p no:anyio -q "$@"
         ;;
     all|"")
         echo ">> Running FULL test suite with coverage"
         exec python3 -m pytest "${all_dirs[@]}" \
             --import-mode=importlib \
             "${COVERAGE_FLAGS[@]}" \
-            --timeout=300 -p no:randomly -q "$@"
+            --timeout=300 -p no:randomly -p no:anyio -q "$@"
         ;;
     --)
         exec python3 -m pytest tests/ \
             --import-mode=importlib \
             "${COVERAGE_FLAGS[@]}" \
-            --timeout=300 -p no:randomly "$@"
+            --timeout=300 -p no:randomly -p no:anyio "$@"
         ;;
     *)
         echo "unknown mode: $mode" >&2

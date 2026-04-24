@@ -1,16 +1,12 @@
 <!--
 Sync Impact Report:
-- Version change: (none) → 1.0.0
+- Version change: 1.1.0 → 1.2.0
 - Principles defined:
-  1. Container-First Architecture (NEW)
-  2. Plugin Contract Integrity (NEW)
-  3. Credential & Secret Security (NEW)
-  4. Container Runtime Portability (NEW)
-  5. Private Tracker Bridge Pattern (NEW)
-  6. Validation-Driven Development (NEW)
-  7. Operational Simplicity (NEW)
-- Added sections: Core Principles (7), Security Requirements, Development Workflow & Quality Gates, Governance
-- Removed sections: (none — initial ratification)
+  9. Test-Driven Development (NEW)
+  10. Hermetic Test Discipline (NEW)
+  11. Minimal Source Commentary (NEW)
+- Added sections: Core Principles (3 new)
+- Removed sections: (none)
 - Templates requiring updates:
   ✅ plan-template.md — Constitution Check section aligns; no changes needed
   ✅ spec-template.md — Requirements structure compatible; no changes needed
@@ -122,7 +118,7 @@ to `nova2dl.py` with proper authentication.
 - `webui-bridge.py` is a separate host process, NOT a container.
   It MUST be started manually: `python3 webui-bridge.py`.
 - The bridge intercepts download URLs matching known private tracker
-  domains and delegates to `nova2dl.py` for authenticated downloads.
+domains and delegates to `nova2dl.py` for authenticated downloads.
 - Direct WebUI downloads bypass `nova2dl.py` and WILL fail for
   private trackers — this is the fundamental problem the bridge solves.
 - Private-tracker URL patterns are defined in `PRIVATE_TRACKERS` dict
@@ -199,6 +195,63 @@ MUST be freeleech-only to protect the user's ratio.
 without seeding back degrades the user's ratio and risks account
 suspension. Automation must be ratio-safe by default.
 
+### IX. Test-Driven Development
+
+Every bug fix and feature MUST follow the TDD cycle.
+
+- Write a failing test first (RED).
+- Observe the failure to confirm the test exercises the right code path.
+- Write the minimal code to make the test pass (GREEN).
+- Verify the full suite still passes.
+- Only then commit.
+
+This discipline applies to Python source, plugins, shell scripts, and
+frontend TypeScript. A commit that changes production code without a
+corresponding test change MUST be rejected in review.
+
+**Rationale**: TDD is the primary defence against the "green tests,
+broken product" anti-pattern. Tests written after the fact validate
+what the author thinks the code does, not what it actually does.
+
+### X. Hermetic Test Discipline
+
+The test suite is the source of truth for correctness. Tests MUST be
+hermetic, well-isolated, and located in the canonical directory.
+
+- All tests MUST live in `./tests/`, NEVER in `download-proxy/tests/`.
+- Unit tests MUST be heavily mocked and MUST NOT require running
+  containers.
+- Integration and E2E tests MAY require running containers but MUST
+  fail loudly (not skip silently) when services are unavailable.
+- Coverage gate is 49% and MUST be maintained or raised. Raising the
+gate requires updating `docs/COVERAGE_BASELINE.md` simultaneously.
+- `sys.modules` isolation for unit tests MUST NOT leak into
+  integration or E2E tests.
+- Event loop state MUST NOT leak between tests; async tests MUST use
+  function-scoped loops.
+
+**Rationale**: Hermetic tests give fast feedback during development.
+Leaky isolation produces flaky failures that erode trust in the suite
+and hide real regressions.
+
+### XI. Minimal Source Commentary
+
+The merge service Python source (`download-proxy/src/`) MUST contain
+NO comments or docstrings. This is an intentional project convention.
+
+- Comments explaining "what" the code does are forbidden; the code
+  must be self-explanatory.
+- Comments explaining "why" a non-obvious decision was made belong in
+  the commit message or in `docs/`, not in source.
+- Type hints on public methods are encouraged; they serve as
+  machine-readable documentation.
+- Test files, plugin files, scripts, and documentation are exempt from
+  this rule.
+
+**Rationale**: Comments rot. Commit messages and living docs are the
+single source of truth for design rationale. Minimal commentary forces
+clarity through naming and structure.
+
 ## Security Requirements
 
 - `.env` file MUST have `600` permissions: `chmod 600 .env`.
@@ -262,4 +315,4 @@ ad-hoc decisions.
 - The `CONTRIBUTING.md` file governs external contribution workflow and
   MUST remain consistent with the principles herein.
 
-**Version**: 1.1.0 | **Ratified**: 2026-04-13 | **Last Amended**: 2026-04-14
+**Version**: 1.2.0 | **Ratified**: 2026-04-13 | **Last Amended**: 2026-04-24

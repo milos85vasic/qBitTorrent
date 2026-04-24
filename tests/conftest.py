@@ -24,6 +24,64 @@ _POLLUTING_ROOTS = ("api", "merge_service", "config")
 
 
 @pytest.fixture(autouse=True)
+def _cleanup_event_loop(request):
+    """Prevent asyncio event-loop pollution between tests.
+
+    pytest-asyncio 1.3.0 on Python 3.13 uses ``asyncio.Runner`` internally.
+    If a prior test leaves a running loop (e.g. via an unclean ``asyncio.run()``
+    or a fixture teardown edge-case), subsequent async tests fail with
+    ``RuntimeError: Runner.run() cannot be called from a running event loop``.
+    This fixture forces a clean slate after every test.
+    """
+    import asyncio
+    import gc
+
+    yield
+
+    # Force GC so any dangling Runner instances are collected before we
+    # inspect the loop state.
+    gc.collect()
+
+    # Close any loop that was set on the current thread without creating
+    # a new one.  We probe the policy's internal storage first; if that
+    # fails we fall back to the public API.
+    try:
+        policy = asyncio.get_event_loop_policy()
+        loop = None
+        if hasattr(policy, "_local") and hasattr(policy._local, "_loop"):
+            loop = policy._local._loop
+        if loop is None:
+            loop = policy.get_event_loop()
+        if loop is not None and not loop.is_closed():
+            if loop.is_running():
+                # Cancel every task we can reach.
+                for task in asyncio.all_tasks(loop):
+                    task.cancel()
+                # Spin the loop briefly so cancellations take effect.
+                # We can't use run_until_complete on a running loop, so we
+                # just run a zero-delay call_soon and hope the runner
+                # cleans up on its own next cycle.  This is a best-effort
+                # mitigation, not a guaranteed fix.
+                loop.call_soon(loop.stop)
+            else:
+                try:
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                except Exception:
+                    pass
+                loop.close()
+    except RuntimeError:
+        pass
+    except Exception:
+        pass
+
+    # Unset the thread-local loop so the next test starts fresh.
+    try:
+        asyncio.set_event_loop(None)
+    except Exception:
+        pass
+
+
+@pytest.fixture(autouse=True)
 def _isolate_download_proxy_modules(request):
     """Keep each test's ``sys.modules`` scribbles from leaking into the next.
 

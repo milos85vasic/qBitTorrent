@@ -85,8 +85,7 @@ class TestFullPipeline:
         if merged[0].total_seeds == 180:
             assert len(merged[0].original_results) == 2
 
-    @pytest.mark.asyncio
-    async def test_search_orchestrator_initializes(self):
+    def test_search_orchestrator_initializes(self):
         """Test that search orchestrator initializes correctly."""
         from collections.abc import MutableMapping
 
@@ -99,8 +98,7 @@ class TestFullPipeline:
         # contract and supports the same [] / in / __setitem__ usage.
         assert isinstance(orch._active_searches, MutableMapping)
 
-    @pytest.mark.asyncio
-    async def test_search_metadata_creation(self):
+    def test_search_metadata_creation(self):
         """Test SearchMetadata creation and serialization."""
         metadata = SearchMetadata(
             search_id="test-123",
@@ -116,20 +114,22 @@ class TestFullPipeline:
         assert data["status"] == "running"
         assert "started_at" in data
 
-    @pytest.mark.asyncio
-    async def test_search_returns_metadata(self, sample_trackers):
+    def test_search_returns_metadata(self, sample_trackers):
         """Test that search returns proper metadata."""
+        import asyncio
+
         orch = SearchOrchestrator()
 
-        with patch.object(orch, "_get_enabled_trackers", return_value=sample_trackers):
-            metadata = await orch.search("Ubuntu", category="linux")
+        async def _run():
+            with patch.object(orch, "_get_enabled_trackers", return_value=sample_trackers):
+                metadata = await orch.search("Ubuntu", category="linux")
+                assert metadata.search_id is not None
+                assert metadata.query == "Ubuntu"
+                assert metadata.status in ["running", "completed", "failed"]
 
-            assert metadata.search_id is not None
-            assert metadata.query == "Ubuntu"
-            assert metadata.status in ["running", "completed", "failed"]
+        asyncio.run(_run())
 
-    @pytest.mark.asyncio
-    async def test_start_search_returns_immediately(self, sample_trackers):
+    def test_start_search_returns_immediately(self, sample_trackers):
         """start_search() must return before any tracker is fanned out.
 
         This is the core of the real-time search feature — callers get
@@ -149,13 +149,14 @@ class TestFullPipeline:
         # No tracker has reported yet.
         assert metadata.total_results == 0
 
-    @pytest.mark.asyncio
-    async def test_run_search_populates_results_incrementally(self, sample_trackers):
+    def test_run_search_populates_results_incrementally(self, sample_trackers):
         """_run_search pushes per-tracker results as each one completes.
 
         Verified via ``_tracker_results`` being populated for at least
         one tracker by the time the task finishes.
         """
+        import asyncio
+
         orch = SearchOrchestrator()
 
         async def _fake_search_tracker(tracker, query, category):
@@ -172,21 +173,24 @@ class TestFullPipeline:
                 )
             ]
 
-        with (
-            patch.object(orch, "_get_enabled_trackers", return_value=sample_trackers),
-            patch.object(orch, "_search_tracker", side_effect=_fake_search_tracker),
-        ):
-            metadata = orch.start_search("Ubuntu", category="linux")
-            await orch._run_search(metadata.search_id, "Ubuntu", "linux")
+        async def _run():
+            with (
+                patch.object(orch, "_get_enabled_trackers", return_value=sample_trackers),
+                patch.object(orch, "_search_tracker", side_effect=_fake_search_tracker),
+            ):
+                metadata = orch.start_search("Ubuntu", category="linux")
+                await orch._run_search(metadata.search_id, "Ubuntu", "linux")
 
-        assert metadata.status == "completed"
-        # One result per fake tracker.
-        assert metadata.total_results == len(sample_trackers)
-        # Per-tracker buckets are filled.
-        per_tracker = orch._tracker_results[metadata.search_id]
-        assert len(per_tracker) == len(sample_trackers)
-        for t in sample_trackers:
-            assert per_tracker[t.name]  # non-empty
+            assert metadata.status == "completed"
+            # One result per fake tracker.
+            assert metadata.total_results == len(sample_trackers)
+            # Per-tracker buckets are filled.
+            per_tracker = orch._tracker_results[metadata.search_id]
+            assert len(per_tracker) == len(sample_trackers)
+            for t in sample_trackers:
+                assert per_tracker[t.name]  # non-empty
+
+        asyncio.run(_run())
 
 
 class TestDeduplication:

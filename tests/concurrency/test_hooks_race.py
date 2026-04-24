@@ -16,14 +16,21 @@ _HOOKS_PATH = _SRC / "api" / "hooks.py"
 
 
 def _load_hooks():
+    saved = {k: v for k, v in sys.modules.items() if k == "api" or k.startswith("api.")}
     for key in list(sys.modules):
         if key == "api" or key.startswith("api."):
             del sys.modules[key]
-    spec = importlib.util.spec_from_file_location("_test_hooks_race", _HOOKS_PATH)
-    assert spec is not None
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    try:
+        spec = importlib.util.spec_from_file_location("_test_hooks_race", _HOOKS_PATH)
+        assert spec is not None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    finally:
+        for key in list(sys.modules):
+            if key == "api" or key.startswith("api."):
+                del sys.modules[key]
+        sys.modules.update(saved)
 
 
 @pytest.mark.asyncio

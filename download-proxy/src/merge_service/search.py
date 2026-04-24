@@ -851,7 +851,7 @@ class SearchOrchestrator:
         if os.getenv("IPTORRENTS_USERNAME") and os.getenv("IPTORRENTS_PASSWORD"):
             trackers.append(TrackerSource(name="iptorrents", url="https://iptorrents.com", enabled=True))
 
-        include_dead = os.getenv("ENABLE_DEAD_TRACKERS", "1") == "1"
+        include_dead = os.getenv("ENABLE_DEAD_TRACKERS", "0") == "1"
         for name, url in sorted(PUBLIC_TRACKERS.items()):
             if name in DEAD_PUBLIC_TRACKERS and not include_dead:
                 continue
