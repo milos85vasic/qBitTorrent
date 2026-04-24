@@ -95,18 +95,18 @@ proxy/VPN that bypasses geoblocks.
 
 The known-dead list:
 
-* HTTP 403 (Cloudflare/geoblock): `eztv`, `kickass`, `bt4g`,
+* HTTP 403 (Cloudflare/geoblock): `eztv`, `bt4g`,
   `extratorrent`, `one337x`, `bitru`
-* HTTP 404 (site down): `megapeer`, `ali213`
-* Gateway timeout: `nyaa`, `audiobookbay`, `torlock`
-* DNS failure (domain dead): `pctorrent`, `yihua`, `torrentgalaxy`
+* HTTP 404 (site down): `ali213`
+* Gateway timeout: `audiobookbay`
+* DNS failure (domain dead): `pctorrent`, `yihua`
 * TLS failure: `xfsub`
-* Plugin crash (site down): `torrentgalaxy`
+* Plugin crash (site down): none
 * API changed: `anilibra` (returns 400 Unknown query)
 * Site rebrand/redesign: `solidtorrents` (→ bitsearch.to), `therarbg`
   (new HTML), `gamestorrents` (WordPress redesign), `btsow`
   (JS redirect challenge)
-* Upstream dead: `torrentfunk` (redirects to rakix), `torrentkitty`
+* Upstream dead: `torrentfunk` (HTTP 500)
 
 These plugins are still installed and the classifier still reports
 their real reasons when `ENABLE_DEAD_TRACKERS=1`, so it's easy to
