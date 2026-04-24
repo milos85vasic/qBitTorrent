@@ -261,6 +261,14 @@ EOF
     _ensure_webui_credentials "$template_config"
     _ensure_webui_credentials "$active_config"
 
+    # If the active config was removed by cleanup_stale_config (or never
+    # existed), seed it from the template so qBittorrent starts with the
+    # correct ban-prevention and path settings.
+    if [[ ! -f "$active_config" ]]; then
+        cp "$template_config" "$active_config"
+        print_info "Copied template config to active config"
+    fi
+
     print_success "qBittorrent configuration ready"
 }
 
