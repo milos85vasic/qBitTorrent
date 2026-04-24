@@ -248,7 +248,6 @@ class TestEnricherResilience:
 
     @pytest.fixture
     def enricher(self):
-        _enricher_mod = sys.modules["merge_service.enricher"]
         return _enricher_mod.MetadataEnricher()
 
     def test_resolve_with_no_api_keys_skips_keyed_apis(self, enricher):
