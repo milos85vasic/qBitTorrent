@@ -60,6 +60,25 @@ jobs:
       - name: start stack
         run: |
           set -euo pipefail
+          # Pre-seed qBittorrent config so the linuxserver init script doesn't
+          # generate a random password.  The container mounts ./config → /config.
+          mkdir -p config/qBittorrent
+          cat > config/qBittorrent/qBittorrent.conf << 'EOF'
+[LegalNotice]
+Accepted=true
+[Preferences]
+WebUI\Enabled=true
+WebUI\Port=7185
+WebUI\Address=*
+WebUI\Username=admin
+WebUI\Password_PBKDF2="@ByteArray(XGCniD5hOQPEcE510BED2Q==:jLIBnLj5eCBZjRCvtE7dTSutDtS8mBQNKQ6rq/W3MszKNsKBjM2/8Ur9fxsADvQeh1wntKorznkorETYAFZawQ==)"
+WebUI\LocalHostAuth=false
+WebUI\AuthSubnetWhitelistEnabled=true
+WebUI\AuthSubnetWhitelist=127.0.0.1/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+WebUI\MaxAuthenticationFailCount=1000000
+WebUI\BanDuration=1
+WebUI\ServerDomains=*
+EOF
           # GitHub runners ship Docker Compose v2 via `docker compose`.
           # Start qbittorrent first so it creates nova3/ search infrastructure.
           docker compose -f docker-compose.yml up -d --build qbittorrent
@@ -114,13 +133,6 @@ jobs:
           docker compose -f docker-compose.yml cp plugins/env_loader.py qbittorrent:/config/qBittorrent/nova3/engines/env_loader.py
           docker compose -f docker-compose.yml exec -T qbittorrent sh -c \
             'chmod 644 /config/qBittorrent/nova3/engines/download_proxy.py /config/qBittorrent/nova3/engines/env_loader.py'
-          # Disable IP-ban behaviour so repeated login probes from the
-          # test suite don't lock the CI runner out of the WebUI.
-          curl -sf http://localhost:7185/api/v2/app/setPreferences \
-            -b /tmp/qb_cookie.txt \
-            -X POST \
-            -d 'json={"bypass_local_auth":true,"bypass_auth_subnet_whitelist_enabled":true,"bypass_auth_subnet_whitelist":"127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16","web_ui_max_auth_fail_count":1000000,"web_ui_ban_duration":1}' \
-            >/dev/null || true
           # Start download-proxy (depends on qbittorrent health).
           docker compose -f docker-compose.yml up -d download-proxy
           # Wait for all required ports before running tests.
@@ -150,7 +162,7 @@ jobs:
             -v --import-mode=importlib \
             -p no:cacheprovider \
             -p no:randomly \
-            -p no:asyncio \
+            -o asyncio_mode=strict \
             --timeout=120 \
             --cov=download-proxy/src \
             --cov-append \
