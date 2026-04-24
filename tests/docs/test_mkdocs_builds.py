@@ -19,7 +19,7 @@ def _mkdocs_available() -> bool:
         return False
 
 
-@pytest.mark.skipif(not _mkdocs_available(), reason="mkdocs not installed")
+@pytest.mark.skipif(not _mkdocs_available(), reason="mkdocs not installed")  # SKIP-OK: #legacy-untriaged
 def test_mkdocs_build_succeeds():
     result = subprocess.run(
         ["mkdocs", "build"],
@@ -33,7 +33,7 @@ def test_mkdocs_build_succeeds():
     )
 
 
-@pytest.mark.skipif(not _mkdocs_available(), reason="mkdocs not installed")
+@pytest.mark.skipif(not _mkdocs_available(), reason="mkdocs not installed")  # SKIP-OK: #legacy-untriaged
 def test_mkdocs_build_produces_site():
     subprocess.run(
         ["mkdocs", "build"],

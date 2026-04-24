@@ -14,12 +14,14 @@ import pytest
 _PLUGINS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "plugins"))
 
 CANONICAL_PLUGINS = [
+    "anilibra",
     "bitsearch",
     "gamestorrents",
     "iptorrents",
     "kickass",
     "kinozal",
     "limetorrents",
+    "megapeer",
     "nnmclub",
     "nyaa",
     "piratebay",
@@ -27,6 +29,7 @@ CANONICAL_PLUGINS = [
     "rutracker",
     "torlock",
     "torrentgalaxy",
+    "torrentkitty",
     "yts",
 ]
 
@@ -39,7 +42,7 @@ _PLUGIN_DEPS = ("helpers", "novaprinter", "nova2")
 def _import_plugin(name: str):
     path = os.path.join(_PLUGINS_DIR, f"{name}.py")
     if not os.path.isfile(path):
-        pytest.skip(f"Plugin file not found: {path}")
+        pytest.skip(f"Plugin file not found: {path}")  # SKIP-OK: #legacy-untriaged
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     saved_path = sys.path[:]

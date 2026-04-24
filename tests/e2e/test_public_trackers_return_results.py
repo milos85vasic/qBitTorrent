@@ -124,7 +124,7 @@ def test_deadline_hit_is_surfaced_on_slow_trackers(linux_search: dict) -> None:
         )
 
 
-@pytest.mark.skipif(
+@pytest.mark.skipif(  # SKIP-OK: #legacy-untriaged
     os.getenv("ENABLE_DEAD_TRACKERS", "0") == "1" or open(".env").read().find("ENABLE_DEAD_TRACKERS=1") != -1,
     reason="Dead trackers are intentionally enabled via ENABLE_DEAD_TRACKERS=1",
 )
@@ -136,7 +136,6 @@ def test_dead_trackers_excluded_from_fan_out(linux_search: dict) -> None:
     stat_names = {t["name"] for t in linux_search.get("tracker_stats", [])}
     dead = {
         "ali213",
-        "anilibra",
         "audiobookbay",
         "bitru",
         "bt4g",

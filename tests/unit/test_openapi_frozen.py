@@ -12,7 +12,7 @@ def _set_env(monkeypatch):
     monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost")
 
 
-@pytest.mark.skipif(
+@pytest.mark.skipif(  # SKIP-OK: #legacy-untriaged
     not os.path.exists(FROZEN_SPEC), reason="Frozen OpenAPI spec not found — run scripts/freeze-openapi.sh first"
 )
 def test_openapi_spec_matches_frozen():
@@ -20,7 +20,7 @@ def test_openapi_spec_matches_frozen():
     try:
         from api import app
     except Exception:
-        pytest.skip("Cannot import FastAPI app (missing deps)")
+        pytest.skip("Cannot import FastAPI app (missing deps)")  # SKIP-OK: #legacy-untriaged
 
     live_schema = app.openapi()
     live_json = json.dumps(live_schema, sort_keys=True, indent=2)

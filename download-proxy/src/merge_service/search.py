@@ -464,7 +464,6 @@ PUBLIC_TRACKERS = {
 DEAD_PUBLIC_TRACKERS = frozenset(
     {
         "ali213",
-        "anilibra",
         "audiobookbay",
         "bitru",
         "bt4g",

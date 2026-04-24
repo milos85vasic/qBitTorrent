@@ -33,7 +33,7 @@ def test_workflow_file_exists(name: str) -> None:
     assert (WORKFLOW_DIR / name).is_file(), f"missing .github/workflows/{name}"
 
 
-@pytest.mark.skipif(yaml is None, reason="PyYAML not installed")
+@pytest.mark.skipif(yaml is None, reason="PyYAML not installed")  # SKIP-OK: #legacy-untriaged
 @pytest.mark.parametrize(("name", "spec"), sorted(REQUIRED_WORKFLOWS.items()))
 def test_workflow_triggers(name: str, spec: dict[str, set[str]]) -> None:
     raw = (WORKFLOW_DIR / name).read_text()
