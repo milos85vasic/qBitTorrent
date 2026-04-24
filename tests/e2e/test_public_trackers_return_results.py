@@ -149,7 +149,6 @@ def test_dead_trackers_excluded_from_fan_out(linux_search: dict) -> None:
         "solidtorrents",
         "therarbg",
         "torrentfunk",
-        "torrentkitty",
         "xfsub",
         "yihua",
     }

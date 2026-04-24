@@ -477,7 +477,6 @@ DEAD_PUBLIC_TRACKERS = frozenset(
         "solidtorrents",
         "therarbg",
         "torrentfunk",
-        "torrentkitty",
         "xfsub",
         "yihua",
     }
