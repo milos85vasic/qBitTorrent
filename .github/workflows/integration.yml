@@ -86,6 +86,10 @@ jobs:
             fi
             sleep 1
           done
+          # Ensure nova3 directory exists (qBittorrent v5+ may not create it
+          # until a search is actually triggered, but we need it now for cp).
+          docker compose -f docker-compose.yml exec -T qbittorrent \
+            mkdir -p /config/qBittorrent/nova3/engines
           # Overwrite qBittorrent's support files with our versions
           # (our plugins depend on helpers.py extensions like build_magnet_link).
           docker compose -f docker-compose.yml cp plugins/helpers.py qbittorrent:/config/qBittorrent/nova3/helpers.py
