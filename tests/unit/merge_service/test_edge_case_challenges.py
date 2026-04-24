@@ -31,12 +31,14 @@ _MS_PATH = REPO / "download-proxy" / "src" / "merge_service"
 # the ``api`` package does not exist, so tests that exercise the merge
 # path install a lightweight stub via a helper.
 
+
 def _install_api_stub():
     _api_stub = types.ModuleType("api")
     _api_routes_stub = types.ModuleType("api.routes")
     _api_routes_stub._detect_quality = lambda name, size: None
     sys.modules.setdefault("api", _api_stub)
     sys.modules.setdefault("api.routes", _api_routes_stub)
+
 
 sys.modules.setdefault("merge_service", type(sys)("merge_service"))
 sys.modules["merge_service"].__path__ = [str(_MS_PATH)]  # type: ignore[attr-defined]
@@ -46,16 +48,12 @@ _search = importlib.util.module_from_spec(_spec)
 sys.modules["merge_service.search"] = _search
 _spec.loader.exec_module(_search)  # type: ignore[union-attr]
 
-_dedup_spec = importlib.util.spec_from_file_location(
-    "merge_service.deduplicator", str(_MS_PATH / "deduplicator.py")
-)
+_dedup_spec = importlib.util.spec_from_file_location("merge_service.deduplicator", str(_MS_PATH / "deduplicator.py"))
 _dedup_mod = importlib.util.module_from_spec(_dedup_spec)
 sys.modules["merge_service.deduplicator"] = _dedup_mod
 _dedup_spec.loader.exec_module(_dedup_mod)  # type: ignore[union-attr]
 
-_enricher_spec = importlib.util.spec_from_file_location(
-    "merge_service.enricher", str(_MS_PATH / "enricher.py")
-)
+_enricher_spec = importlib.util.spec_from_file_location("merge_service.enricher", str(_MS_PATH / "enricher.py"))
 _enricher_mod = importlib.util.module_from_spec(_enricher_spec)
 sys.modules["merge_service.enricher"] = _enricher_mod
 _enricher_spec.loader.exec_module(_enricher_mod)  # type: ignore[union-attr]
@@ -214,7 +212,7 @@ class TestPublicTrackerResultParsing:
         orch = SearchOrchestrator()
 
         lines = [
-            b'WARNING: deprecated call\n',
+            b"WARNING: deprecated call\n",
             b'{"name":"good","size":"1 B","seeds":1,"leech":0,"link":"m","desc_link":"d"}\n',
         ]
 

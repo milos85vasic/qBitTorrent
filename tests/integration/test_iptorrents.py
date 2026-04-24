@@ -157,10 +157,7 @@ class TestIPTorrentsMergeService:
         result = live_search_result("linux", 100)
         ip_results = [r for r in result.get("results", []) if r.get("tracker") == "iptorrents"]
         if not ip_results:
-            pytest.skip(
-                f"IPTorrents results not in top-N for 'linux'; "
-                f"total_results={result.get('total_results')}"
-            )
+            pytest.skip(f"IPTorrents results not in top-N for 'linux'; total_results={result.get('total_results')}")
         for r in ip_results:
             assert "freeleech" in r, "Missing freeleech field in iptorrents result"
 
