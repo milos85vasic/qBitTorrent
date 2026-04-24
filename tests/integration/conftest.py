@@ -27,13 +27,17 @@ import requests
 from tests.fixtures.live_search import _file_lock as _live_search_lock
 
 
-def _wait_for_idle(base_url: str, max_wait: float = 180.0) -> None:
+_WAIT_FOR_IDLE_MAX: float = float(os.environ.get("WAIT_FOR_IDLE_MAX_SECONDS", "180.0"))
+
+
+def _wait_for_idle(base_url: str, max_wait: float | None = None) -> None:
     """Poll ``/api/v1/stats`` for ``active_searches == 0``.
 
     Bounded so a genuinely-stuck service fails the NEXT test
     explicitly (with a useful error message) rather than hanging
     the pytest session indefinitely.
     """
+    max_wait = max_wait if max_wait is not None else _WAIT_FOR_IDLE_MAX
     deadline = time.monotonic() + max_wait
     while time.monotonic() < deadline:
         try:
@@ -46,11 +50,11 @@ def _wait_for_idle(base_url: str, max_wait: float = 180.0) -> None:
             # Service hiccup — give it another beat.
             pass
         time.sleep(2)
-    # Don't fail the test outright — logs the reason so operators can
-    # spot a stuck orchestrator in CI output.
-    import logging
-
-    logging.getLogger(__name__).warning("orchestrator did not reach idle within %.0fs — proceeding", max_wait)
+    raise RuntimeError(
+        f"orchestrator did not reach idle within {max_wait:.0f}s — "
+        f"{base_url}/api/v1/stats still reports active searches. "
+        "Abort any stuck searches or restart the merge service."
+    )
 
 
 @pytest.fixture(autouse=True)

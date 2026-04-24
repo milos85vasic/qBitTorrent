@@ -157,6 +157,8 @@ jobs:
           MERGE_SERVICE_URL: http://localhost:7187
           QBITTORRENT_URL: http://localhost:7186
           CONTAINER_RUNTIME: docker
+          PUBLIC_TRACKER_DEADLINE_SECONDS: 5
+          WAIT_FOR_IDLE_MAX_SECONDS: 30
         run: |
           python -m pytest tests/integration/ tests/e2e/ \
             -v --import-mode=importlib \
@@ -164,6 +166,7 @@ jobs:
             -p no:randomly \
             -o asyncio_mode=strict \
             --timeout=120 \
+            --timeout-method=thread \
             --cov=download-proxy/src \
             --cov-append \
             --cov-report=xml \
