@@ -17,6 +17,10 @@ services:
       - ./tmp:/shared-tmp
     network_mode: host
     restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2g
+    pids_limit: 1024
+    oom_score_adj: 500
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:7185/ || exit 1"]
       interval: 30s
@@ -36,6 +40,10 @@ services:
       - ./config/jackett:/config
     network_mode: host
     restart: unless-stopped
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 512
+    oom_score_adj: 500
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9117/health || exit 1"]
       interval: 30s
@@ -83,6 +91,10 @@ services:
       - ./tmp:/shared-tmp
     network_mode: host
     restart: unless-stopped
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 512
+    oom_score_adj: 500
     depends_on:
       qbittorrent:
         condition: service_healthy
@@ -132,6 +144,10 @@ services:
     command: /start-proxy.sh
     network_mode: host
     restart: unless-stopped
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 512
+    oom_score_adj: 500
     depends_on:
       qbittorrent:
         condition: service_healthy
