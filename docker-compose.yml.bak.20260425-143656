@@ -1,0 +1,145 @@
+services:
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Moscow
+      - WEBUI_PORT=7185
+      - WEBUI_USERNAME=admin
+      - WEBUI_PASSWORD=admin
+      - RUTRACKER_USERNAME=${RUTRACKER_USERNAME}
+      - RUTRACKER_PASSWORD=${RUTRACKER_PASSWORD}
+    volumes:
+      - ./config:/config
+      - ${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/downloads
+      - ./tmp:/shared-tmp
+    network_mode: host
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7185/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: jackett
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Moscow
+      - AUTO_UPDATE=true
+    volumes:
+      - ./config/jackett:/config
+    network_mode: host
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9117/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  qbittorrent-proxy-go:
+    build:
+      context: ./qBitTorrent-go
+      dockerfile: Dockerfile
+    container_name: qbittorrent-proxy-go
+    environment:
+      - QBITTORRENT_HOST=localhost
+      - QBITTORRENT_PORT=7185
+      - QBITTORRENT_URL=http://localhost:7185
+      - QBITTORRENT_USER=${QBITTORRENT_USER:-admin}
+      - QBITTORRENT_PASS=${QBITTORRENT_PASS:-admin}
+      - QBITTORRENT_USERNAME=${QBITTORRENT_USERNAME:-admin}
+      - QBITTORRENT_PASSWORD=${QBITTORRENT_PASSWORD:-admin}
+      - MERGE_SERVICE_PORT=7187
+      - MERGE_SERVICE_HOST=0.0.0.0
+      - PROXY_PORT=7186
+      - BRIDGE_PORT=7188
+      - TMPDIR=/shared-tmp
+      - RUTRACKER_USERNAME=${RUTRACKER_USERNAME}
+      - RUTRACKER_PASSWORD=${RUTRACKER_PASSWORD}
+      - KINOZAL_USERNAME=${KINOZAL_USERNAME}
+      - KINOZAL_PASSWORD=${KINOZAL_PASSWORD}
+      - NNMCLUB_COOKIES=${NNMCLUB_COOKIES}
+      - NNMCLUB_USERNAME=${NNMCLUB_USERNAME}
+      - NNMCLUB_PASSWORD=${NNMCLUB_PASSWORD}
+      - IPTORRENTS_USERNAME=${IPTORRENTS_USERNAME}
+      - IPTORRENTS_PASSWORD=${IPTORRENTS_PASSWORD}
+      - MAX_CONCURRENT_SEARCHES=5
+      - MAX_CONCURRENT_TRACKERS=10
+      - PUBLIC_TRACKER_DEADLINE_SECONDS=15
+      - LOG_LEVEL=INFO
+      - ALLOWED_ORIGINS=*
+      - JACKETT_API_KEY=${JACKETT_API_KEY:-}
+    volumes:
+      - ./config:/config
+      - ./config/jackett:/jackett-config:ro
+      - ${QBITTORRENT_DATA_DIR:-/mnt/DATA}:/downloads
+      - ./tmp:/shared-tmp
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      qbittorrent:
+        condition: service_healthy
+      jackett:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7187/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - go
+
+  download-proxy:
+    image: python:3.12-alpine
+    container_name: qbittorrent-proxy
+    environment:
+      - QBITTORRENT_HOST=localhost
+      - QBITTORRENT_PORT=7185
+      - QBITTORRENT_URL=http://localhost:7185
+      - QBITTORRENT_USER=admin
+      - QBITTORRENT_PASS=admin
+      - PROXY_PORT=7186
+      - MERGE_SERVICE_PORT=7187
+      - TMPDIR=/shared-tmp
+      - RUTRACKER_USERNAME=${RUTRACKER_USERNAME}
+      - RUTRACKER_PASSWORD=${RUTRACKER_PASSWORD}
+      - KINOZAL_USERNAME=${KINOZAL_USERNAME}
+      - KINOZAL_PASSWORD=${KINOZAL_PASSWORD}
+      - NNMCLUB_COOKIES=${NNMCLUB_COOKIES}
+      - NNMCLUB_USERNAME=${NNMCLUB_USERNAME:-}
+      - NNMCLUB_PASSWORD=${NNMCLUB_PASSWORD:-}
+      - IPTORRENTS_USERNAME=${IPTORRENTS_USERNAME}
+      - IPTORRENTS_PASSWORD=${IPTORRENTS_PASSWORD}
+      - MAX_CONCURRENT_TRACKERS=10
+      - PUBLIC_TRACKER_DEADLINE_SECONDS=15
+      - ENABLE_DEAD_TRACKERS=${ENABLE_DEAD_TRACKERS:-0}
+      - JACKETT_API_KEY=${JACKETT_API_KEY:-}
+    volumes:
+      - ./config:/config
+      - ./config/jackett:/jackett-config:ro
+      - ./download-proxy:/config/download-proxy
+      - ./tmp:/shared-tmp
+      - ./start-proxy.sh:/start-proxy.sh:ro
+    working_dir: /config/qBittorrent/nova3/engines
+    command: /start-proxy.sh
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      qbittorrent:
+        condition: service_healthy
+      jackett:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:7186/', timeout=5)\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
