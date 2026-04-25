@@ -41,6 +41,43 @@ writes to stderr is captured after the subprocess exits (or is killed
 at the deadline) and passed through `_classify_plugin_stderr` to
 produce a structured diagnostic.
 
+### Subprocess lifecycle
+
+1. **Spawn** — `asyncio.create_subprocess_exec(..., start_new_session=True)`
+   gives the plugin its own process group so any threads or forked
+   workers can be terminated together.
+
+2. **Stream** — stdout is read line-by-line with a per-read timeout.
+   Each NDJSON row is parsed as it arrives; partial results are
+   preserved even if the deadline fires mid-scrape.
+
+3. **Deadline** — when `PUBLIC_TRACKER_DEADLINE_SECONDS` is reached the
+   loop breaks with `killed_by_deadline=True`.
+
+4. **Kill** — `proc.kill()` (SIGKILL to the direct child) followed by
+   `os.killpg(os.getpgid(proc.pid), signal.SIGKILL)` (SIGKILL to the
+   entire process group). This catches plugins that spawn child
+   processes or background threads.
+
+5. **Wait** — `asyncio.wait_for(proc.wait(), timeout=5.0)` waits up to
+   5 seconds for the process to actually die. If it doesn't, we log a
+   warning and abandon the zombie — the orchestrator must NEVER hang
+   waiting for a defunct subprocess.
+
+6. **Stderr** — `asyncio.wait_for(proc.stderr.read(), timeout=5.0)`
+   reads stderr with the same 5-second cap. If the pipe is still open
+   (zombie), we abandon it and move on.
+
+7. **Backstop** — `_search_tracker` wraps the entire
+   `_search_public_tracker` call in an outer
+   `asyncio.wait_for(..., deadline+10)` so even if every internal
+   cleanup step has a bug, the coroutine always returns.
+
+8. **Gather defence** — `_run_search` uses
+   `asyncio.gather(..., return_exceptions=True)` so one tracker
+   failing (or hanging) cannot prevent the rest of the fan-out from
+   completing.
+
 ## Error classes (`error_type`)
 
 | `error_type`             | Meaning                                                    | Operator action              |
@@ -177,6 +214,14 @@ upstream is rate-limiting.
 
 **`results_count` is capped at some suspicious round number.** Check
 `notes.deadline_hit`. If true, raise `PUBLIC_TRACKER_DEADLINE_SECONDS`.
+
+**Search hangs forever — one tracker is stuck in cleanup.** Prior to
+2026-04-24 a plugin in an uninterruptible sleep state could deadlock
+the entire orchestrator because `stderr.read()` was called before
+`proc.wait()`. The fix reordered cleanup, added process-group kills,
+and wrapped every blocking call in a 5-second timeout. If you still
+see hangs, check the logs for the warning
+`"proc.wait() timed out during cleanup — abandoning zombie"`.
 
 **I added a tracker but it never appears in the fan-out.** It's
 probably in `DEAD_PUBLIC_TRACKERS`. Move it out, or set
