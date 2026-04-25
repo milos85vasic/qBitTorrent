@@ -2,6 +2,8 @@
 Core data models for the merge service.
 """
 
+import asyncio
+import os
 import re as _re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -756,14 +758,18 @@ class SearchOrchestrator:
                 metadata.completed_at = datetime.now(UTC)
                 return
 
-            search_results = await asyncio.gather(*[_bounded(t) for t in trackers])
+            search_results = await asyncio.gather(*[_bounded(t) for t in trackers], return_exceptions=True)
 
             if metadata.status == "aborted":
                 metadata.completed_at = datetime.now(UTC)
                 return
 
             all_results = []
-            for name, results, error in search_results:
+            for item in search_results:
+                if isinstance(item, BaseException):
+                    metadata.errors.append(f"uncaught exception: {item}")
+                    continue
+                name, results, error = item
                 all_results.extend(results)
                 if error:
                     metadata.errors.append(f"{name}: {error}")
@@ -880,7 +886,15 @@ class SearchOrchestrator:
             elif tracker.name == "iptorrents":
                 results = await self._search_iptorrents(query, category)
             elif tracker.name in PUBLIC_TRACKERS or tracker.name == "jackett":
-                results = await self._search_public_tracker(tracker.name, query, category)
+                try:
+                    _raw_deadline = float(os.getenv("PUBLIC_TRACKER_DEADLINE_SECONDS", "60"))
+                except ValueError:
+                    _raw_deadline = 60.0
+                _deadline_seconds = max(5.0, min(120.0, _raw_deadline))
+                results = await asyncio.wait_for(
+                    self._search_public_tracker(tracker.name, query, category),
+                    timeout=_deadline_seconds + 10.0,
+                )
         except Exception as e:
             logger.error(f"Error searching {tracker.name}: {e}")
 
@@ -891,6 +905,8 @@ class SearchOrchestrator:
         import asyncio
         import json
         import logging
+        import os as _os_timeout
+        import signal as _signal
 
         logger = logging.getLogger(__name__)
         results = []
@@ -925,8 +941,6 @@ class SearchOrchestrator:
         # line already flushed is preserved. The deadline is tunable via
         # `PUBLIC_TRACKER_DEADLINE_SECONDS` (clamped to 5..120) so
         # operators on slow networks can widen it without editing code.
-        import os as _os_timeout
-
         try:
             _raw_deadline = float(_os_timeout.getenv("PUBLIC_TRACKER_DEADLINE_SECONDS", "60"))
         except ValueError:
@@ -968,6 +982,7 @@ class SearchOrchestrator:
                 script,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,
             )
             while True:
                 remaining = deadline - asyncio.get_event_loop().time()
@@ -989,20 +1004,38 @@ class SearchOrchestrator:
                 except Exception:  # noqa: S112
                     continue
 
+            # --- Defensive subprocess cleanup --------------------------------
+            # A plugin stuck in a blocking network call may ignore SIGKILL
+            # (uninterruptible sleep) or spawn threads/children that outlive
+            # the direct child.  We therefore:
+            #   1. kill the entire process group so threads/children die too
+            #   2. wait for the process with a short timeout
+            #   3. only THEN read stderr (reading a live pipe can block)
+            # If any cleanup step times out we abandon the process and let
+            # the OS reap it — the orchestrator must NEVER hang here.
+            # -----------------------------------------------------------------
             if proc.returncode is None:
-                try:  # noqa: SIM105
+                try:
                     proc.kill()
-                except Exception:  # noqa: S110
+                except Exception:
+                    pass
+                try:
+                    os.killpg(os.getpgid(proc.pid), _signal.SIGKILL)
+                except Exception:
                     pass
             try:
-                stderr_tail = (await proc.stderr.read()).decode(errors="replace").strip()
+                await asyncio.wait_for(proc.wait(), timeout=5.0)
+            except TimeoutError:
+                logger.warning(f"Plugin {tracker_name} proc.wait() timed out during cleanup — abandoning zombie")
+            except Exception:
+                pass
+            try:
+                stderr_tail = (await asyncio.wait_for(proc.stderr.read(), timeout=5.0)).decode(errors="replace").strip()
                 if stderr_tail:
                     logger.debug(f"Plugin {tracker_name} stderr: {stderr_tail[:300]}")
-            except Exception:  # noqa: S110
-                pass
-            try:  # noqa: SIM105
-                await proc.wait()
-            except Exception:  # noqa: S110
+            except TimeoutError:
+                logger.warning(f"Plugin {tracker_name} stderr.read() timed out during cleanup")
+            except Exception:
                 pass
 
         except Exception as e:
@@ -1010,8 +1043,15 @@ class SearchOrchestrator:
             if proc and proc.returncode is None:
                 try:
                     proc.kill()
-                    await proc.wait()
-                except Exception:  # noqa: S110
+                except Exception:
+                    pass
+                try:
+                    os.killpg(os.getpgid(proc.pid), _signal.SIGKILL)
+                except Exception:
+                    pass
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=5.0)
+                except Exception:
                     pass
 
         diag = _classify_plugin_stderr(stderr_tail, killed_by_deadline=killed_by_deadline, had_results=bool(results))
