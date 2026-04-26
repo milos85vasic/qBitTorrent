@@ -51,15 +51,16 @@ For deeper reference (technology stack, per-test-file mapping, full gotchas), se
 
 ## Architecture
 
-Two-container setup via `docker-compose.yml` (Python), with an optional Go backend:
+Multi-container setup via `docker-compose.yml`, with an optional Go backend:
 
 - **qbittorrent** (lscr.io/linuxserver/qbittorrent:latest) — port **7185**
+- **jackett** (lscr.io/linuxserver/jackett:latest) — port **9117**, auto-configured (API key extracted at startup and injected into proxy via `JACKETT_API_KEY`)
 - **qbittorrent-proxy** (python:3.12-alpine) — ports **7186** (proxy), **7187** (merge service)
-- **qbittorrent-proxy-go** (Go/Gin, opt-in via `--profile go`) — ports **7187** (merge service), **7188** (bridge)
+- **qbittorrent-proxy-go** (Go/Gin, opt-in via `--profile go`) — replaces the Python proxy on **7186**, **7187**, **7188**
 
 `webui-bridge.py` is a host process on port **7188** for private tracker downloads. The Go `webui-bridge` binary replaces this when using the Go profile.
 
-`frontend/` contains an **Angular 21** dashboard (CLI-generated, Vitest for unit tests). Separate from the FastAPI dashboard served by the merge service on port 7187.
+`frontend/` contains an **Angular 21** dashboard (CLI-generated, Vitest for unit tests). Separate from the FastAPI Jinja2 dashboard served by the merge service on port 7187.
 
 Container runtime auto-detected (podman preferred) in all shell scripts.
 
@@ -71,6 +72,7 @@ Container runtime auto-detected (podman preferred) in all shell scripts.
 | 7186 | Download proxy → qBittorrent WebUI | `http://localhost:7186` |
 | 7187 | Merge Search Service (FastAPI or Go/Gin) | `http://localhost:7187/` |
 | 7188 | webui-bridge (host process or Go binary) | manual start |
+| 9117 | Jackett indexer | `http://localhost:9117` |
 
 ## Key Commands
 
@@ -99,7 +101,7 @@ python3 -m py_compile plugins/*.py                 # Syntax check plugins
 bash -n start.sh stop.sh test.sh install-plugin.sh # Bash syntax check
 ```
 
-### Merge Service Tests (331 tests total, live in `./tests/` not `download-proxy/tests/`)
+### Merge Service Tests (live in `./tests/`, not `download-proxy/tests/`)
 ```bash
 python3 -m pytest tests/unit/ -v --import-mode=importlib              # Unit tests
 python3 -m pytest tests/unit/merge_service/ -v --import-mode=importlib # Merge service only
@@ -114,17 +116,14 @@ ruff check --fix .                                 # Auto-fix
 ruff format .                                      # Format
 ```
 
-### Frontend (Angular 19)
+### Frontend (Angular 21)
 ```bash
 cd frontend && ng serve                            # Dev server on :4200
 cd frontend && ng build                            # Production build to dist/
 cd frontend && ng test                             # Unit tests (Vitest)
 ```
 
-### Sync to Container
-```bash
-podman cp download-proxy/src/ qbittorrent-proxy:/app/src/
-```
+> Container sync: `download-proxy/` is bind-mounted into `qbittorrent-proxy` at `/config/download-proxy` (see `docker-compose.yml:140`). Do NOT `podman cp` source into the container — edits to `download-proxy/src/` are live; just clear `__pycache__` and restart per the rules in "Critical Constraints".
 
 ## Merge Search Service
 
