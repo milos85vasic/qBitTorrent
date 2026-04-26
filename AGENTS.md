@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Compact instruction file for AI agents working in this repo.
-For deeper narrative docs see `CLAUDE.md`, `docs/USER_MANUAL.md`, `docs/PLUGINS.md`.
+For deeper narrative docs see `CLAUDE.md`, `docs/USER_MANUAL.md`, `docs/PLUGINS.md`, `docs/SECURITY.md`.
 
 ## What This Project Is
 
@@ -29,6 +29,7 @@ The project provides:
 | Container runtime | Podman (preferred) or Docker | Auto-detected in all shell scripts |
 | Orchestration | docker-compose / podman compose | `network_mode: host` |
 | qBittorrent image | `lscr.io/linuxserver/qbittorrent:latest` | Internal WebUI on `:7185` |
+| Jackett image | `lscr.io/linuxserver/jackett:latest` | Port `:9117`, auto-configured |
 
 Key Python runtime dependencies (`download-proxy/requirements.txt`):
 `fastapi`, `uvicorn`, `aiohttp`, `pydantic`, `Levenshtein`, `cachetools`, `filelock`, `tenacity`, `pybreaker`, `requests`, `urllib3`.
@@ -43,6 +44,7 @@ Two-container setup via `docker-compose.yml` (`network_mode: host`), with an opt
 | Service | Container / Process | Image / Binary | Ports | Notes |
 |---------|---------------------|----------------|-------|-------|
 | qBittorrent | `qbittorrent` | `lscr.io/linuxserver/qbittorrent:latest` | 7185 | Internal WebUI; hardcoded credentials `admin`/`admin` |
+| Jackett | `jackett` | `lscr.io/linuxserver/jackett:latest` | 9117 | Auto-configured; API key extracted at startup |
 | Download proxy + Merge service | `qbittorrent-proxy` | `python:3.12-alpine` | 7186, 7187 | Python multi-threaded entrypoint (`download-proxy/src/main.py`) |
 | Go backend | `qbittorrent-proxy-go` | Built from `qBitTorrent-go/Dockerfile` | 7186, 7187, 7188 | Opt-in via `--profile go`; replaces Python proxy |
 | WebUI bridge | Host process | `python3 webui-bridge.py` | 7188 | Not a container; bridges private-tracker auth |
@@ -52,6 +54,7 @@ Port map:
 - **7186** -- Download proxy -> qBittorrent
 - **7187** -- Merge Search Service (FastAPI + Angular SPA + Jinja2 dashboard)
 - **7188** -- webui-bridge (private-tracker downloads)
+- **9117** -- Jackett health/API endpoint
 
 Container runtime auto-detected (podman preferred) in all shell scripts.
 
@@ -63,10 +66,37 @@ Starts two daemon threads:
 
 Signal handlers for `SIGTERM`/`SIGINT` trigger a graceful shutdown via `threading.Event`.
 
+### Merge Search Service internals
+
+The search orchestrator (`merge_service/search.py`) is the central coordinator.
+
+**Concurrency controls:**
+- `MAX_CONCURRENT_SEARCHES` (default 8) -- caps in-flight fan-out tasks; returns HTTP 429 when saturated.
+- `MAX_CONCURRENT_TRACKERS` (default 5) -- per-search semaphore limiting parallel tracker subprocesses/aiohttp sessions.
+- `PUBLIC_TRACKER_DEADLINE_SECONDS` (default 60, clamped 5--120) -- kills unresponsive public tracker subprocesses.
+
+**Fan-out flow:**
+1. `start_search()` creates a `SearchMetadata` with pre-seeded `tracker_stats` so the dashboard knows which trackers will be hit.
+2. `_run_search()` acquires the tracker semaphore, then calls `_search_tracker()` for each enabled source.
+3. **Public trackers** run in isolated subprocesses (`asyncio.create_subprocess_exec`) executing a dynamically generated Python script that patches `novaprinter.prettyPrinter` to emit NDJSON lines. The orchestrator reads stdout line-by-line with a deadline so partial results are preserved even on timeout.
+4. **Private trackers** use direct `aiohttp` with session cookies (RuTracker, Kinozal, NNMClub, IPTorrents).
+5. Per-tracker `TrackerSearchStat` objects update in real time (status, duration, error classification, authentication flag).
+6. When all trackers finish, `Deduplicator.merge_results()` runs once, metadata flips to `completed`.
+
+**Error classification:** `_classify_plugin_stderr()` categorizes subprocess stderr into structured diagnostics (`upstream_http_403`, `dns_failure`, `plugin_parse_failure`, `deadline_timeout`, etc.).
+
+**Deduplication** (`merge_service/deduplicator.py`) uses a tiered matching engine: metadata identity -> infohash -> name+size -> fuzzy Levenshtein.
+
+**Enrichment** (`merge_service/enricher.py`) resolves titles against TMDB, OMDb, TVMaze, AniList, MusicBrainz, and OpenLibrary to add posters, years, genres, and content types.
+
+**Validation** (`merge_service/validator.py`) performs HTTP (BEP 48) and UDP (BEP 15) scrape health checks with a bencode parser.
+
+**Data stores** are all TTL-bounded (`cachetools.TTLCache`) to prevent memory leaks: `_active_searches`, `_tracker_results`, `_last_merged_results`, `_tracker_sessions`.
+
 ### Go backend (`qBitTorrent-go/`)
 
-- `cmd/qbittorrent-proxy/` -- main API binary serving `:7187` (and `:7186` proxy, `:7188` bridge).
-- `cmd/webui-bridge/` -- bridge binary.
+- `cmd/qbittorrent-proxy/` -- main API binary serving `:7187`.
+- `cmd/webui-bridge/` -- bridge binary serving `:7188`.
 - `internal/api/` -- HTTP handlers (health, search, hooks, download, scheduler, theme).
 - `internal/service/` -- Merge search orchestrator + SSE broker.
 - `internal/client/` -- qBittorrent Web API client (auth, search, torrents).
@@ -76,9 +106,15 @@ Signal handlers for `SIGTERM`/`SIGINT` trigger a graceful shutdown via `threadin
 - `Dockerfile` -- multi-stage build.
 - `scripts/build.sh` -- local build script.
 
+**Current state:** The Go backend is a skeleton/rewrite-in-progress. It replicates the API surface and proxies to qBittorrent's built-in search API, but lacks the plugin ecosystem, deduplication, enrichment, real download proxying, scheduled execution, and private-tracker auth flows that make the Python backend feature-complete.
+
 ### Frontend (`frontend/`)
 
 Angular 21 standalone application. Uses signals, RxJS, Angular CDK. Vitest for unit tests. Prettier for formatting. Built with `npx ng build` and served from the merge service.
+
+- Output path: `../download-proxy/src/ui/dist/frontend`
+- Production budgets: 500 kB warning / 1 MB error for initial bundle
+- Coverage provider: v8; thresholds: 40% across lines, branches, functions, statements
 
 ## Code Organization
 
@@ -130,6 +166,8 @@ plugins/                 # Tracker plugins + support files
   nova2.py               # Nova search interface
   novaprinter.py         # Plugin output formatter
   socks.py               # SOCKS proxy support
+  download_proxy.py      # Legacy HTTP proxy server (:7186)
+  env_loader.py          # Dotenv loader used by some plugins
 
 tests/                   # All tests (NOT in download-proxy/tests/)
   unit/                  # Unit tests (heavily mocked)
@@ -168,6 +206,7 @@ frontend/                # Angular 21 dashboard
   package.json
   angular.json
   .prettierrc
+  vitest.config.ts
 ```
 
 ## Critical Constraints
@@ -204,6 +243,7 @@ cd qBitTorrent-go && go vet ./...         # Go static analysis
 ./ci.sh --tests-only                   # Skip syntax, run tests
 scripts/run-tests.sh                   # Full suite with coverage (hermetic | live | all)
 scripts/run-tests.sh hermetic          # Only hermetic suites (fast)
+scripts/run-tests.sh live              # Integration + e2e only (slow, needs containers)
 ```
 
 ### Single test / subset
@@ -230,9 +270,10 @@ mypy download-proxy/src/               # Strict mypy (config in pyproject.toml)
 
 ### Frontend
 ```bash
-cd frontend && npm test                # Vitest unit tests
+cd frontend && npm test                # Vitest unit tests (interactive)
 cd frontend && npx ng build            # Production build
 cd frontend && npx vitest run          # Non-interactive Vitest
+cd frontend && npm run test:coverage   # Coverage, single run
 ```
 
 ### Sync code to container after edits
@@ -263,11 +304,13 @@ Tests live in `./tests/`, NOT in `download-proxy/tests/`.
 | `tests/observability/` | Prometheus metric assertions | Nothing |
 | `tests/benchmark/` | Performance benchmarks | Nothing |
 | `tests/chaos/` | Fault-injection / chaos | Nothing |
+| `tests/performance/` | Performance regression tests | Nothing |
+| `tests/stress/` | High-load stress tests | Nothing |
 | `tests/security/` | Security-focused tests | Running containers |
 | `tests/integration/` | Integration tests | Running containers or mocks |
 | `tests/e2e/` | End-to-end pipeline | Running containers |
-| `tests/fixtures/` | Shared live-service fixtures (`services.py`, `live_search.py`) | -- |
 | `tests/docs/` | Documentation integrity (broken links) | Nothing |
+| `tests/fixtures/` | Shared live-service fixtures (`services.py`, `live_search.py`) | -- |
 
 Key fixtures in `tests/conftest.py`: `mock_qbittorrent_api`, `sample_search_result`, `sample_merged_result`, `qbittorrent_host/port/url`.
 Live fixtures in `tests/fixtures/services.py`: `merge_service_live`, `qbittorrent_live`, `webui_bridge_live`, `all_services_live`.
@@ -275,6 +318,10 @@ Live fixtures in `tests/fixtures/services.py`: `merge_service_live`, `qbittorren
 ### Unit test `sys.modules` isolation
 
 `conftest.py` has an autouse fixture `_isolate_download_proxy_modules` that isolates `sys.modules` for tests under `tests/unit/` only (stub packages for `api`/`merge_service` would pollute other tests). Integration/e2e tests are excluded because they import real modules with live async references.
+
+### Event-loop cleanup
+
+`conftest.py` has an autouse fixture `_cleanup_event_loop` that forces a clean asyncio loop after every test to prevent `Runner.run()` pollution (critical on Python 3.13).
 
 ### pytest markers
 
@@ -294,7 +341,7 @@ Defined in `pyproject.toml`:
 
 - **ruff**: target py312, line-length 120, select `E F W I UP B SIM RUF ASYNC S PT C4 TID`, ignore `E501 S101 S603 S607`
 - **mypy**: strict, py312, excludes `plugins/` and `tests/` and `download-proxy/src/ui/`
-- **pytest**: `--import-mode=importlib`, `--timeout=60`, `--strict-markers`, asyncio_mode=auto, asyncio_default_test_loop_scope=class
+- **pytest**: `--import-mode=importlib`, `--timeout=60`, `--strict-markers`, asyncio_mode=auto, asyncio_default_test_loop_scope=function
 - **coverage**: sources `download-proxy/src` and `plugins`, `fail_under=49` (raised from 1% baseline, see `docs/COVERAGE_BASELINE.md`)
 - **mutmut**: paths `download-proxy/src/`
 
@@ -322,6 +369,18 @@ scripts/scan.sh --all
 | Grafana | `observability/dashboards/` | Dashboard visualization |
 
 All scanner reports land in `artifacts/scans/<timestamp>/` as SARIF. Mandatory waiver format: Finding ID / reason / expiry.
+
+## Security Considerations
+
+- **Threat model**: WebUI is bound to host network; hardcoded `admin`/`admin` is intentional for trusted LAN. Operator must change before exposing. Reverse-proxy or VPN is the operator's responsibility.
+- **Credential storage**: Env vars only. Priority: shell env -> `./.env` -> `~/.qbit.env` -> container env. `.env` is `rw-------` and gitignored.
+- **Tracker sessions** (`_tracker_sessions`) are in-memory only; they evaporate on container restart. Phase 2.3 plans Fernet-at-rest encryption.
+- **Credential scrubbing**: `CredentialScrubber` in `config/log_filter.py` redacts passwords/api keys from logs.
+- **CORS**: Currently `allow_origins=["*"]` (over-permissive for local dev). Phase 3 will tighten to `ALLOWED_ORIGINS` env var.
+- **SSE streams**: Protected by unguessable `search_id` UUID. Phase 3 plans per-client bearer tokens.
+- **Plugin isolation**: Public trackers run in subprocesses with a deadline timeout so a crashing plugin cannot crash the orchestrator.
+- **IPTorrents freeleech policy** (Constitution Principle VIII): Automated tests and downloads MUST only use freeleech results. Freeleech results are tagged `IPTorrents [free]`. The deduplicator refuses to merge non-freeleech IPTorrents results with results from other trackers. `tests/unit/test_freeleech.py` guards the rule.
+- **Gitleaks**: Allowlists `admin:admin` literal to prevent doc false positives.
 
 ## Environment Variables
 
@@ -384,7 +443,111 @@ Support files (`plugins/`):
 - Go backend is opt-in via `--profile go` -- does not replace Python by default
 - Go `qbittorrent-proxy` binary serves on 7187 (same as Python merge service); both cannot run simultaneously
 - The `download-proxy` container mounts `./download-proxy` to `/config/download-proxy` so live edits on the host are reflected inside the container without rebuild
+- `frontend/` is a standalone Angular 21 SPA built to `download-proxy/src/ui/dist/frontend` and served by the FastAPI merge service
 
 ## Commit Style
 
 Format: `<type>: <subject>` where type is `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`. Branch naming: `feature/your-feature-name`.
+
+## Universal Mandatory Constraints
+
+These rules are non-negotiable across every project, submodule, and sibling
+repository. They are derived from the HelixAgent root `CLAUDE.md`. Each
+project MUST surface them in its own `CLAUDE.md`, `AGENTS.md`, and
+`CONSTITUTION.md`. Project-specific addenda are welcome but cannot weaken
+or override these.
+
+### Hard Stops (permanent, non-negotiable)
+
+1. **NO CI/CD pipelines.** No `.github/workflows/`, `.gitlab-ci.yml`,
+   `Jenkinsfile`, `.travis.yml`, `.circleci/`, or any automated pipeline.
+   No Git hooks either. All builds and tests run manually or via Makefile/
+   script targets.
+2. **NO HTTPS for Git.** SSH URLs only (`git@github.com:…`,
+   `git@gitlab.com:…`, etc.) for clones, fetches, pushes, and submodule
+   updates. Including for public repos. SSH keys are configured on every
+   service.
+3. **NO manual container commands.** Container orchestration is owned by
+   the project's binary/orchestrator (e.g. `make build` → `./bin/<app>`).
+   Direct `docker`/`podman start|stop|rm` and `docker-compose up|down`
+   are prohibited as workflows. The orchestrator reads its configured
+   `.env` and brings up everything.
+
+### Mandatory Development Standards
+
+1. **100% Test Coverage.** Every component MUST have unit, integration,
+   E2E, automation, security/penetration, and benchmark tests. No false
+   positives. Mocks/stubs ONLY in unit tests; all other test types use
+   real data and live services.
+2. **Challenge Coverage.** Every component MUST have Challenge scripts
+   (`./challenges/scripts/`) validating real-life use cases. No false
+   success — validate actual behavior, not return codes.
+3. **Real Data.** Beyond unit tests, all components MUST use actual API
+   calls, real databases, live services. No simulated success. Fallback
+   chains tested with actual failures.
+4. **Health & Observability.** Every service MUST expose health
+   endpoints. Circuit breakers for all external dependencies. Prometheus
+   / OpenTelemetry integration where applicable.
+5. **Documentation & Quality.** Update `CLAUDE.md`, `AGENTS.md`, and
+   relevant docs alongside code changes. Pass language-appropriate
+   format/lint/security gates. Conventional Commits:
+   `<type>(<scope>): <description>`.
+6. **Validation Before Release.** Pass the project's full validation
+   suite (`make ci-validate-all`-equivalent) plus all challenges
+   (`./challenges/scripts/run_all_challenges.sh`).
+7. **No Mocks or Stubs in Production.** Mocks, stubs, fakes, placeholder
+   classes, TODO implementations are STRICTLY FORBIDDEN in production
+   code. All production code is fully functional with real integrations.
+   Only unit tests may use mocks/stubs.
+8. **Comprehensive Verification.** Every fix MUST be verified from all
+   angles: runtime testing (actual HTTP requests / real CLI invocations),
+   compile verification, code structure checks, dependency existence
+   checks, backward compatibility, and no false positives in tests or
+   challenges. Grep-only validation is NEVER sufficient.
+9. **Resource Limits for Tests & Challenges (CRITICAL).** ALL test and
+   challenge execution MUST be strictly limited to 30-40% of host system
+   resources. Use `GOMAXPROCS=2`, `nice -n 19`, `ionice -c 3`, `-p 1`
+   for `go test`. Container limits required. The host runs
+   mission-critical processes — exceeding limits causes system crashes.
+10. **Bugfix Documentation.** All bug fixes MUST be documented in
+    `docs/issues/fixed/BUGFIXES.md` (or the project's equivalent) with
+    root cause analysis, affected files, fix description, and a link to
+    the verification test/challenge.
+11. **Real Infrastructure for All Non-Unit Tests.** Mocks/fakes/stubs/
+    placeholders MAY be used ONLY in unit tests (files ending `_test.go`
+    run under `go test -short`, equivalent for other languages). ALL
+    other test types — integration, E2E, functional, security, stress,
+    chaos, challenge, benchmark, runtime verification — MUST execute
+    against the REAL running system with REAL containers, REAL
+    databases, REAL services, and REAL HTTP calls. Non-unit tests that
+    cannot connect to real services MUST skip (not fail).
+12. **Reproduction-Before-Fix (CONST-032 — MANDATORY).** Every reported
+    error, defect, or unexpected behavior MUST be reproduced by a
+    Challenge script BEFORE any fix is attempted. Sequence:
+    (1) Write the Challenge first. (2) Run it; confirm fail (it
+    reproduces the bug). (3) Then write the fix. (4) Re-run; confirm
+    pass. (5) Commit Challenge + fix together. The Challenge becomes
+    the regression guard for that bug forever.
+13. **Concurrent-Safe Containers (Go-specific, where applicable).** Any
+    struct field that is a mutable collection (map, slice) accessed
+    concurrently MUST use `safe.Store[K,V]` / `safe.Slice[T]` from
+    `digital.vasic.concurrency/pkg/safe` (or the project's equivalent
+    primitives). Bare `sync.Mutex + map/slice` combinations are
+    prohibited for new code.
+
+### Definition of Done (universal)
+
+A change is NOT done because code compiles and tests pass. "Done"
+requires pasted terminal output from a real run, produced in the same
+session as the change.
+
+- **No self-certification.** Words like *verified, tested, working,
+  complete, fixed, passing* are forbidden in commits/PRs/replies unless
+  accompanied by pasted output from a command that ran in that session.
+- **Demo before code.** Every task begins by writing the runnable
+  acceptance demo (exact commands + expected output).
+- **Real system, every time.** Demos run against real artifacts.
+- **Skips are loud.** `t.Skip` / `@Ignore` / `xit` / `describe.skip`
+  without a trailing `SKIP-OK: #<ticket>` comment break validation.
+- **Evidence in the PR.** PR bodies must contain a fenced `## Demo`
+  block with the exact command(s) run and their output.
