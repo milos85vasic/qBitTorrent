@@ -68,61 +68,21 @@ def merge_ready():
 
 
 def test_autoconfig_endpoint_returns_live_result(merge_ready, jackett_ready):
-    r = requests.get(f"{MERGE_BASE}/api/v1/jackett/autoconfig/last", timeout=5)
-    assert r.status_code == 200
-    body = r.json()
-    assert "ran_at" in body
-    assert "discovered" in body
-    assert "configured_now" in body
-    assert "already_present" in body
-    assert "errors" in body
+    pytest.skip(
+        "endpoint moved to boba-jackett:7189 — see qBitTorrent-go/tests/integration/jackett_management_test.go"
+    )
 
 
 def test_autoconfig_no_credential_leakage_in_response(merge_ready, jackett_ready):
-    r = requests.get(f"{MERGE_BASE}/api/v1/jackett/autoconfig/last", timeout=5)
-    if r.status_code != 200:
-        pytest.skip("autoconfig has not run")
-    body = r.text
-    # Read .env to find credential VALUES (not names) and assert none leak
-    env_path = os.path.join(_REPO_ROOT, ".env")
-    if not os.path.isfile(env_path):
-        pytest.skip(".env not present")
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if "=" not in line or line.startswith("#"):
-                continue
-            key, _, value = line.partition("=")
-            value = value.strip().strip('"').strip("'")
-            if not value or len(value) < 4:
-                continue
-            if any(s in key.upper() for s in ("PASSWORD", "COOKIES", "API_KEY", "TOKEN")):
-                # The Jackett API key WILL appear in connection logs but never
-                # in the response body of /jackett/autoconfig/last.
-                if key.startswith("JACKETT_API_KEY"):
-                    continue
-                assert value not in body, f"credential value for {key} leaked into response"
+    pytest.skip(
+        "endpoint moved to boba-jackett:7189 — see qBitTorrent-go/tests/security/credential_leak_test.go"
+    )
 
 
 def test_jackett_has_at_least_the_indexers_we_configured(merge_ready, jackett_ready):
-    """Cross-check: every entry in our 'configured_now' or 'already_present'
-    should appear in Jackett's actual configured-indexer list."""
-    r = requests.get(f"{MERGE_BASE}/api/v1/jackett/autoconfig/last", timeout=5)
-    if r.status_code != 200:
-        pytest.skip("autoconfig has not run")
-    body = r.json()
-    expected = set(body["configured_now"]) | set(body["already_present"])
-    if not expected:
-        pytest.skip("autoconfig did not configure any indexers")
-
-    s = requests.Session()
-    s.post(f"{JACKETT_URL}/UI/Dashboard", data={"password": ""}, allow_redirects=True, timeout=5)
-    indexers = s.get(
-        f"{JACKETT_URL}/api/v2.0/indexers", params={"apikey": jackett_ready}, timeout=5
-    ).json()
-    actually_configured = {x["id"] for x in indexers if x.get("configured")}
-    missing = expected - actually_configured
-    assert not missing, f"reported configured but not actually present in Jackett: {missing}"
+    pytest.skip(
+        "endpoint moved to boba-jackett:7189 — see qBitTorrent-go/tests/integration/jackett_management_test.go"
+    )
 
 
 def test_module_orchestrator_is_idempotent_on_second_invocation(jackett_ready):

@@ -38,14 +38,9 @@ _ac_spec.loader.exec_module(_ac_mod)
 
 
 def test_endpoint_response_contains_no_sentinel_credentials():
-    try:
-        r = requests.get(f"{MERGE_BASE}/api/v1/jackett/autoconfig/last", timeout=5)
-    except requests.RequestException:
-        pytest.skip("merge service unreachable")
-    if r.status_code == 404:
-        pytest.skip("autoconfig has not run")
-    assert SENTINEL_PASSWORD not in r.text
-    assert SENTINEL_COOKIE not in r.text
+    pytest.skip(
+        "endpoint moved to boba-jackett:7189 — see qBitTorrent-go/tests/security/credential_leak_test.go"
+    )
 
 
 @pytest.mark.asyncio

@@ -219,7 +219,12 @@ async def stats():
 
 from .auth import router as auth_router  # noqa: E402
 from .hooks import router as hooks_router  # noqa: E402
-from .jackett import router as jackett_router  # noqa: E402
+
+# NOTE(2026-04-27): the Python `/api/v1/jackett/autoconfig/last` endpoint
+# (formerly download-proxy/src/api/jackett.py) was removed in favour of
+# the canonical Go service at boba-jackett:7189
+# (`/api/v1/jackett/autoconfig/runs` + `/runs/{id}`). See plan
+# 2026-04-27-jackett-management-ui-and-system-db.md §38.
 from .routes import router as api_router  # noqa: E402
 from .scheduler import router as scheduler_router  # noqa: E402
 
@@ -227,7 +232,6 @@ app.include_router(api_router, prefix="/api/v1")
 app.include_router(hooks_router, prefix="/api/v1/hooks")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(scheduler_router, prefix="/api/v1/schedules")
-app.include_router(jackett_router, prefix="/api/v1")
 
 
 def _serve_index_html():

@@ -29,24 +29,15 @@ def stack_ready():
 
 
 def test_autoconfig_endpoint_returns_200_or_404(stack_ready):
-    r = requests.get(f"{MERGE_BASE}/api/v1/jackett/autoconfig/last", timeout=5)
-    assert r.status_code in (200, 404), r.text
+    pytest.skip(
+        "endpoint moved to boba-jackett:7189 — see qBitTorrent-go/tests/e2e/jackett_management_test.go"
+    )
 
 
 def test_autoconfig_payload_structure_when_present(stack_ready):
-    r = requests.get(f"{MERGE_BASE}/api/v1/jackett/autoconfig/last", timeout=5)
-    if r.status_code != 200:
-        pytest.skip("autoconfig has not run")
-    body = r.json()
-    for key in (
-        "ran_at",
-        "discovered",
-        "configured_now",
-        "already_present",
-        "skipped_no_match",
-        "errors",
-    ):
-        assert key in body, f"missing key {key!r} in autoconfig payload"
+    pytest.skip(
+        "endpoint moved to boba-jackett:7189 — see qBitTorrent-go/tests/e2e/jackett_management_test.go"
+    )
 
 
 def test_search_endpoint_does_not_5xx(stack_ready):
