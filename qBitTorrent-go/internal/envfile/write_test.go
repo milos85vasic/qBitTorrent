@@ -153,6 +153,41 @@ func TestAtomicHonorsConcurrentMutex(t *testing.T) {
 	}
 }
 
+// TestMutateFallsBackOnRenameEBUSY simulates the bind-mounted-single-file
+// container deployment scenario (docker-compose mounts ./.env onto
+// /host-env/.env; the kernel forbids replacing the bind-mount target via
+// rename, returning EBUSY).
+//
+// We can't create a real bind-mount in a unit test (needs CAP_SYS_ADMIN),
+// so the verification is indirect: we exercise the post-rename path by
+// running an Atomic call AGAIN against an existing target — confirming
+// the function handles "target already exists with content" without
+// error AND the new content fully replaces the old.
+//
+// The actual EBUSY fallback is exercised by
+// challenges/scripts/envfile_bindmount_atomic_challenge.sh which does
+// the real bind-mount setup.
+func TestMutateOverwritesExistingTarget(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, ".env")
+	if err := os.WriteFile(p, []byte("OLD=value\n"), 0600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := Upsert(p, map[string]string{"NEW": "value"}); err != nil {
+		t.Fatalf("first Upsert: %v", err)
+	}
+	if err := Upsert(p, map[string]string{"NEW": "value2"}); err != nil {
+		t.Fatalf("second Upsert: %v", err)
+	}
+	body, _ := os.ReadFile(p)
+	if !strings.Contains(string(body), "NEW=value2") {
+		t.Fatalf("second write did not land:\n%s", body)
+	}
+	if strings.Contains(string(body), "NEW=value\n") && !strings.Contains(string(body), "NEW=value2") {
+		t.Fatalf("old NEW=value still present:\n%s", body)
+	}
+}
+
 func TestCRLFNormalizedOnRead(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, ".env")

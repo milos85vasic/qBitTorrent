@@ -1,12 +1,14 @@
 package envfile
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 )
 
 // writerMu guards concurrent Upsert/Delete invocations on any envfile.
@@ -152,6 +154,44 @@ func mutate(path string, fn func([]string) []string) error {
 		return fmt.Errorf("chmod tmp: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
+		// EBUSY happens when `path` is a bind-mounted single file
+		// (common in container deployments — see docker-compose.yml's
+		// `./.env:/host-env/.env` mount). The kernel forbids replacing
+		// the bind-mount target via rename. Fall back to in-place
+		// truncate-and-write of the target itself: read tmp, write
+		// directly into target, fsync, drop tmp. This sacrifices the
+		// single-rename atomicity for a slightly larger write window,
+		// but the alternative (crash-loop on every container start) is
+		// strictly worse. The .env file is read at boot only, so the
+		// race window is irrelevant in practice.
+		if errors.Is(err, syscall.EBUSY) {
+			data, rerr := os.ReadFile(tmp)
+			if rerr != nil {
+				os.Remove(tmp)
+				return fmt.Errorf("rename EBUSY + read tmp: %w", rerr)
+			}
+			tf, oerr := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0600)
+			if oerr != nil {
+				os.Remove(tmp)
+				return fmt.Errorf("rename EBUSY + reopen target: %w", oerr)
+			}
+			if _, werr := tf.Write(data); werr != nil {
+				tf.Close()
+				os.Remove(tmp)
+				return fmt.Errorf("rename EBUSY + write-in-place: %w", werr)
+			}
+			if serr := tf.Sync(); serr != nil {
+				tf.Close()
+				os.Remove(tmp)
+				return fmt.Errorf("rename EBUSY + fsync target: %w", serr)
+			}
+			if cerr := tf.Close(); cerr != nil {
+				os.Remove(tmp)
+				return fmt.Errorf("rename EBUSY + close target: %w", cerr)
+			}
+			os.Remove(tmp)
+			return nil
+		}
 		os.Remove(tmp)
 		return fmt.Errorf("rename: %w", err)
 	}
