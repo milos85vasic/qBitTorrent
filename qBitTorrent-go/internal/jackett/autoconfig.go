@@ -125,9 +125,20 @@ func FillFields(template []map[string]any, cred *repos.Credential) ([]map[string
 // env merge entirely.
 func Autoconfigure(deps AutoconfigDeps, envOverrides map[string]string) AutoconfigResult {
 	started := time.Now().UTC()
+	// Pre-allocate every slice/map field as non-nil so JSON serializes
+	// `[]` / `{}` instead of `null`. The OpenAPI contract requires these
+	// fields to be non-nullable arrays/objects (spec §8.4 +
+	// internal/jackettapi/openapi.json AutoconfigResult). nil slices in
+	// Go marshal to `null`, breaking the contract.
 	result := AutoconfigResult{
-		RanAt:           started,
-		MatchedIndexers: map[string]string{},
+		RanAt:                 started,
+		DiscoveredCredentials: []string{},
+		MatchedIndexers:       map[string]string{},
+		ConfiguredNow:         []string{},
+		AlreadyPresent:        []string{},
+		SkippedNoMatch:        []string{},
+		SkippedAmbiguous:      []AmbiguousMatch{},
+		Errors:                []string{},
 	}
 
 	// Step 1: load credentials metadata, then decrypt only the rows that
@@ -194,6 +205,18 @@ func Autoconfigure(deps AutoconfigDeps, envOverrides map[string]string) Autoconf
 	// Step 4: match. envNames must be the sorted bundle names so matched
 	// iteration order downstream stays deterministic.
 	matched, ambiguous, unmatched := MatchIndexers(discovered, catalog, override)
+	// Preserve non-nil empties when MatchIndexers returns nil (no matches /
+	// no ambiguities / no unmatched) so the JSON contract stays
+	// `[]` / `{}`, not `null`. See AutoconfigResult init at top of fn.
+	if matched == nil {
+		matched = map[string]string{}
+	}
+	if ambiguous == nil {
+		ambiguous = []AmbiguousMatch{}
+	}
+	if unmatched == nil {
+		unmatched = []string{}
+	}
 	result.MatchedIndexers = matched
 	result.SkippedAmbiguous = ambiguous
 	result.SkippedNoMatch = unmatched
