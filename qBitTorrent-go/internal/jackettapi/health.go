@@ -39,8 +39,9 @@ type healthDTO struct {
 //
 // Jackett readiness: GetCatalog with the client's default timeout. Any
 // non-error response (including an empty list) is treated as healthy.
-// TODO: when jackett.Client gains a dedicated low-overhead Ping(), swap
-// this in to avoid the catalog round-trip on every healthz hit.
+// NOTE: GetCatalog is the most lightweight readiness signal Jackett's
+// public API offers today. If a dedicated low-overhead Ping endpoint
+// is added upstream, this is the call to swap.
 //
 // Status mapping:
 //   - both up        → "ok"

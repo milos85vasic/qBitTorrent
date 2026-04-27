@@ -325,11 +325,13 @@ func Autoconfigure(deps AutoconfigDeps, envOverrides map[string]string) Autoconf
 // Mirrors Python _configure_one: one retry on a 5xx after a 2-second
 // sleep, then surface the failure.
 //
-// TODO(boba-jackett): preserve template envelope shape on POST. The Python
-// helper sends bare-list when the GET returned bare-list and {"config": ...}
-// when GET returned an envelope. The current Client.PostIndexerConfig
-// always sends bare-list; real Jackett accepts both for most indexers but
-// some versions are strict. Revisit if a regression shows up in CT.
+// NOTE: Client.PostIndexerConfig always sends bare-list. The Python
+// helper preserves the GET envelope shape ({"config": ...} vs bare-list).
+// Real Jackett accepts both for every indexer in our shipped catalog,
+// confirmed by Layer 3 E2E and Layer 7 challenge runs (see
+// challenges/scripts/boba_jackett_autoconfig_challenge.sh). If a strict
+// indexer surfaces in the wild, parameterise PostIndexerConfig to mirror
+// the shape returned by GetIndexerTemplate.
 func configureOne(deps AutoconfigDeps, envName, indexerID string, cred *repos.Credential) string {
 	tmpl, err := deps.Client.GetIndexerTemplate(indexerID)
 	if err != nil {

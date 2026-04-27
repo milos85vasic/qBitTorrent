@@ -28,6 +28,14 @@ import (
 // so callers should AddSecret LONGER secrets BEFORE shorter ones that
 // might be substrings of them. Otherwise the shorter secret will be
 // masked first and leave fragments of the longer secret unmasked.
+//
+// CONST-013 note: `secrets` is a mutable slice guarded by a bare
+// sync.RWMutex. Per project rule 13, mutable collections SHOULD use
+// safe.Slice[T] from digital.vasic.concurrency/pkg/safe. That module
+// is not currently in this go.mod's import graph (verified 2026-04-27);
+// when it lands, refactor `secrets` to safe.Slice[[]byte]. The current
+// implementation is correct (-race clean) but does not satisfy the
+// preferred primitive contract.
 type Redactor struct {
 	dest    io.Writer
 	mu      sync.RWMutex
