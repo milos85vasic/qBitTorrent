@@ -25,6 +25,8 @@ config/qBittorrent/*
 # Source code that has "credentials" in its name (not secret material) — allow explicitly.
 !qBitTorrent-go/internal/db/repos/credentials.go
 !qBitTorrent-go/internal/db/repos/credentials_test.go
+!qBitTorrent-go/internal/jackettapi/credentials.go
+!qBitTorrent-go/internal/jackettapi/credentials_test.go
 *secrets*
 *_password*
 *.key
