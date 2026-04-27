@@ -47,6 +47,7 @@ Two-container setup via `docker-compose.yml` (`network_mode: host`), with an opt
 | Jackett | `jackett` | `lscr.io/linuxserver/jackett:latest` | 9117 | Auto-configured; API key extracted at startup |
 | Download proxy + Merge service | `qbittorrent-proxy` | `python:3.12-alpine` | 7186, 7187 | Python multi-threaded entrypoint (`download-proxy/src/main.py`) |
 | Go backend | `qbittorrent-proxy-go` | Built from `qBitTorrent-go/Dockerfile` | 7186, 7187, 7188 | Opt-in via `--profile go`; replaces Python proxy |
+| boba-jackett | `boba-jackett` | Built from `qBitTorrent-go/Dockerfile.jackett` | 7189 | Owns Jackett credentials + indexer overrides + autoconfig run history; backed by encrypted SQLite at `/config/boba.db` |
 | WebUI bridge | Host process | `python3 webui-bridge.py` | 7188 | Not a container; bridges private-tracker auth |
 
 Port map:
@@ -54,6 +55,7 @@ Port map:
 - **7186** -- Download proxy -> qBittorrent
 - **7187** -- Merge Search Service (FastAPI + Angular SPA + Jinja2 dashboard)
 - **7188** -- webui-bridge (private-tracker downloads)
+- **7189** -- boba-jackett (Go) — `http://localhost:7189`
 - **9117** -- Jackett health/API endpoint
 
 Container runtime auto-detected (podman preferred) in all shell scripts.
@@ -412,11 +414,14 @@ Key variables:
 - `OMDB_API_KEY`, `TMDB_API_KEY`, `TVDB_API_KEY` -- metadata enrichment
 - `ANILIST_CLIENT_ID` -- anime metadata
 - `JACKETT_API_KEY` -- public tracker uplift (auto-discovered from Jackett container config; manual override optional)
-- `JACKETT_INDEXER_MAP` -- CSV `NAME:indexer_id` overrides for the autoconfig fuzzy matcher
+- `JACKETT_INDEXER_MAP` -- CSV `NAME:indexer_id` overrides for the autoconfig fuzzy matcher (legacy; prefer DB `indexer_map_overrides`)
 - `JACKETT_AUTOCONFIG_EXCLUDE` -- CSV prefix denylist for env scan; default `QBITTORRENT,JACKETT,WEBUI,PROXY,MERGE,BRIDGE`
+- `BOBA_MASTER_KEY` -- 32-byte hex AES-256-GCM key encrypting `tracker_credentials` in `/config/boba.db`. Auto-generated on first boot by `bootstrap.EnsureMasterKey` (and `start.sh ensure_boba_master_key`). **Loss = total credential loss.** See `docs/BOBA_DATABASE.md` § "Master key lifecycle"
+- `BOBA_DB_PATH` -- SQLite path; default `/config/boba.db`. File mode forced to `0600`
+- `BOBA_ENV_PATH` -- host `.env` path used for one-shot bootstrap import; default `/host-env/.env`
 - `SNYK_TOKEN`, `SONAR_TOKEN` -- scanner tokens (opt-in)
 
-**Jackett auto-configuration** (since 2026-04-27): the merge service discovers `<NAME>_USERNAME/_PASSWORD/_COOKIES` env triples at startup and idempotently configures matching Jackett indexers. Last-run summary at `GET /api/v1/jackett/autoconfig/last` (redacted, 404 when not run). Best-effort, never blocks boot. See `docs/JACKETT_INTEGRATION.md` § "Auto-Configuration".
+**Jackett auto-configuration** (canonical: boba-jackett:7189): credentials, indexer-map overrides, and run history live in the encrypted SQLite system DB `config/boba.db`. The Angular dashboard at `http://localhost:7187/jackett` is the canonical edit surface. `.env` is imported once on first boot, never re-read after. The Python `/api/v1/jackett/autoconfig/last` endpoint was removed (replaced by Go `/api/v1/jackett/autoconfig/runs`). See `docs/JACKETT_INTEGRATION.md` § "Auto-Configuration" and `docs/BOBA_DATABASE.md`.
 
 ## Plugin System
 

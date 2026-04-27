@@ -228,84 +228,81 @@ curl "http://localhost:9117/api/v2.0/indexers/all/results/torznab/api?apikey=${A
 | `download-proxy/src/merge_service/search.py` | Jackett tracker registration + dispatch |
 | `scripts/extract-jackett-key.py` | Standalone key extraction utility |
 
-## Auto-Configuration (since 2026-04-27)
+## Auto-Configuration (canonical: boba-jackett:7189 + DB)
 
-At merge-service startup, the proxy automatically configures Jackett
-indexers using credentials it finds in environment variables.
+Jackett indexer auto-configuration is now owned by the dedicated
+**boba-jackett** Go service (port `7189`) backed by a SQLite system
+database (`config/boba.db`) encrypted with `BOBA_MASTER_KEY`.
 
-### Discovery
+The Python `download-proxy` previously exposed a transient
+`/api/v1/jackett/autoconfig/last` endpoint and an in-memory `lifespan()`
+hook. Both were removed at commit `<see plan 2026-04-27 §38>`. The
+canonical surface is now:
 
-The merge service scans `os.environ` for triples of the form
-`<NAME>_USERNAME` / `<NAME>_PASSWORD` / `<NAME>_COOKIES`. Each tracker
-needs *either* a `(USERNAME, PASSWORD)` pair *or* a `COOKIES` value.
+- `GET  /api/v1/jackett/autoconfig/runs` — paginated history of every
+  auto-config run (persisted, not just last-run-in-memory).
+- `GET  /api/v1/jackett/autoconfig/runs/{id}` — single run detail.
+- `POST /api/v1/jackett/autoconfig/trigger` — manual re-run from the UI.
 
-Names matching the **denylist** (default
-`QBITTORRENT,JACKETT,WEBUI,PROXY,MERGE,BRIDGE`, override via
-`JACKETT_AUTOCONFIG_EXCLUDE`) are dropped — these are project-internal
-credentials, not tracker creds.
+See `qBitTorrent-go/internal/jackett/` and `cmd/boba-jackett/`.
 
-### Matching
+### Source-of-truth data layer (DB)
 
-For each surviving credential bundle, the autoconfig:
-1. Checks `JACKETT_INDEXER_MAP` (CSV `NAME:indexer_id` pairs) for an
-   explicit override. Highest precedence.
+Credentials, overrides, and run history live in `config/boba.db`
+(`modernc.org/sqlite` — pure Go, no CGO). The schema (full reference at
+`docs/BOBA_DATABASE.md`):
+
+| Table | Purpose |
+|---|---|
+| `tracker_credentials` | per-tracker username / password / cookie blob, encrypted with `BOBA_MASTER_KEY` (AES-256-GCM) |
+| `indexer_map_overrides` | explicit `tracker_name → indexer_id` user overrides (highest match priority) |
+| `autoconfig_runs` | every auto-config run summary (`ran_at`, discovered, configured_now, already_present, errors) |
+| `jackett_indexer_catalog` | last refreshed catalog snapshot from Jackett (browse + filter source for the UI) |
+
+File mode is enforced to `0600` on first open by `internal/db.Open`.
+
+### .env import is bootstrap-only
+
+On first start (DB empty) or via the `boba-jackett` `bootstrap` flow,
+`<NAME>_USERNAME` / `<NAME>_PASSWORD` / `<NAME>_COOKIES` triples in
+`./.env` are imported into `tracker_credentials` exactly once, then
+encrypted with the master key. Subsequent edits to `.env` do **not**
+override DB state — the UI is the canonical edit surface.
+
+The denylist (default
+`QBITTORRENT,JACKETT,WEBUI,PROXY,MERGE,BRIDGE`, override
+`JACKETT_AUTOCONFIG_EXCLUDE`) is still honored at scan time so
+project-internal env vars never enter the DB.
+
+### Matching and configuration
+
+For each tracker credential bundle in `tracker_credentials`:
+
+1. Checks `indexer_map_overrides` for an explicit `tracker_name → indexer_id`.
 2. Falls back to fuzzy matching (Levenshtein `ratio() >= 0.85`,
-   case-insensitive) against Jackett's catalog id and display name.
-3. Skips ambiguous matches (multiple indexers ≥ threshold) with a clear
-   log message and an entry in `skipped_ambiguous`.
+   case-insensitive) against the cached `jackett_indexer_catalog`.
+3. Skips ambiguous matches with `skipped_ambiguous`.
 
-### Configuration
+For each match, the service fetches the per-indexer config template
+from Jackett, maps DB-decrypted credentials onto compatible fields
+(`username`/`password`/`cookie`/`cookies`/`cookieheader`), and POSTs.
+Idempotent — already-configured indexers land in `already_present`.
 
-For each matched indexer:
-1. Fetches the per-indexer config template via
-   `GET /api/v2.0/indexers/{id}/config`.
-2. Maps env credentials onto the template's `username` / `password` /
-   `cookie` / `cookies` / `cookieheader` fields, preserving every other
-   field verbatim.
-3. POSTs the populated config back. Retries once on 5xx.
-4. Skips with `no_compatible_credential_fields_for_indexer` if no env
-   credential maps to any template field (e.g. IPTorrents requires
-   `cookie`; if you only provide `IPTORRENTS_USERNAME/PASSWORD`, the
-   indexer is reported skipped rather than failing).
+### UI
 
-The autoconfig is **idempotent**: it consults the catalog's `configured`
-flag and skips already-configured indexers (`already_present`).
+The Angular dashboard at `http://localhost:7187/jackett` is the
+canonical edit surface. Pages (some shipping in successor patches):
 
-### Endpoint
-
-```
-GET /api/v1/jackett/autoconfig/last
-```
-
-Returns the most recent autoconfig run summary (redacted — never
-contains credential values). 404 when autoconfig has not run yet
-(e.g., no `JACKETT_API_KEY`).
-
-Example response:
-
-```json
-{
-  "ran_at": "2026-04-27T11:34:21.835022Z",
-  "discovered": ["IPTORRENTS", "KINOZAL", "NNMCLUB", "RUTRACKER"],
-  "matched_indexers": {
-    "KINOZAL": "kinozal",
-    "IPTORRENTS": "iptorrents",
-    "RUTRACKER": "rutracker"
-  },
-  "configured_now": ["kinozal", "rutracker"],
-  "already_present": [],
-  "skipped_no_match": ["NNMCLUB"],
-  "skipped_ambiguous": [],
-  "errors": [
-    "indexer_config_failed:iptorrents:no_compatible_credential_fields_for_indexer"
-  ]
-}
-```
+- **Credentials** (shipped): list / add / edit / delete tracker
+  credentials. Edits are encrypted at rest via `BOBA_MASTER_KEY`.
+- **Indexers** (shipped backend, frontend deferred): browse the
+  catalog, force-refresh, configure, test, toggle, remove.
+- **Runs** (shipped backend): paginated auto-config run history.
 
 ### Failure modes (best-effort)
 
-The autoconfig is best-effort and **never blocks boot**. Errors land in
-the result's `errors` list and are logged WARNING. Common error codes:
+Auto-config is best-effort and **never blocks boot**. Errors land in
+the run's `errors` list and a WARNING log. Codes:
 
 | Code | Meaning |
 |---|---|
@@ -314,17 +311,24 @@ the result's `errors` list and are logged WARNING. Common error codes:
 | `jackett_auth_missing_key` | `JACKETT_API_KEY` env var was empty |
 | `catalog_parse_failed` | Catalog endpoint returned non-JSON |
 | `jackett_total_timeout_60s` | Hit the outer 60-second cap |
-| `indexer_config_failed:<id>:<reason>` | Per-indexer failure (HTTP code or `no_compatible_credential_fields_for_indexer`) |
+| `indexer_config_failed:<id>:<reason>` | Per-indexer failure |
 
 ### Configuration
 
 | Env var | Purpose | Default |
 |---|---|---|
-| `JACKETT_INDEXER_MAP` | CSV `NAME:indexer_id` overrides for fuzzy match | empty |
+| `BOBA_MASTER_KEY` | 32-byte hex encryption key for `tracker_credentials` | auto-generated by `start.sh` and `bootstrap.EnsureMasterKey` |
+| `BOBA_DB_PATH` | SQLite path | `/config/boba.db` |
+| `BOBA_ENV_PATH` | host `.env` path used for one-shot bootstrap import | `/host-env/.env` |
+| `JACKETT_INDEXER_MAP` | CSV `NAME:indexer_id` overrides (legacy; prefer DB `indexer_map_overrides`) | empty |
 | `JACKETT_AUTOCONFIG_EXCLUDE` | CSV prefix denylist | `QBITTORRENT,JACKETT,WEBUI,PROXY,MERGE,BRIDGE` |
 
 ### Files
 
-- `download-proxy/src/merge_service/jackett_autoconfig.py` — module
-- `download-proxy/src/api/jackett.py` — read-only endpoint
-- `download-proxy/src/api/__init__.py` — wired into FastAPI lifespan
+- `qBitTorrent-go/cmd/boba-jackett/main.go` — service entry point
+- `qBitTorrent-go/internal/jackett/` — autoconfig orchestrator
+- `qBitTorrent-go/internal/db/` — SQLite layer + migrations
+- `qBitTorrent-go/internal/envfile/` — atomic .env writer
+- `qBitTorrent-go/internal/bootstrap/` — `EnsureMasterKey` + .env import
+- `frontend/src/app/jackett/` — Angular pages
+- `docs/BOBA_DATABASE.md` — schema reference, key lifecycle, backup, recovery
