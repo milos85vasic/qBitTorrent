@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	_ "modernc.org/sqlite"
@@ -48,6 +49,21 @@ func Open(path string) (*sql.DB, error) {
 	if err := conn.Ping(); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("ping: %w", err)
+	}
+	// Enforce 0600 on the SQLite database file. modernc.org/sqlite creates
+	// the file with the process umask (typically 0644 on Linux), but boba.db
+	// stores AES-GCM-encrypted credentials whose master key lives in
+	// .env(0600) — the DB file must match. We chmod after the first
+	// successful Ping() so the file definitely exists. WAL/SHM sidecars
+	// are chmodded too on a best-effort basis; missing sidecars (no write
+	// has happened yet) are fine.
+	for _, p := range []string{path, path + "-wal", path + "-shm"} {
+		if _, err := os.Stat(p); err == nil {
+			if err := os.Chmod(p, 0o600); err != nil {
+				conn.Close()
+				return nil, fmt.Errorf("chmod %s 0600: %w", p, err)
+			}
+		}
 	}
 	return conn, nil
 }
