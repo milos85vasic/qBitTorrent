@@ -227,12 +227,15 @@ CREATE TABLE indexer_map_overrides (
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE schema_migrations (
+-- IF NOT EXISTS + INSERT OR IGNORE because Migrate() bootstraps this
+-- same table first so it can query for applied versions before running
+-- the migration body. Idempotency keeps fresh and resumed boots safe.
+CREATE TABLE IF NOT EXISTS schema_migrations (
   version       INTEGER PRIMARY KEY,
   applied_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO schema_migrations (version) VALUES (1);
+INSERT OR IGNORE INTO schema_migrations (version) VALUES (1);
 ```
 
 ### 5.1 Encryption envelope
