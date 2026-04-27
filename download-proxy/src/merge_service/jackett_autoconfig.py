@@ -158,22 +158,43 @@ async def _configure_one(
     except (TimeoutError, aiohttp.ClientError) as e:
         return ("error", f"template fetch network error: {type(e).__name__}")
 
-    config_fields = template.get("config", []) if isinstance(template, dict) else []
+    # Jackett's template comes back as either a bare list of field
+    # descriptors OR a {"config": [...]} envelope, depending on version.
+    if isinstance(template, list):
+        config_fields = template
+    elif isinstance(template, dict):
+        config_fields = template.get("config", [])
+    else:
+        config_fields = []
+
     field_map = {
         "username": creds.get("username"),
         "password": creds.get("password"),
-        "cookieheader": creds.get("cookies"),
+        # Jackett uses different keys for cookie-based auth across indexers.
+        "cookie": creds.get("cookies"),
         "cookies": creds.get("cookies"),
+        "cookieheader": creds.get("cookies"),
     }
+    # Preserve ALL fields verbatim from the template (id, type, name, etc.)
+    # — Jackett rejects POSTs that drop schema fields. Only mutate `value`.
     populated: list[dict[str, Any]] = []
+    fields_we_filled = 0
     for field in config_fields:
-        fid = field.get("id")
+        new_field = dict(field) if isinstance(field, dict) else field
+        fid = new_field.get("id") if isinstance(new_field, dict) else None
         if fid in field_map and field_map[fid] is not None:
-            populated.append({"id": fid, "value": field_map[fid]})
-        else:
-            populated.append(field)
+            new_field["value"] = field_map[fid]
+            fields_we_filled += 1
+        populated.append(new_field)
 
-    body = {"config": populated}
+    # If the indexer's template requires a kind of credential we don't
+    # have (e.g. iptorrents needs `cookie` but we only supply user/pass),
+    # skip cleanly rather than POST a half-empty config Jackett will 500 on.
+    if fields_we_filled == 0:
+        return ("error", "no_compatible_credential_fields_for_indexer")
+
+    # POST body matches GET shape: bare list when the template was a list.
+    body: Any = populated if isinstance(template, list) else {"config": populated}
     for attempt in (1, 2):
         try:
             async with session.post(
@@ -254,11 +275,33 @@ async def autoconfigure_jackett(
     try:
         async with asyncio.timeout(TOTAL_TIMEOUT_SECONDS):
             async with aiohttp.ClientSession(timeout=client_timeout) as session:
+                # Session warmup: Jackett's admin API redirects to /UI/TestCookie
+                # on first hit. POSTing to /UI/Dashboard with empty password
+                # establishes the session (Jackett accepts empty when no
+                # AdminPassword is set in ServerConfig.json). Failure is
+                # tolerated — the next API call will report the real error.
+                try:
+                    async with session.post(
+                        f"{jackett_url}/UI/Dashboard",
+                        data={"password": ""},
+                        allow_redirects=True,
+                    ):
+                        pass
+                except (TimeoutError, aiohttp.ClientError):
+                    pass
+
                 catalog: list[dict[str, Any]] = []
                 catalog_err: str | None = None
                 try:
-                    cat_url = f"{jackett_url}/api/v2.0/indexers/all/results"
-                    async with session.get(cat_url, params=params, headers=headers) as r:
+                    # /api/v2.0/indexers?configured=false returns ALL available
+                    # indexers (configured + unconfigured) as JSON. Requires
+                    # admin session (warmed up above).
+                    cat_url = f"{jackett_url}/api/v2.0/indexers"
+                    async with session.get(
+                        cat_url,
+                        params={**params, "configured": "false"},
+                        headers=headers,
+                    ) as r:
                         if r.status == 401:
                             catalog_err = "jackett_auth_failed"
                         elif r.status >= 400:
@@ -287,16 +330,14 @@ async def autoconfigure_jackett(
                         errors=[catalog_err],
                     )
 
-                already: set[str] = set()
-                try:
-                    list_url = f"{jackett_url}/api/v2.0/indexers"
-                    async with session.get(list_url, params=params, headers=headers) as r:
-                        if r.status < 400:
-                            data = await r.json()
-                            if isinstance(data, list):
-                                already = {e.get("id") for e in data if e.get("id")}
-                except (TimeoutError, aiohttp.ClientError):
-                    pass
+                # Already-configured set. The catalog above already includes a
+                # "configured" boolean per indexer — use that instead of a
+                # second request.
+                already: set[str] = {
+                    entry["id"]
+                    for entry in catalog
+                    if entry.get("id") and entry.get("configured") is True
+                }
 
                 matched, ambiguous, unmatched = _match_indexers(
                     bundles, catalog, override
