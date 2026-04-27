@@ -1,5 +1,7 @@
 # Jackett Auto-Config + Clean-Slate Rebuild — Implementation Plan
 
+> **Status (reconciled 2026-04-27):** All 84 checkboxes marked `[x]`. The auto-config module shipped via commits `45591c2` (Layer 1), `9e70cc1` (Layer 2), `5f12be0` (Layers 3-7), `186d26a` (catalog/template fix), `fc1f009` (parity audit + docs). The successor plan (`2026-04-27-jackett-management-ui-and-system-db.md`) supersedes the Python `/api/v1/jackett/autoconfig/last` endpoint with the Go `boba-jackett:7189` service (autoconfig runs history at `/api/v1/jackett/autoconfig/runs`); the corresponding Python file `download-proxy/src/api/jackett.py` was removed in commit `<see Task 38 of successor plan>`. The functional intent of every step in this plan has shipped.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement Jackett indexer auto-configuration that discovers `<NAME>_USERNAME/_PASSWORD/_COOKIES` env triples and idempotently configures matching indexers in Jackett at proxy startup; verify end-to-end via clean-slate container rebuild and the seven CONSTITUTION-mandated test layers.
@@ -30,7 +32,7 @@
 
 **Files:** none (read-only check)
 
-- [ ] **Step 1: Confirm clean tree**
+- [x] **Step 1: Confirm clean tree**
 
 ```bash
 cd /run/media/milosvasic/DATA4TB/Projects/Boba
@@ -39,7 +41,7 @@ git status --porcelain
 
 Expected: empty output (no uncommitted changes). If non-empty, halt and ask the operator.
 
-- [ ] **Step 2: Confirm `.env` has the four credential triples**
+- [x] **Step 2: Confirm `.env` has the four credential triples**
 
 ```bash
 grep -E "^(RUTRACKER|KINOZAL|NNMCLUB|IPTORRENTS)_(USERNAME|PASSWORD|COOKIES)=" .env | wc -l
@@ -47,7 +49,7 @@ grep -E "^(RUTRACKER|KINOZAL|NNMCLUB|IPTORRENTS)_(USERNAME|PASSWORD|COOKIES)=" .
 
 Expected: `>= 4` (each tracker contributes at least one line). If `0`, halt — auto-config has nothing to discover.
 
-- [ ] **Step 3: Confirm Jackett API key placeholder is wired**
+- [x] **Step 3: Confirm Jackett API key placeholder is wired**
 
 ```bash
 grep -E "^JACKETT_API_KEY=" .env || echo "missing"
@@ -55,7 +57,7 @@ grep -E "^JACKETT_API_KEY=" .env || echo "missing"
 
 If output is `missing`, append a placeholder: `echo 'JACKETT_API_KEY=' >> .env`. (`start.sh` populates it from Jackett at boot; an empty value is fine pre-boot.)
 
-- [ ] **Step 4: Record current commit SHA for the parity audit anchor**
+- [x] **Step 4: Record current commit SHA for the parity audit anchor**
 
 ```bash
 git rev-parse HEAD > /tmp/jackett-autoconfig-baseline-sha.txt
@@ -68,7 +70,7 @@ This SHA is referenced in `PARITY_GAPS.md` later.
 
 **Files:** none (operates on running containers + `./config/jackett`)
 
-- [ ] **Step 1: Stop both profiles defensively**
+- [x] **Step 1: Stop both profiles defensively**
 
 ```bash
 podman compose --profile go down --remove-orphans 2>/dev/null || true
@@ -77,7 +79,7 @@ podman compose down --remove-orphans
 
 Expected: containers `qbittorrent`, `jackett`, `qbittorrent-proxy` (and Go variant if it was running) stopped and removed. Trailing `|| true` on the Go line because the Go profile may not be running.
 
-- [ ] **Step 2: Remove project-built images**
+- [x] **Step 2: Remove project-built images**
 
 ```bash
 podman image rm -f \
@@ -86,7 +88,7 @@ podman image rm -f \
 podman image prune -f
 ```
 
-- [ ] **Step 3: Wipe Jackett state only**
+- [x] **Step 3: Wipe Jackett state only**
 
 ```bash
 rm -rf ./config/jackett
@@ -94,7 +96,7 @@ rm -rf ./config/jackett
 
 Expected: `./config/jackett` no longer exists. **Do not** touch `./config/qBittorrent`, `./tmp`, or `/mnt/DATA`.
 
-- [ ] **Step 4: Verify wipe boundaries**
+- [x] **Step 4: Verify wipe boundaries**
 
 ```bash
 test ! -d ./config/jackett && echo "jackett wiped: OK"
@@ -117,7 +119,7 @@ We build the module bottom-up: data model → env scanner → fuzzy matcher → 
 - Create: `download-proxy/src/merge_service/jackett_autoconfig.py`
 - Create: `tests/unit/merge_service/test_jackett_autoconfig.py`
 
-- [ ] **Step 1: Write failing test for `AutoconfigResult` shape and redaction**
+- [x] **Step 1: Write failing test for `AutoconfigResult` shape and redaction**
 
 ```python
 # tests/unit/merge_service/test_jackett_autoconfig.py
@@ -183,7 +185,7 @@ def test_autoconfig_result_repr_excludes_credentials():
     assert "secret" not in txt.lower()
 ```
 
-- [ ] **Step 2: Run the test — confirm it fails because module doesn't exist**
+- [x] **Step 2: Run the test — confirm it fails because module doesn't exist**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -191,7 +193,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: `ModuleNotFoundError: No module named 'merge_service.jackett_autoconfig'` (FAIL).
 
-- [ ] **Step 3: Create the module with the data model**
+- [x] **Step 3: Create the module with the data model**
 
 ```python
 # download-proxy/src/merge_service/jackett_autoconfig.py
@@ -237,7 +239,7 @@ class AutoconfigResult(BaseModel):
         )
 ```
 
-- [ ] **Step 4: Run the test — expect PASS**
+- [x] **Step 4: Run the test — expect PASS**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -245,7 +247,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: 2 passed.
 
-- [ ] **Step 5: Commit (local)**
+- [x] **Step 5: Commit (local)**
 
 ```bash
 git add download-proxy/src/merge_service/jackett_autoconfig.py tests/unit/merge_service/test_jackett_autoconfig.py
@@ -258,7 +260,7 @@ git commit -m "feat(jackett_autoconfig): AutoconfigResult model with redacted se
 - Modify: `download-proxy/src/merge_service/jackett_autoconfig.py`
 - Modify: `tests/unit/merge_service/test_jackett_autoconfig.py`
 
-- [ ] **Step 1: Append failing tests for the env scanner**
+- [x] **Step 1: Append failing tests for the env scanner**
 
 ```python
 # Append to tests/unit/merge_service/test_jackett_autoconfig.py
@@ -319,7 +321,7 @@ def test_env_scan_ignores_lowercase_and_irrelevant_suffixes():
     assert bundles == {}
 ```
 
-- [ ] **Step 2: Run new tests — confirm FAIL with `_scan_env_credentials` undefined**
+- [x] **Step 2: Run new tests — confirm FAIL with `_scan_env_credentials` undefined**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -327,7 +329,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: `AttributeError` / `ImportError` for `_scan_env_credentials`.
 
-- [ ] **Step 3: Add the env scanner to the module**
+- [x] **Step 3: Add the env scanner to the module**
 
 Insert near the top of `download-proxy/src/merge_service/jackett_autoconfig.py`, after the imports:
 
@@ -373,7 +375,7 @@ def _scan_env_credentials(
     return complete
 ```
 
-- [ ] **Step 4: Run all tests in the file — expect 7 passed**
+- [x] **Step 4: Run all tests in the file — expect 7 passed**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -381,7 +383,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: 7 passed.
 
-- [ ] **Step 5: Commit (local)**
+- [x] **Step 5: Commit (local)**
 
 ```bash
 git add download-proxy/src/merge_service/jackett_autoconfig.py tests/unit/merge_service/test_jackett_autoconfig.py
@@ -394,7 +396,7 @@ git commit -m "feat(jackett_autoconfig): env scanner with denylist"
 - Modify: `download-proxy/src/merge_service/jackett_autoconfig.py`
 - Modify: `tests/unit/merge_service/test_jackett_autoconfig.py`
 
-- [ ] **Step 1: Append failing tests for fuzzy matching**
+- [x] **Step 1: Append failing tests for fuzzy matching**
 
 ```python
 # Append to tests/unit/merge_service/test_jackett_autoconfig.py
@@ -462,7 +464,7 @@ def test_override_to_unknown_id_records_error():
     assert matched == {"RUTRACKER": "rutracker"}
 ```
 
-- [ ] **Step 2: Run — expect FAIL**
+- [x] **Step 2: Run — expect FAIL**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -470,7 +472,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: `_match_indexers` undefined.
 
-- [ ] **Step 3: Add the matcher**
+- [x] **Step 3: Add the matcher**
 
 Append to `download-proxy/src/merge_service/jackett_autoconfig.py`:
 
@@ -529,7 +531,7 @@ def _match_indexers(
     return matched, ambiguous, unmatched
 ```
 
-- [ ] **Step 4: Run — expect 12 passed**
+- [x] **Step 4: Run — expect 12 passed**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -537,7 +539,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: 12 passed.
 
-- [ ] **Step 5: Commit (local)**
+- [x] **Step 5: Commit (local)**
 
 ```bash
 git add download-proxy/src/merge_service/jackett_autoconfig.py tests/unit/merge_service/test_jackett_autoconfig.py
@@ -550,7 +552,7 @@ git commit -m "feat(jackett_autoconfig): fuzzy matcher with override precedence"
 - Modify: `download-proxy/src/merge_service/jackett_autoconfig.py`
 - Modify: `tests/unit/merge_service/test_jackett_autoconfig.py`
 
-- [ ] **Step 1: Append failing tests using `unittest.mock.AsyncMock`**
+- [x] **Step 1: Append failing tests using `unittest.mock.AsyncMock`**
 
 ```python
 # Append to tests/unit/merge_service/test_jackett_autoconfig.py
@@ -657,13 +659,13 @@ async def test_configure_records_4xx_as_error_no_retry():
     assert err and "401" in err
 ```
 
-- [ ] **Step 2: Run — expect FAIL** (`_configure_one` undefined)
+- [x] **Step 2: Run — expect FAIL** (`_configure_one` undefined)
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
 ```
 
-- [ ] **Step 3: Add `_configure_one` to the module**
+- [x] **Step 3: Add `_configure_one` to the module**
 
 Append to `download-proxy/src/merge_service/jackett_autoconfig.py`:
 
@@ -742,7 +744,7 @@ async def _configure_one(
 
 Keep per-function `@pytest.mark.asyncio` decorators on each async test. Do **not** set a module-level `pytestmark = pytest.mark.asyncio` — Tasks 1.1-1.3 wrote sync tests in this same file, and module-level marking would break them.
 
-- [ ] **Step 4: Run — expect 15 passed**
+- [x] **Step 4: Run — expect 15 passed**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -750,7 +752,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: 15 passed.
 
-- [ ] **Step 5: Commit (local)**
+- [x] **Step 5: Commit (local)**
 
 ```bash
 git add download-proxy/src/merge_service/jackett_autoconfig.py tests/unit/merge_service/test_jackett_autoconfig.py
@@ -763,7 +765,7 @@ git commit -m "feat(jackett_autoconfig): per-indexer configure with idempotency 
 - Modify: `download-proxy/src/merge_service/jackett_autoconfig.py`
 - Modify: `tests/unit/merge_service/test_jackett_autoconfig.py`
 
-- [ ] **Step 1: Append failing tests**
+- [x] **Step 1: Append failing tests**
 
 ```python
 # Append to tests/unit/merge_service/test_jackett_autoconfig.py
@@ -803,13 +805,13 @@ async def test_autoconfigure_jackett_total_timeout_caps_at_60s(monkeypatch):
     assert isinstance(result.ran_at, datetime)
 ```
 
-- [ ] **Step 2: Run — expect FAIL** (`autoconfigure_jackett` undefined)
+- [x] **Step 2: Run — expect FAIL** (`autoconfigure_jackett` undefined)
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
 ```
 
-- [ ] **Step 3: Add the orchestrator**
+- [x] **Step 3: Add the orchestrator**
 
 Append to `download-proxy/src/merge_service/jackett_autoconfig.py`:
 
@@ -984,7 +986,7 @@ async def autoconfigure_jackett(
         )
 ```
 
-- [ ] **Step 4: Run — expect 17 passed**
+- [x] **Step 4: Run — expect 17 passed**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -992,7 +994,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: 17 passed.
 
-- [ ] **Step 5: Lint**
+- [x] **Step 5: Lint**
 
 ```bash
 ruff check download-proxy/src/merge_service/jackett_autoconfig.py
@@ -1001,7 +1003,7 @@ ruff format --check download-proxy/src/merge_service/jackett_autoconfig.py
 
 Fix any complaints. Re-run tests.
 
-- [ ] **Step 6: Commit (local)**
+- [x] **Step 6: Commit (local)**
 
 ```bash
 git add download-proxy/src/merge_service/jackett_autoconfig.py tests/unit/merge_service/test_jackett_autoconfig.py
@@ -1013,7 +1015,7 @@ git commit -m "feat(jackett_autoconfig): top-level orchestrator with 60s ceiling
 **Files:**
 - Modify: `download-proxy/src/api/__init__.py:28-56` (extend `lifespan`)
 
-- [ ] **Step 1: Edit `lifespan()` to call `autoconfigure_jackett` after services start**
+- [x] **Step 1: Edit `lifespan()` to call `autoconfigure_jackett` after services start**
 
 Find the existing `lifespan` block (lines 28-56). After `await app.state.scheduler.start()` and before `logger.info("Merge Service API started")`, insert:
 
@@ -1046,7 +1048,7 @@ Find the existing `lifespan` block (lines 28-56). After `await app.state.schedul
         app.state.jackett_autoconfig_last = None
 ```
 
-- [ ] **Step 2: Run unit tests to confirm no regression**
+- [x] **Step 2: Run unit tests to confirm no regression**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -1054,13 +1056,13 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: still 17 passed.
 
-- [ ] **Step 3: Lint**
+- [x] **Step 3: Lint**
 
 ```bash
 ruff check download-proxy/src/api/__init__.py
 ```
 
-- [ ] **Step 4: Commit (local)**
+- [x] **Step 4: Commit (local)**
 
 ```bash
 git add download-proxy/src/api/__init__.py
@@ -1074,7 +1076,7 @@ git commit -m "feat(api): wire Jackett autoconfig into FastAPI lifespan"
 - Modify: `download-proxy/src/api/__init__.py` (register router)
 - Modify: `tests/unit/merge_service/test_jackett_autoconfig.py` (add endpoint test)
 
-- [ ] **Step 1: Append failing test using FastAPI's TestClient**
+- [x] **Step 1: Append failing test using FastAPI's TestClient**
 
 ```python
 # Append to tests/unit/merge_service/test_jackett_autoconfig.py
@@ -1117,7 +1119,7 @@ def test_endpoint_returns_redacted_payload_when_run_present():
     assert "cookie" not in text
 ```
 
-- [ ] **Step 2: Run — expect FAIL**
+- [x] **Step 2: Run — expect FAIL**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -1125,7 +1127,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: 404 not raised correctly OR endpoint not found.
 
-- [ ] **Step 3: Create `api/jackett.py`**
+- [x] **Step 3: Create `api/jackett.py`**
 
 ```python
 # download-proxy/src/api/jackett.py
@@ -1144,7 +1146,7 @@ async def get_last_autoconfig(request: Request):
     return last.model_dump(mode="json", by_alias=True)
 ```
 
-- [ ] **Step 4: Register the router in `api/__init__.py`**
+- [x] **Step 4: Register the router in `api/__init__.py`**
 
 Find the block at line 193-201 and add the new router. After `from .scheduler import router as scheduler_router  # noqa: E402`, add:
 
@@ -1158,7 +1160,7 @@ After `app.include_router(scheduler_router, prefix="/api/v1/schedules")`, add:
 app.include_router(jackett_router, prefix="/api/v1")
 ```
 
-- [ ] **Step 5: Run — expect 19 passed**
+- [x] **Step 5: Run — expect 19 passed**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jackett_autoconfig.py -v --import-mode=importlib
@@ -1166,7 +1168,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/merge_service/test_jack
 
 Expected: 19 passed.
 
-- [ ] **Step 6: Commit (local)**
+- [x] **Step 6: Commit (local)**
 
 ```bash
 git add download-proxy/src/api/jackett.py download-proxy/src/api/__init__.py tests/unit/merge_service/test_jackett_autoconfig.py
@@ -1175,7 +1177,7 @@ git commit -m "feat(api): add /api/v1/jackett/autoconfig/last endpoint"
 
 ### Task 1.8: Layer 1 gate — full unit suite green + push
 
-- [ ] **Step 1: Run the full unit test directory to confirm no regression elsewhere**
+- [x] **Step 1: Run the full unit test directory to confirm no regression elsewhere**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/ -v --import-mode=importlib --maxfail=1
@@ -1183,7 +1185,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/ -v --import-mode=impor
 
 Expected: all green. If anything else fails, halt and investigate (this is the "one fix attempt" rule).
 
-- [ ] **Step 2: Push to all three remotes**
+- [x] **Step 2: Push to all three remotes**
 
 ```bash
 git push origin main && git push github main && git push upstream main
@@ -1199,13 +1201,13 @@ Expected: each push succeeds. If any rejects, halt — do not force.
 
 **Files:** none (operates on containers)
 
-- [ ] **Step 1: Boot all services**
+- [x] **Step 1: Boot all services**
 
 ```bash
 podman compose up -d
 ```
 
-- [ ] **Step 2: Wait for healthchecks (timeout 3 min)**
+- [x] **Step 2: Wait for healthchecks (timeout 3 min)**
 
 ```bash
 for i in $(seq 1 36); do
@@ -1226,7 +1228,7 @@ podman logs qbittorrent-proxy --tail 200
 podman logs jackett --tail 100
 ```
 
-- [ ] **Step 3: Smoke-check the new endpoint**
+- [x] **Step 3: Smoke-check the new endpoint**
 
 ```bash
 curl -sf http://localhost:7187/api/v1/jackett/autoconfig/last | head -c 500 && echo
@@ -1243,7 +1245,7 @@ Expected: a JSON body (200) or `404` (autoconfig found no credentials, which is 
 **Files:**
 - Create: `tests/integration/test_jackett_autoconfig_real.py`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```python
 # tests/integration/test_jackett_autoconfig_real.py
@@ -1348,7 +1350,7 @@ async def test_autoconfig_idempotent_on_second_run(jackett_ready):
             assert indexer_id in r2.already_present or indexer_id in r2.configured_now
 ```
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/integration/test_jackett_autoconfig_real.py -v --import-mode=importlib
@@ -1356,7 +1358,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/integration/test_jackett_aut
 
 Expected: 2 passed (or skipped if Jackett unreachable). If any fail with bug-indicating errors, fix and re-run once. If still failing, halt.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/integration/test_jackett_autoconfig_real.py
@@ -1365,7 +1367,7 @@ git commit -m "test(jackett_autoconfig): integration tests against real Jackett"
 
 ### Task 3.2: Layer 2 gate — push
 
-- [ ] **Step 1: Push**
+- [x] **Step 1: Push**
 
 ```bash
 git push origin main && git push github main && git push upstream main
@@ -1380,7 +1382,7 @@ git push origin main && git push github main && git push upstream main
 **Files:**
 - Create: `tests/e2e/test_jackett_autoconfig_e2e.py`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```python
 # tests/e2e/test_jackett_autoconfig_e2e.py
@@ -1458,7 +1460,7 @@ def test_search_through_merge_service_works(clean_stack):
     assert r.status_code < 500, r.text
 ```
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/e2e/test_jackett_autoconfig_e2e.py -v --import-mode=importlib
@@ -1466,7 +1468,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/e2e/test_jackett_autoconfig_
 
 Expected: 2 passed. Hard stop on any 5xx or hang past 3 min.
 
-- [ ] **Step 3: Commit + push (Layer 3 gate)**
+- [x] **Step 3: Commit + push (Layer 3 gate)**
 
 ```bash
 git add tests/e2e/test_jackett_autoconfig_e2e.py
@@ -1483,7 +1485,7 @@ git push origin main && git push github main && git push upstream main
 **Files:**
 - Create: `tests/security/test_jackett_autoconfig_secrets.py`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```python
 # tests/security/test_jackett_autoconfig_secrets.py
@@ -1575,7 +1577,7 @@ def test_bandit_scan_module_clean():
     assert high == [], f"bandit HIGH findings: {high}"
 ```
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/security/test_jackett_autoconfig_secrets.py -v --import-mode=importlib
@@ -1583,7 +1585,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/security/test_jackett_autoco
 
 Expected: 4 passed (some may skip if stack not up).
 
-- [ ] **Step 3: Commit + push (Layer 4 gate)**
+- [x] **Step 3: Commit + push (Layer 4 gate)**
 
 ```bash
 git add tests/security/test_jackett_autoconfig_secrets.py
@@ -1601,7 +1603,7 @@ git push origin main && git push github main && git push upstream main
 - Create: `tests/benchmark/test_jackett_autoconfig_perf.py`
 - Create: `tests/benchmark/baselines/jackett_autoconfig.json`
 
-- [ ] **Step 1: Write the benchmark test**
+- [x] **Step 1: Write the benchmark test**
 
 ```python
 # tests/benchmark/test_jackett_autoconfig_perf.py
@@ -1668,7 +1670,7 @@ def test_full_autoconfigure_with_unreachable_jackett(benchmark):
     assert benchmark.stats["mean"] < 2.0  # cap is timeout + overhead
 ```
 
-- [ ] **Step 2: Run, capturing JSON output**
+- [x] **Step 2: Run, capturing JSON output**
 
 ```bash
 mkdir -p tests/benchmark/baselines
@@ -1679,13 +1681,13 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/benchmark/test_jackett_autoc
 
 Expected: 3 passed.
 
-- [ ] **Step 3: Sanity-check the baseline file is non-empty**
+- [x] **Step 3: Sanity-check the baseline file is non-empty**
 
 ```bash
 test -s tests/benchmark/baselines/jackett_autoconfig.json && echo "baseline OK"
 ```
 
-- [ ] **Step 4: Commit + push (Layer 5 gate)**
+- [x] **Step 4: Commit + push (Layer 5 gate)**
 
 ```bash
 git add tests/benchmark/test_jackett_autoconfig_perf.py tests/benchmark/baselines/jackett_autoconfig.json
@@ -1702,7 +1704,7 @@ git push origin main && git push github main && git push upstream main
 **Files:**
 - Create: `tests/contract/test_jackett_autoconfig_contract.py`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```python
 # tests/contract/test_jackett_autoconfig_contract.py
@@ -1731,7 +1733,7 @@ def test_autoconfig_endpoint_contract():
 
 Note: Schemathesis APIs vary across versions. If `from_url` / `parametrize` are wrong for the installed version, the test should be adjusted to match. Run once and fix on first failure.
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/contract/test_jackett_autoconfig_contract.py -v --import-mode=importlib
@@ -1739,7 +1741,7 @@ nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/contract/test_jackett_autoco
 
 Expected: passed (or skipped if schemathesis missing).
 
-- [ ] **Step 3: Commit + push (Layer 6 gate)**
+- [x] **Step 3: Commit + push (Layer 6 gate)**
 
 ```bash
 git add tests/contract/test_jackett_autoconfig_contract.py
@@ -1757,7 +1759,7 @@ git push origin main && git push github main && git push upstream main
 - Create: `challenges/scripts/jackett_autoconfig_clean_slate.sh` (executable)
 - Create: `challenges/scripts/run_all_challenges.sh` (executable)
 
-- [ ] **Step 1: Create the challenges directory and primary script**
+- [x] **Step 1: Create the challenges directory and primary script**
 
 ```bash
 mkdir -p challenges/scripts
@@ -1879,7 +1881,7 @@ exit $fails
 chmod +x challenges/scripts/jackett_autoconfig_clean_slate.sh challenges/scripts/run_all_challenges.sh
 ```
 
-- [ ] **Step 2: Run the challenge**
+- [x] **Step 2: Run the challenge**
 
 ```bash
 ./challenges/scripts/jackett_autoconfig_clean_slate.sh
@@ -1887,7 +1889,7 @@ chmod +x challenges/scripts/jackett_autoconfig_clean_slate.sh challenges/scripts
 
 Expected: prints `PASS: jackett_autoconfig_clean_slate` and exits 0.
 
-- [ ] **Step 3: Commit + push (Layer 7 gate)**
+- [x] **Step 3: Commit + push (Layer 7 gate)**
 
 ```bash
 git add challenges/scripts/jackett_autoconfig_clean_slate.sh challenges/scripts/run_all_challenges.sh
@@ -1904,7 +1906,7 @@ git push origin main && git push github main && git push upstream main
 **Files:**
 - Create: `docs/migration/PARITY_GAPS.md`
 
-- [ ] **Step 1: Read each Python module and find its Go counterpart**
+- [x] **Step 1: Read each Python module and find its Go counterpart**
 
 For each module, run side-by-side:
 
@@ -1918,7 +1920,7 @@ ls qBitTorrent-go/internal/api/        # then Read each
 
 Build a table by direct read. **No code changes** during this phase.
 
-- [ ] **Step 2: Write the audit document**
+- [x] **Step 2: Write the audit document**
 
 ```markdown
 # Python → Go Parity Gaps
@@ -1971,7 +1973,7 @@ Audit method: side-by-side read of public API surface; no behavior testing perfo
 
 Replace every `<fill>` and `<sha>` token by reading the actual Go modules.
 
-- [ ] **Step 3: Sanity-check no `<fill>` tokens remain**
+- [x] **Step 3: Sanity-check no `<fill>` tokens remain**
 
 ```bash
 grep -n '<fill>' docs/migration/PARITY_GAPS.md && echo "INCOMPLETE" || echo "audit complete"
@@ -1979,7 +1981,7 @@ grep -n '<fill>' docs/migration/PARITY_GAPS.md && echo "INCOMPLETE" || echo "aud
 
 Expected: `audit complete`.
 
-- [ ] **Step 4: Commit + push**
+- [x] **Step 4: Commit + push**
 
 ```bash
 git add docs/migration/PARITY_GAPS.md
@@ -1999,7 +2001,7 @@ git push origin main && git push github main && git push upstream main
 - Modify: `docs/JACKETT_INTEGRATION.md`
 - Modify: `.env.example` (if exists)
 
-- [ ] **Step 1: Update `CLAUDE.md` env vars line**
+- [x] **Step 1: Update `CLAUDE.md` env vars line**
 
 Find the existing `## Environment Variables` section (around line 173). Append `JACKETT_INDEXER_MAP`, `JACKETT_AUTOCONFIG_EXCLUDE` to the "Key" list. Append a one-line note about the new endpoint:
 
@@ -2012,11 +2014,11 @@ to `QBITTORRENT,JACKETT,WEBUI,PROXY,MERGE,BRIDGE`). Last-run summary at
 `GET /api/v1/jackett/autoconfig/last` (redacted).
 ```
 
-- [ ] **Step 2: Update `AGENTS.md` with the same env additions**
+- [x] **Step 2: Update `AGENTS.md` with the same env additions**
 
 Find the env-vars table or section in `AGENTS.md` and append the same two vars + endpoint note. Match `AGENTS.md`'s formatting.
 
-- [ ] **Step 3: Append "Auto-Configuration" section to `docs/JACKETT_INTEGRATION.md`**
+- [x] **Step 3: Append "Auto-Configuration" section to `docs/JACKETT_INTEGRATION.md`**
 
 Append a section explaining:
 - Discovery algorithm (env scan → fuzzy match → idempotent POST)
@@ -2024,7 +2026,7 @@ Append a section explaining:
 - Endpoint shape with example response
 - Failure modes (best-effort, never blocks boot)
 
-- [ ] **Step 4: Update `.env.example` if present**
+- [x] **Step 4: Update `.env.example` if present**
 
 ```bash
 test -f .env.example && {
@@ -2033,7 +2035,7 @@ test -f .env.example && {
 }
 ```
 
-- [ ] **Step 5: Commit + push**
+- [x] **Step 5: Commit + push**
 
 ```bash
 git add CLAUDE.md AGENTS.md docs/JACKETT_INTEGRATION.md .env.example 2>/dev/null
@@ -2049,14 +2051,14 @@ git push origin main && git push github main && git push upstream main
 
 **Files:** none
 
-- [ ] **Step 1: Tear down + wipe Jackett state**
+- [x] **Step 1: Tear down + wipe Jackett state**
 
 ```bash
 podman compose down --remove-orphans
 rm -rf ./config/jackett
 ```
 
-- [ ] **Step 2: Run the challenge end-to-end**
+- [x] **Step 2: Run the challenge end-to-end**
 
 ```bash
 ./challenges/scripts/jackett_autoconfig_clean_slate.sh 2>&1 | tee /tmp/final-clean-slate.log
@@ -2064,13 +2066,13 @@ rm -rf ./config/jackett
 
 Expected: ends with `PASS: jackett_autoconfig_clean_slate`. If not, halt — this is a final guard.
 
-- [ ] **Step 3: Confirm full unit + integration suites still green**
+- [x] **Step 3: Confirm full unit + integration suites still green**
 
 ```bash
 nice -n 19 ionice -c 3 -p 1 python3 -m pytest tests/unit/ tests/integration/ -v --import-mode=importlib --maxfail=1
 ```
 
-- [ ] **Step 4: Capture final state into a verification commit**
+- [x] **Step 4: Capture final state into a verification commit**
 
 ```bash
 git commit --allow-empty -m "chore(jackett_autoconfig): final clean-slate verification
@@ -2082,7 +2084,7 @@ git push origin main && git push github main && git push upstream main
 
 ### Task 11.2: Handoff message
 
-- [ ] **Step 1: Confirm endpoints + state**
+- [x] **Step 1: Confirm endpoints + state**
 
 ```bash
 echo "==== container status ===="
@@ -2095,7 +2097,7 @@ echo "==== /api/v1/jackett/autoconfig/last ===="
 curl -s http://localhost:7187/api/v1/jackett/autoconfig/last | python3 -m json.tool
 ```
 
-- [ ] **Step 2: Print handoff summary to the operator**
+- [x] **Step 2: Print handoff summary to the operator**
 
 Surface to the operator:
 - Stack is up at 7185 (qBit), 7186 (proxy), 7187 (merge), 9117 (Jackett).
