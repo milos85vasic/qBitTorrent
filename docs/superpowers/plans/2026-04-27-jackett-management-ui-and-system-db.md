@@ -491,12 +491,13 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func Open(path string) (*sql.DB, error) {
-	dsn := fmt.Sprintf("file:%s?_journal_mode=WAL&_foreign_keys=on&_synchronous=NORMAL", path)
-	conn, err := sql.Open("sqlite3", dsn)
+	// modernc.org/sqlite uses _pragma= syntax for PRAGMA setup.
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=foreign_keys(on)&_pragma=synchronous(NORMAL)", path)
+	conn, err := sql.Open("sqlite", dsn) // driver name "sqlite" (not "sqlite3") for modernc
 	if err != nil {
 		return nil, fmt.Errorf("sql.Open: %w", err)
 	}
@@ -508,6 +509,8 @@ func Open(path string) (*sql.DB, error) {
 	return conn, nil
 }
 ```
+
+> **Driver-swap note (post-Task-1 review):** Task 1's commit `ddcf5f7` swapped `github.com/mattn/go-sqlite3` (CGO-only) for `modernc.org/sqlite` (pure Go). The blank import above locks the dep into the build graph so `go mod tidy` no longer strips it. Driver name is `"sqlite"` (not `"sqlite3"`); DSN uses `_pragma=...(...)` syntax. All subsequent tasks reference this driver.
 
 - [ ] **Step 5: Implement `internal/db/migrate.go`**
 
