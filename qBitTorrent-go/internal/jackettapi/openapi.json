@@ -165,7 +165,7 @@
       "AutoconfigResult": {
         "type": "object",
         "description": "Full redacted summary produced by the autoconfig orchestrator (jackett.AutoconfigResult). Stored byte-verbatim in autoconfig_runs.result_summary_json.",
-        "required": ["ran_at", "discovered", "matched_indexers", "configured_now", "already_present", "skipped_no_match", "skipped_ambiguous", "errors"],
+        "required": ["ran_at", "discovered", "matched_indexers", "configured_now", "already_present", "skipped_no_match", "skipped_ambiguous", "served_by_native_plugin", "errors"],
         "properties": {
           "ran_at": {"type": "string", "format": "date-time"},
           "discovered": {"type": "array", "items": {"type": "string"}},
@@ -178,6 +178,11 @@
           "already_present": {"type": "array", "items": {"type": "string"}},
           "skipped_no_match": {"type": "array", "items": {"type": "string"}},
           "skipped_ambiguous": {"type": "array", "items": {"$ref": "#/components/schemas/AmbiguousMatch"}},
+          "served_by_native_plugin": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Subset of discovered/unmatched names that are served by a native qBittorrent plugin (e.g. NNMCLUB) instead of Jackett. UI uses this to render a 'this is fine' banner."
+          },
           "errors": {"type": "array", "items": {"type": "string"}}
         }
       },

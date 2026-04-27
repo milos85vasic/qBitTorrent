@@ -119,6 +119,7 @@ func bootService(t *testing.T) *httptest.Server {
 					AlreadyPresent:        []string{},
 					SkippedNoMatch:        []string{},
 					SkippedAmbiguous:      []jackett.AmbiguousMatch{},
+					ServedByNativePlugin:  []string{},
 					Errors:                []string{},
 				}
 			},

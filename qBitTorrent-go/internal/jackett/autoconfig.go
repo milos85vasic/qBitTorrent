@@ -27,7 +27,36 @@ type AutoconfigResult struct {
 	AlreadyPresent        []string          `json:"already_present"`
 	SkippedNoMatch        []string          `json:"skipped_no_match"`
 	SkippedAmbiguous      []AmbiguousMatch  `json:"skipped_ambiguous"`
-	Errors                []string          `json:"errors"`
+	// ServedByNativePlugin lists names from SkippedNoMatch (or
+	// DiscoveredCredentials) that are known to be served by a native
+	// qBittorrent plugin (e.g. NNMCLUB) instead of Jackett. The dashboard
+	// uses this to render a "this is fine" banner instead of an error,
+	// since the user does not need to wire up a Jackett indexer for these.
+	// See plan §32 (NNMClub clarification).
+	ServedByNativePlugin []string `json:"served_by_native_plugin"`
+	Errors               []string `json:"errors"`
+}
+
+// nativePluginNames lists tracker env-var prefixes that are served by a
+// native qBittorrent plugin in plugins/ instead of Jackett. Membership is
+// upper-case to match the env-var prefix convention. Extend as needed.
+var nativePluginNames = map[string]bool{
+	"NNMCLUB": true,
+}
+
+// classifyServedByNativePlugin returns the subset of the given names that
+// match the native-plugin allowlist. Used to populate
+// AutoconfigResult.ServedByNativePlugin from the unmatched/discovered
+// pools so the UI can show a clarifying banner.
+func classifyServedByNativePlugin(names []string) []string {
+	out := make([]string, 0)
+	for _, n := range names {
+		if nativePluginNames[strings.ToUpper(n)] {
+			out = append(out, n)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // AutoconfigDeps holds the DB repositories and the Jackett client the
@@ -138,6 +167,7 @@ func Autoconfigure(deps AutoconfigDeps, envOverrides map[string]string) Autoconf
 		AlreadyPresent:        []string{},
 		SkippedNoMatch:        []string{},
 		SkippedAmbiguous:      []AmbiguousMatch{},
+		ServedByNativePlugin:  []string{},
 		Errors:                []string{},
 	}
 
@@ -220,6 +250,34 @@ func Autoconfigure(deps AutoconfigDeps, envOverrides map[string]string) Autoconf
 	result.MatchedIndexers = matched
 	result.SkippedAmbiguous = ambiguous
 	result.SkippedNoMatch = unmatched
+
+	// Tag any unmatched names that are actually served by a native
+	// qBittorrent plugin (e.g. NNMCLUB) so the UI can render a clarifying
+	// banner instead of treating it as a bug. We also scan ambiguous
+	// candidates and the full discovered list — if a known native plugin
+	// shows up anywhere in these pools, the user gets the banner.
+	nativeSet := map[string]bool{}
+	for _, n := range classifyServedByNativePlugin(unmatched) {
+		nativeSet[n] = true
+	}
+	for _, a := range ambiguous {
+		for _, n := range classifyServedByNativePlugin([]string{a.EnvName}) {
+			nativeSet[n] = true
+		}
+	}
+	for _, n := range classifyServedByNativePlugin(discovered) {
+		// Only flag if it's NOT already happily configured at Jackett —
+		// that would mean Jackett DOES support it for this user.
+		if _, ok := matched[n]; !ok {
+			nativeSet[n] = true
+		}
+	}
+	served := make([]string, 0, len(nativeSet))
+	for n := range nativeSet {
+		served = append(served, n)
+	}
+	sort.Strings(served)
+	result.ServedByNativePlugin = served
 
 	// Step 5: configure. Iterate matched in env-name order for determinism
 	// (map range is unordered).

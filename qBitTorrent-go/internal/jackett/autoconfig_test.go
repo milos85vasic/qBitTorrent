@@ -222,6 +222,89 @@ func TestAutoconfigureHappyPath(t *testing.T) {
 	}
 }
 
+// TestAutoconfigureNNMClubServedByNativePlugin pins the Task 32
+// behaviour: when a discovered credential is a known native-plugin
+// tracker (NNMCLUB) and Jackett's catalog has no matching indexer, the
+// orchestrator MUST list it in ServedByNativePlugin so the UI can render
+// the "this is served by a native qBittorrent plugin" banner.
+//
+// Anti-bluff: a stub that just returned an empty AutoconfigResult would
+// FAIL because we assert on the exact membership. A regression that
+// dropped the classifier would also FAIL because ServedByNativePlugin
+// would be the pre-allocated empty slice instead of containing
+// NNMCLUB.
+func TestAutoconfigureNNMClubServedByNativePlugin(t *testing.T) {
+	// Catalog has only rutracker — NNMCLUB will land in unmatched.
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "POST" && r.URL.Path == "/UI/Dashboard":
+			w.WriteHeader(302)
+		case r.URL.Path == "/api/v2.0/indexers" && r.Method == "GET":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{"id":"rutracker","name":"RuTracker","type":"private","configured":true}]`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(500)
+		}
+	})
+	h := newHarness(t, handler)
+	defer h.cleanup()
+	if err := h.deps.Creds.Upsert("NNMCLUB", "cookie", nil, nil, acStrPtr("sid=abc")); err != nil {
+		t.Fatalf("seed nnmclub: %v", err)
+	}
+
+	res := Autoconfigure(h.deps, nil)
+
+	// NNMCLUB must be in unmatched (no rutracker-like fuzzy match).
+	foundUnmatched := false
+	for _, u := range res.SkippedNoMatch {
+		if u == "NNMCLUB" {
+			foundUnmatched = true
+		}
+	}
+	if !foundUnmatched {
+		t.Fatalf("expected NNMCLUB in SkippedNoMatch: %+v", res.SkippedNoMatch)
+	}
+
+	// And critically: NNMCLUB must show up in ServedByNativePlugin.
+	foundServed := false
+	for _, n := range res.ServedByNativePlugin {
+		if n == "NNMCLUB" {
+			foundServed = true
+		}
+	}
+	if !foundServed {
+		t.Fatalf("expected NNMCLUB in ServedByNativePlugin, got %+v", res.ServedByNativePlugin)
+	}
+
+	// Round-trips through JSON the same way the runs row stores it.
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"served_by_native_plugin":["NNMCLUB"]`) {
+		t.Fatalf("served_by_native_plugin missing or not array: %s", encoded)
+	}
+}
+
+// TestAutoconfigureServedByNativePluginEmptyArray verifies the empty-slice
+// initialization fix from Phase 6 still applies to the new field — when
+// the discovered set has no native-plugin trackers, the JSON must
+// serialize as `[]` not `null`.
+func TestAutoconfigureServedByNativePluginEmptyArray(t *testing.T) {
+	h := newHarness(t, http.NotFoundHandler())
+	defer h.cleanup()
+
+	res := Autoconfigure(h.deps, nil)
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"served_by_native_plugin":[]`) {
+		t.Fatalf("served_by_native_plugin should serialize as []: %s", encoded)
+	}
+}
+
 // TestParseIndexerMapCSV exercises the env-string parser used to merge
 // JACKETT_INDEXER_MAP into the override map. Mirrors Python _parse_indexer_map.
 func TestParseIndexerMapCSV(t *testing.T) {
