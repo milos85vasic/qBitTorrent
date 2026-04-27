@@ -431,6 +431,38 @@ wait_for_jackett() {
     return 0
 }
 
+ensure_boba_master_key() {
+    # Auto-generates BOBA_MASTER_KEY (32-byte hex) into ./.env if missing
+    # or malformed. The Go binary (cmd/boba-jackett) ALSO generates on
+    # startup via bootstrap.EnsureMasterKey — this host-side path is the
+    # earlier defense in depth so the docker-compose env-var interpolation
+    # has a value before the container starts.
+    #
+    # Safe to run repeatedly. Existing valid key (64 hex chars) is left
+    # alone. File mode is forced to 0600 — never world-readable.
+    local env_file="$SCRIPT_DIR/.env"
+    if [[ ! -f "$env_file" ]]; then
+        touch "$env_file"
+        chmod 0600 "$env_file"
+    fi
+    if grep -qE '^BOBA_MASTER_KEY=[0-9a-fA-F]{64}$' "$env_file"; then
+        return 0
+    fi
+    print_info "Generating BOBA_MASTER_KEY (32-byte hex) for boba-jackett credential encryption..."
+    local key
+    key=$(head -c 32 /dev/urandom | xxd -p -c 64)
+    {
+        echo ""
+        echo "# === BOBA SYSTEM ==="
+        echo "# Master key for credential encryption-at-rest in config/boba.db."
+        echo "# DO NOT LOSE THIS — credentials become unrecoverable without it."
+        echo "# To rotate: see docs/BOBA_DATABASE.md § \"Key Rotation\"."
+        echo "BOBA_MASTER_KEY=$key"
+    } >> "$env_file"
+    chmod 0600 "$env_file"
+    print_success "BOBA_MASTER_KEY persisted to .env (mode 0600)"
+}
+
 extract_jackett_key() {
     local config_file="$SCRIPT_DIR/config/jackett/Jackett/ServerConfig.json"
     if [[ ! -f "$config_file" ]]; then
@@ -658,6 +690,7 @@ main() {
     fi
 
     load_environment
+    ensure_boba_master_key
     detect_container_runtime
     check_prerequisites
 
