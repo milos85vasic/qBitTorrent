@@ -53,4 +53,34 @@ JACKETT_API_KEY=ignored
 	if len(bundles) != 2 {
 		t.Fatalf("want 2 (RUTRACKER, IPTORRENTS), got %+v", bundles)
 	}
+	// Order MUST be deterministic (alphabetical by Name) so boot logs and
+	// downstream import passes are reproducible across runs.
+	if bundles[0].Name != "IPTORRENTS" {
+		t.Fatalf("bundles[0].Name = %q, want IPTORRENTS", bundles[0].Name)
+	}
+	if bundles[1].Name != "RUTRACKER" {
+		t.Fatalf("bundles[1].Name = %q, want RUTRACKER", bundles[1].Name)
+	}
+}
+
+func TestEnsureMasterKeyDoesNotDuplicateHeader(t *testing.T) {
+	dir := t.TempDir()
+	envP := filepath.Join(dir, ".env")
+	// Pre-seed: header present, key MISSING (the old crash-window state).
+	seed := "FOO=bar\n\n# === BOBA SYSTEM ===\n# Master key for credential encryption-at-rest in config/boba.db.\n# DO NOT LOSE THIS — credentials become unrecoverable without it.\n# To rotate: see docs/BOBA_DATABASE.md § \"Key Rotation\".\n"
+	if err := os.WriteFile(envP, []byte(seed), 0600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	_, generated, err := EnsureMasterKey(envP)
+	if err != nil {
+		t.Fatalf("EnsureMasterKey: %v", err)
+	}
+	if !generated {
+		t.Fatal("expected generated=true (key was missing)")
+	}
+	body, _ := os.ReadFile(envP)
+	count := strings.Count(string(body), "=== BOBA SYSTEM ===")
+	if count != 1 {
+		t.Fatalf("header duplicated, count=%d:\n%s", count, body)
+	}
 }

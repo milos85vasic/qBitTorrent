@@ -92,6 +92,67 @@ func TestDeleteOnMissingFileNoCreate(t *testing.T) {
 	}
 }
 
+func TestAtomicAppendsAndPersists(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, ".env")
+	if err := os.WriteFile(p, []byte("FOO=bar\n"), 0600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	err := Atomic(p, func(lines []string) []string {
+		return append(lines, "BAZ=qux", "QUUX=zot")
+	})
+	if err != nil {
+		t.Fatalf("Atomic: %v", err)
+	}
+	body, _ := os.ReadFile(p)
+	s := string(body)
+	if !strings.Contains(s, "FOO=bar") {
+		t.Fatalf("FOO=bar lost:\n%s", s)
+	}
+	if !strings.Contains(s, "BAZ=qux") {
+		t.Fatalf("BAZ=qux missing:\n%s", s)
+	}
+	if !strings.Contains(s, "QUUX=zot") {
+		t.Fatalf("QUUX=zot missing:\n%s", s)
+	}
+	got, err := Parse(strings.NewReader(s))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got["FOO"] != "bar" || got["BAZ"] != "qux" || got["QUUX"] != "zot" {
+		t.Fatalf("values mismatch: %+v", got)
+	}
+}
+
+func TestAtomicHonorsConcurrentMutex(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, ".env")
+	if err := os.WriteFile(p, []byte(""), 0600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	var wg sync.WaitGroup
+	const N = 50
+	for n := 0; n < N; n++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = Atomic(p, func(lines []string) []string {
+				return append(lines, "K=v", "K2=v2")
+			})
+		}()
+	}
+	wg.Wait()
+	// No corruption: file must parse successfully.
+	body, _ := os.ReadFile(p)
+	got, err := Parse(strings.NewReader(string(body)))
+	if err != nil {
+		t.Fatalf("post-concurrent parse: %v\nbody:\n%s", err, body)
+	}
+	if got["K"] != "v" || got["K2"] != "v2" {
+		t.Fatalf("post-concurrent values lost: %+v", got)
+	}
+}
+
 func TestCRLFNormalizedOnRead(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, ".env")

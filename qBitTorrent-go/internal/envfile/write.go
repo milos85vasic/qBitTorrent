@@ -61,6 +61,21 @@ func Upsert(path string, kv map[string]string) error {
 	})
 }
 
+// Atomic exposes the package's atomic-write primitive (read → transform →
+// tmp+fsync → rename → dir-fsync) to callers that need to compose multiple
+// mutations in one durable pass. The transform function receives the
+// current lines (CRLF normalized) and returns the new lines; an empty
+// return on a missing file is a no-op.
+//
+// Use Upsert/Delete for the common single-mutation cases; reach for Atomic
+// only when you need to combine, e.g., adding a comment block AND keys in
+// one rename.
+func Atomic(path string, fn func([]string) []string) error {
+	writerMu.Lock()
+	defer writerMu.Unlock()
+	return mutate(path, fn)
+}
+
 // Delete removes the given keys atomically. Comment lines and other
 // keys are preserved. Mode is forced to 0600.
 func Delete(path string, keys []string) error {

@@ -1,6 +1,9 @@
 package bootstrap
 
-import "regexp"
+import (
+	"regexp"
+	"sort"
+)
 
 // credRE matches legacy credential triple keys: NAME_USERNAME,
 // NAME_PASSWORD, NAME_COOKIES. NAME captures group 1, the kind
@@ -21,8 +24,8 @@ type CredBundle struct {
 // triples (NAME_USERNAME, NAME_PASSWORD, NAME_COOKIES) and returns one
 // bundle per NAME that has either a complete username+password pair OR
 // a non-empty cookies value. Names whose prefix matches the exclude
-// set are skipped. Order of returned bundles is non-deterministic
-// (map iteration); callers that need ordering should sort.
+// set are skipped. Returned bundles are sorted alphabetically by Name
+// so boot logs and downstream import passes are reproducible.
 func DiscoverCredentialBundles(env map[string]string, exclude map[string]bool) []*CredBundle {
 	groups := map[string]*CredBundle{}
 	for k, v := range env {
@@ -56,5 +59,6 @@ func DiscoverCredentialBundles(env map[string]string, exclude map[string]bool) [
 			out = append(out, b)
 		}
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
