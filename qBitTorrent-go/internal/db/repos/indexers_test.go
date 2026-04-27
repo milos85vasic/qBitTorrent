@@ -1,6 +1,7 @@
 package repos
 
 import (
+	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -87,5 +88,54 @@ func TestIndexersRecordTest(t *testing.T) {
 	}
 	if rows[0].LastTestAt == nil {
 		t.Fatalf("LastTestAt should be set")
+	}
+}
+
+func TestFKDeleteCredentialNullsLinkedIndexer(t *testing.T) {
+	// Wire BOTH repos onto the same connection so they share state.
+	dir := t.TempDir()
+	conn, err := db.Open(filepath.Join(dir, "t.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if err := db.Migrate(conn); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	key := make([]byte, 32)
+	rand.Read(key)
+	creds := NewCredentials(conn, key)
+	idx := NewIndexers(conn)
+
+	// Insert credential, then indexer linking to it.
+	if err := creds.Upsert("RUTRACKER", "userpass", strPtr("u"), strPtr("p"), nil); err != nil {
+		t.Fatalf("creds.Upsert: %v", err)
+	}
+	link := "RUTRACKER"
+	if err := idx.Upsert(&Indexer{
+		ID: "rutracker", DisplayName: "RuTracker", Type: "private",
+		ConfiguredAtJackett: true, EnabledForSearch: true,
+		LinkedCredentialName: &link,
+	}); err != nil {
+		t.Fatalf("idx.Upsert: %v", err)
+	}
+
+	// Sanity: the link is set.
+	rows, _ := idx.List()
+	if rows[0].LinkedCredentialName == nil || *rows[0].LinkedCredentialName != "RUTRACKER" {
+		t.Fatalf("link not set pre-delete: %+v", rows[0].LinkedCredentialName)
+	}
+
+	// Delete the credential — FK ON DELETE SET NULL should null the indexer's link.
+	if err := creds.Delete("RUTRACKER"); err != nil {
+		t.Fatalf("creds.Delete: %v", err)
+	}
+
+	// Verify the indexer row still exists with linked_credential_name now NULL.
+	rows, _ = idx.List()
+	if len(rows) != 1 {
+		t.Fatalf("indexer row should still exist; got %d rows", len(rows))
+	}
+	if rows[0].LinkedCredentialName != nil {
+		t.Fatalf("FK ON DELETE SET NULL did not fire — link still %q", *rows[0].LinkedCredentialName)
 	}
 }
