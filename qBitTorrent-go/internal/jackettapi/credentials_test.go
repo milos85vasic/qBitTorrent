@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
-	"io"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -343,6 +342,16 @@ func TestDeleteCredentialBadPathReturns400(t *testing.T) {
 	}
 }
 
+func TestDeleteCredentialNestedPathReturns400(t *testing.T) {
+	h := newCredsHarness(t)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("DELETE", "/api/v1/jackett/credentials/RUTRACKER/extra", nil)
+	h.deps.HandleDeleteCredential(rec, req)
+	if rec.Code != 400 {
+		t.Fatalf("expected 400 for nested path, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestDeleteCredentialIdempotent(t *testing.T) {
 	// Spec §8.1 says DELETE returns 204; the underlying repo Delete is
 	// idempotent (no error if row didn't exist). Confirm the handler is
@@ -355,6 +364,3 @@ func TestDeleteCredentialIdempotent(t *testing.T) {
 		t.Fatalf("expected 204 for missing name, got %d", rec.Code)
 	}
 }
-
-// io.ReadAll guard against accidental imports
-var _ = io.ReadAll
