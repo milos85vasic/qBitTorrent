@@ -62,14 +62,12 @@ func TestConcurrentWritesNoCorruption(t *testing.T) {
 	p := filepath.Join(dir, ".env")
 	os.WriteFile(p, []byte(""), 0600)
 	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
-		i := i
+	for n := 0; n < 50; n++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			_ = Upsert(p, map[string]string{"K": "v"})
 			_ = Upsert(p, map[string]string{"K2": "v2"})
-			_ = i
 		}()
 	}
 	wg.Wait()
@@ -80,5 +78,34 @@ func TestConcurrentWritesNoCorruption(t *testing.T) {
 	}
 	if got["K"] != "v" || got["K2"] != "v2" {
 		t.Fatalf("post-concurrent values lost: %+v", got)
+	}
+}
+
+func TestDeleteOnMissingFileNoCreate(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, ".env")
+	if err := Delete(p, []string{"FOO"}); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := os.Stat(p); !os.IsNotExist(err) {
+		t.Fatalf("Delete created a file at %s when it should not have", p)
+	}
+}
+
+func TestCRLFNormalizedOnRead(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, ".env")
+	// Seed with Windows line endings.
+	os.WriteFile(p, []byte("FOO=bar\r\nBAZ=qux\r\n"), 0600)
+	if err := Upsert(p, map[string]string{"NEW": "v"}); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	body, _ := os.ReadFile(p)
+	if strings.Contains(string(body), "\r") {
+		t.Fatalf("CR remained after upsert:\n%q", body)
+	}
+	got, _ := Parse(strings.NewReader(string(body)))
+	if got["FOO"] != "bar" || got["BAZ"] != "qux" || got["NEW"] != "v" {
+		t.Fatalf("values lost or mangled: %+v", got)
 	}
 }

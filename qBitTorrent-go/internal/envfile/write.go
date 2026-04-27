@@ -98,14 +98,21 @@ func Delete(path string, keys []string) error {
 // writerMu.
 func mutate(path string, fn func([]string) []string) error {
 	body, err := os.ReadFile(path)
+	existedBefore := err == nil
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("read: %w", err)
 	}
+	// Normalize CRLF to LF so Windows-edited .env files don't leave \r in values.
+	text := strings.ReplaceAll(string(body), "\r\n", "\n")
 	lines := []string{}
-	if len(body) > 0 {
-		lines = strings.Split(strings.TrimRight(string(body), "\n"), "\n")
+	if len(text) > 0 {
+		lines = strings.Split(strings.TrimRight(text, "\n"), "\n")
 	}
 	out := fn(lines)
+	// Don't materialize a placeholder file if input was missing AND nothing to write.
+	if !existedBefore && len(out) == 0 {
+		return nil
+	}
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
