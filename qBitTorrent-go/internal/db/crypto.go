@@ -15,11 +15,16 @@ const (
 )
 
 var (
+	// ErrEmptyPlaintext is returned when Encrypt is called with an empty plaintext string.
 	ErrEmptyPlaintext = errors.New("crypto: empty plaintext")
-	ErrShortBlob      = errors.New("crypto: blob shorter than nonce")
-	ErrBadKeySize     = errors.New("crypto: key must be 32 bytes (AES-256)")
+	// ErrShortBlob is returned when Decrypt receives a blob shorter than the nonce size.
+	ErrShortBlob = errors.New("crypto: blob shorter than nonce")
+	// ErrBadKeySize is returned when key length is not 32 bytes (AES-256 requirement).
+	ErrBadKeySize = errors.New("crypto: key must be 32 bytes (AES-256)")
 )
 
+// Encrypt seals plaintext with AES-256-GCM and a random 12-byte nonce.
+// Returns nonce||ciphertext_with_tag. Plaintext must be non-empty; key must be exactly 32 bytes.
 func Encrypt(key []byte, plaintext string) ([]byte, error) {
 	if len(key) != keySize {
 		return nil, ErrBadKeySize
@@ -46,6 +51,8 @@ func Encrypt(key []byte, plaintext string) ([]byte, error) {
 	return out, nil
 }
 
+// Decrypt opens a blob produced by Encrypt. Returns the original plaintext as a string.
+// Tampered ciphertext returns an error from GCM authentication.
 func Decrypt(key []byte, blob []byte) (string, error) {
 	if len(key) != keySize {
 		return "", ErrBadKeySize

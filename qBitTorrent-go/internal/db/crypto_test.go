@@ -1,9 +1,7 @@
 package db
 
 import (
-	"bytes"
 	"crypto/rand"
-	"strings"
 	"testing"
 )
 
@@ -67,8 +65,5 @@ func TestBlobShape(t *testing.T) {
 	blob, _ := Encrypt(key32(), "x")
 	if len(blob) < 12+16 { // nonce(12) + GCM tag(16) + at least 1 byte
 		t.Fatalf("blob too short: %d", len(blob))
-	}
-	if !bytes.Equal(blob[:12], blob[:12]) || strings.Contains(string(blob), "x") {
-		// just sanity — the test above already proves round-trip
 	}
 }
