@@ -12,5 +12,8 @@ cd "$ROOT_DIR" && go build -o "$BIN_DIR/qbittorrent-proxy" ./cmd/qbittorrent-pro
 echo "Building webui-bridge..."
 cd "$ROOT_DIR" && go build -o "$BIN_DIR/webui-bridge" ./cmd/webui-bridge
 
+echo "Building boba-jackett..."
+cd "$ROOT_DIR" && go build -o "$BIN_DIR/boba-jackett" ./cmd/boba-jackett
+
 echo "Build complete: $BIN_DIR/"
 ls -la "$BIN_DIR/"
