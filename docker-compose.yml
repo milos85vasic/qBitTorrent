@@ -159,3 +159,39 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+
+  # boba-jackett — Go service exposing the Jackett management API on :7189.
+  # See docs/superpowers/specs/2026-04-27-jackett-management-ui-and-system-db-design.md §4.2.
+  # Network host so it can reach Jackett on localhost:9117 and serve :7189
+  # to the dashboard alongside the existing services.
+  boba-jackett:
+    build:
+      context: ./qBitTorrent-go
+      dockerfile: Dockerfile.jackett
+    container_name: boba-jackett
+    environment:
+      - JACKETT_URL=http://localhost:9117
+      - JACKETT_API_KEY=${JACKETT_API_KEY:-}
+      - BOBA_MASTER_KEY=${BOBA_MASTER_KEY:-}
+      - BOBA_DB_PATH=/config/boba.db
+      - BOBA_ENV_PATH=/host-env/.env
+      - PORT=7189
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./config:/config                    # boba.db lives here
+      - ./config/jackett:/jackett-config:ro
+      - ./.env:/host-env/.env               # bind-mount for atomic mirror writes
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 256m
+    pids_limit: 256
+    oom_score_adj: 500
+    depends_on:
+      jackett:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7189/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
