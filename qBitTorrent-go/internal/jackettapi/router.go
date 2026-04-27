@@ -34,6 +34,7 @@ type Deps struct {
 // Route table (spec §8):
 //
 //	/healthz                                    GET            §8.6
+//	/openapi.json                               GET            Task 22
 //	/api/v1/jackett/credentials                 GET, POST      §8.1
 //	/api/v1/jackett/credentials/{name}          DELETE         §8.1
 //	/api/v1/jackett/indexers                    GET            §8.2
@@ -57,6 +58,10 @@ func NewMux(d *Deps) http.Handler {
 
 	// §8.6 health (GET only — passes WithAuth without credentials).
 	mux.HandleFunc("/healthz", d.Health.HandleHealth)
+
+	// Task 22 OpenAPI 3.1 spec (GET only — public). Served verbatim
+	// from the embedded openapi.json sibling file.
+	mux.HandleFunc("/openapi.json", HandleOpenAPI)
 
 	// §8.1 credentials
 	mux.HandleFunc("/api/v1/jackett/credentials", func(w http.ResponseWriter, r *http.Request) {

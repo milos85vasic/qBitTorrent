@@ -1,0 +1,538 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "boba-jackett HTTP API",
+    "version": "0.1.0",
+    "description": "Jackett management API for the Боба dashboard. Spec: docs/superpowers/specs/2026-04-27-jackett-management-ui-and-system-db-design.md"
+  },
+  "servers": [
+    {"url": "http://localhost:7189", "description": "default boba-jackett port"}
+  ],
+  "tags": [
+    {"name": "Health", "description": "Liveness / readiness."},
+    {"name": "Meta", "description": "Service metadata (OpenAPI spec)."},
+    {"name": "Credentials", "description": "Tracker credentials (DB-encrypted, mirrored to .env)."},
+    {"name": "Indexers", "description": "Configured Jackett indexer rows."},
+    {"name": "Catalog", "description": "Cached Jackett indexer catalog."},
+    {"name": "Autoconfig", "description": "Autoconfig orchestrator runs and trigger."},
+    {"name": "Overrides", "description": "Manual env_name → indexer_id overrides."}
+  ],
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {"type": "http", "scheme": "basic"}
+    },
+    "schemas": {
+      "ErrorBody": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {"type": "string", "description": "machine-readable error code"},
+          "detail": {"type": "string", "description": "human-readable detail"}
+        }
+      },
+      "HealthDTO": {
+        "type": "object",
+        "required": ["status", "db_ok", "jackett_ok", "version", "uptime_s"],
+        "properties": {
+          "status": {"type": "string", "enum": ["ok", "degraded", "unhealthy"]},
+          "db_ok": {"type": "boolean"},
+          "jackett_ok": {"type": "boolean"},
+          "version": {"type": "string"},
+          "uptime_s": {"type": "integer", "format": "int64", "minimum": 0}
+        }
+      },
+      "CredentialDTO": {
+        "type": "object",
+        "description": "Credential metadata. Plaintext username / password / cookies are NEVER serialized — only has_* booleans and timestamps. Spec §8.1.",
+        "required": ["name", "kind", "has_username", "has_password", "has_cookies", "created_at", "updated_at"],
+        "properties": {
+          "name": {"type": "string", "description": "Upper-case env-var prefix (e.g. RUTRACKER)."},
+          "kind": {"type": "string", "enum": ["userpass", "cookie"]},
+          "has_username": {"type": "boolean"},
+          "has_password": {"type": "boolean"},
+          "has_cookies": {"type": "boolean"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "last_used_at": {"type": ["string", "null"], "format": "date-time"}
+        }
+      },
+      "CredentialPostBody": {
+        "type": "object",
+        "description": "PATCH semantics — only fields whose JSON keys are present are updated. PLAINTEXT values are accepted on this body (the operator just typed them); the response shape never echoes them back.",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "username": {"type": "string"},
+          "password": {"type": "string"},
+          "cookies": {"type": "string"}
+        }
+      },
+      "IndexerDTO": {
+        "type": "object",
+        "required": ["id", "display_name", "type", "configured_at_jackett", "linked_credential_name", "enabled_for_search", "last_jackett_sync_at", "last_test_status", "last_test_at"],
+        "properties": {
+          "id": {"type": "string"},
+          "display_name": {"type": "string"},
+          "type": {"type": "string"},
+          "configured_at_jackett": {"type": "boolean"},
+          "linked_credential_name": {"type": ["string", "null"]},
+          "enabled_for_search": {"type": "boolean"},
+          "last_jackett_sync_at": {"type": ["string", "null"], "format": "date-time"},
+          "last_test_status": {"type": ["string", "null"], "enum": ["ok", "auth_failed", "unreachable", "empty_results", null]},
+          "last_test_at": {"type": ["string", "null"], "format": "date-time"}
+        }
+      },
+      "IndexerConfigureBody": {
+        "type": "object",
+        "required": ["credential_name"],
+        "properties": {
+          "credential_name": {"type": "string", "description": "Existing row in the credentials table."},
+          "extra_fields": {
+            "type": "array",
+            "description": "Optional Jackett config fields. Entries with matching id override the populated template's value (later wins).",
+            "items": {"type": "object", "additionalProperties": true}
+          }
+        }
+      },
+      "IndexerPatchBody": {
+        "type": "object",
+        "required": ["enabled_for_search"],
+        "properties": {
+          "enabled_for_search": {"type": "boolean"}
+        }
+      },
+      "IndexerTestResult": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {"type": "string", "enum": ["ok", "auth_failed", "unreachable", "empty_results"]},
+          "details": {"type": "string"}
+        }
+      },
+      "CatalogItemDTO": {
+        "type": "object",
+        "required": ["id", "display_name", "type", "required_fields"],
+        "properties": {
+          "id": {"type": "string"},
+          "display_name": {"type": "string"},
+          "type": {"type": "string"},
+          "language": {"type": "string"},
+          "description": {"type": "string"},
+          "required_fields": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Credential-bearing field ids the dashboard should prompt for."
+          }
+        }
+      },
+      "CatalogPageDTO": {
+        "type": "object",
+        "required": ["total", "page", "page_size", "items"],
+        "properties": {
+          "total": {"type": "integer", "minimum": 0},
+          "page": {"type": "integer", "minimum": 1},
+          "page_size": {"type": "integer", "minimum": 1, "maximum": 200},
+          "items": {"type": "array", "items": {"$ref": "#/components/schemas/CatalogItemDTO"}}
+        }
+      },
+      "CatalogRefreshResultDTO": {
+        "type": "object",
+        "required": ["refreshed_count", "errors"],
+        "properties": {
+          "refreshed_count": {"type": "integer", "minimum": 0},
+          "errors": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "RunSummaryDTO": {
+        "type": "object",
+        "required": ["id", "ran_at", "discovered_count", "configured_now_count", "error_count"],
+        "properties": {
+          "id": {"type": "integer", "format": "int64"},
+          "ran_at": {"type": "string", "format": "date-time"},
+          "discovered_count": {"type": "integer", "minimum": 0},
+          "configured_now_count": {"type": "integer", "minimum": 0},
+          "error_count": {"type": "integer", "minimum": 0}
+        }
+      },
+      "AmbiguousMatch": {
+        "type": "object",
+        "required": ["env_name", "candidates"],
+        "properties": {
+          "env_name": {"type": "string"},
+          "candidates": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "AutoconfigResult": {
+        "type": "object",
+        "description": "Full redacted summary produced by the autoconfig orchestrator (jackett.AutoconfigResult). Stored byte-verbatim in autoconfig_runs.result_summary_json.",
+        "required": ["ran_at", "discovered", "matched_indexers", "configured_now", "already_present", "skipped_no_match", "skipped_ambiguous", "errors"],
+        "properties": {
+          "ran_at": {"type": "string", "format": "date-time"},
+          "discovered": {"type": "array", "items": {"type": "string"}},
+          "matched_indexers": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "description": "env_name → indexer_id."
+          },
+          "configured_now": {"type": "array", "items": {"type": "string"}},
+          "already_present": {"type": "array", "items": {"type": "string"}},
+          "skipped_no_match": {"type": "array", "items": {"type": "string"}},
+          "skipped_ambiguous": {"type": "array", "items": {"$ref": "#/components/schemas/AmbiguousMatch"}},
+          "errors": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "OverrideDTO": {
+        "type": "object",
+        "required": ["env_name", "indexer_id", "created_at"],
+        "properties": {
+          "env_name": {"type": "string"},
+          "indexer_id": {"type": "string"},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "OverridePostBody": {
+        "type": "object",
+        "required": ["env_name", "indexer_id"],
+        "properties": {
+          "env_name": {"type": "string", "description": "Normalized to upper-case server-side."},
+          "indexer_id": {"type": "string"}
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "validation error",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorBody"}}}
+      },
+      "Unauthorized": {
+        "description": "missing or wrong Basic auth (admin/admin) on a mutating endpoint",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorBody"}}}
+      },
+      "NotFound": {
+        "description": "resource not found",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorBody"}}}
+      },
+      "InternalError": {
+        "description": "internal server error (DB / env-file write / decrypt failure)",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorBody"}}}
+      },
+      "BadGateway": {
+        "description": "Jackett admin-API call failed",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorBody"}}}
+      }
+    }
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Liveness + readiness probe.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "always 200; consult body fields for actual subsystem state",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HealthDTO"}}}
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": ["Meta"],
+        "summary": "Return this OpenAPI 3.1 spec.",
+        "operationId": "getOpenAPISpec",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 document",
+            "content": {"application/json": {"schema": {"type": "object"}}}
+          }
+        }
+      }
+    },
+    "/api/v1/jackett/credentials": {
+      "get": {
+        "tags": ["Credentials"],
+        "summary": "List credentials (metadata only — never plaintext).",
+        "operationId": "listCredentials",
+        "responses": {
+          "200": {
+            "description": "credential metadata array",
+            "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/CredentialDTO"}}}}
+          },
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      },
+      "post": {
+        "tags": ["Credentials"],
+        "summary": "Upsert a credential (PATCH semantics) and mirror to .env.",
+        "operationId": "upsertCredential",
+        "security": [{"basicAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CredentialPostBody"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "post-write metadata snapshot",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CredentialDTO"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/api/v1/jackett/credentials/{name}": {
+      "parameters": [
+        {"name": "name", "in": "path", "required": true, "schema": {"type": "string"}}
+      ],
+      "delete": {
+        "tags": ["Credentials"],
+        "summary": "Delete credential, .env keys, and any linked Jackett indexers.",
+        "operationId": "deleteCredential",
+        "security": [{"basicAuth": []}],
+        "responses": {
+          "204": {"description": "deleted (idempotent — missing name still returns 204)"},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/api/v1/jackett/indexers": {
+      "get": {
+        "tags": ["Indexers"],
+        "summary": "List configured indexer rows.",
+        "operationId": "listIndexers",
+        "responses": {
+          "200": {
+            "description": "indexer array",
+            "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/IndexerDTO"}}}}
+          },
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/api/v1/jackett/indexers/{id}": {
+      "parameters": [
+        {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}
+      ],
+      "post": {
+        "tags": ["Indexers"],
+        "summary": "Configure an indexer at Jackett with a named credential.",
+        "operationId": "configureIndexer",
+        "security": [{"basicAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IndexerConfigureBody"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "newly written indexer row",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IndexerDTO"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "500": {"$ref": "#/components/responses/InternalError"},
+          "502": {"$ref": "#/components/responses/BadGateway"}
+        }
+      },
+      "delete": {
+        "tags": ["Indexers"],
+        "summary": "Delete indexer from Jackett (best-effort) and from local DB.",
+        "operationId": "deleteIndexer",
+        "security": [{"basicAuth": []}],
+        "responses": {
+          "204": {"description": "deleted"},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      },
+      "patch": {
+        "tags": ["Indexers"],
+        "summary": "Toggle enabled_for_search on a configured indexer.",
+        "operationId": "patchIndexer",
+        "security": [{"basicAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IndexerPatchBody"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "post-write indexer row",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IndexerDTO"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/api/v1/jackett/indexers/{id}/test": {
+      "parameters": [
+        {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}
+      ],
+      "post": {
+        "tags": ["Indexers"],
+        "summary": "Probe a configured indexer; records last_test_status.",
+        "operationId": "testIndexer",
+        "security": [{"basicAuth": []}],
+        "responses": {
+          "200": {
+            "description": "test result",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IndexerTestResult"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/api/v1/jackett/catalog": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List the cached Jackett indexer catalog (paginated).",
+        "operationId": "listCatalog",
+        "parameters": [
+          {"name": "search", "in": "query", "schema": {"type": "string"}},
+          {"name": "type", "in": "query", "schema": {"type": "string"}},
+          {"name": "language", "in": "query", "schema": {"type": "string"}},
+          {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "default": 1}},
+          {"name": "page_size", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50}}
+        ],
+        "responses": {
+          "200": {
+            "description": "catalog page",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CatalogPageDTO"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/api/v1/jackett/catalog/refresh": {
+      "post": {
+        "tags": ["Catalog"],
+        "summary": "Re-fetch every indexer template from Jackett and persist.",
+        "operationId": "refreshCatalog",
+        "security": [{"basicAuth": []}],
+        "responses": {
+          "200": {
+            "description": "refresh summary (per-indexer errors are non-fatal)",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CatalogRefreshResultDTO"}}}
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "500": {"$ref": "#/components/responses/InternalError"},
+          "502": {"$ref": "#/components/responses/BadGateway"}
+        }
+      }
+    },
+    "/api/v1/jackett/autoconfig/runs": {
+      "get": {
+        "tags": ["Autoconfig"],
+        "summary": "List autoconfig run summaries (most recent first).",
+        "operationId": "listAutoconfigRuns",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50}}
+        ],
+        "responses": {
+          "200": {
+            "description": "run summary array",
+            "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/RunSummaryDTO"}}}}
+          },
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/api/v1/jackett/autoconfig/runs/{id}": {
+      "parameters": [
+        {"name": "id", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64"}}
+      ],
+      "get": {
+        "tags": ["Autoconfig"],
+        "summary": "Return the stored result_summary_json for a run, byte-verbatim.",
+        "operationId": "getAutoconfigRun",
+        "responses": {
+          "200": {
+            "description": "stored autoconfig summary",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AutoconfigResult"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/api/v1/jackett/autoconfig/run": {
+      "post": {
+        "tags": ["Autoconfig"],
+        "summary": "Run the autoconfig orchestrator once, synchronously.",
+        "operationId": "triggerAutoconfigRun",
+        "security": [{"basicAuth": []}],
+        "responses": {
+          "200": {
+            "description": "redacted result summary",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AutoconfigResult"}}}
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "503": {
+            "description": "orchestrator not wired into this build",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorBody"}}}
+          }
+        }
+      }
+    },
+    "/api/v1/jackett/overrides": {
+      "get": {
+        "tags": ["Overrides"],
+        "summary": "List manual env_name → indexer_id overrides.",
+        "operationId": "listOverrides",
+        "responses": {
+          "200": {
+            "description": "override array",
+            "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/OverrideDTO"}}}}
+          },
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      },
+      "post": {
+        "tags": ["Overrides"],
+        "summary": "Upsert an env_name → indexer_id override.",
+        "operationId": "upsertOverride",
+        "security": [{"basicAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OverridePostBody"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "post-write override",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OverrideDTO"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/api/v1/jackett/overrides/{env_name}": {
+      "parameters": [
+        {"name": "env_name", "in": "path", "required": true, "schema": {"type": "string"}}
+      ],
+      "delete": {
+        "tags": ["Overrides"],
+        "summary": "Delete an override (idempotent).",
+        "operationId": "deleteOverride",
+        "security": [{"basicAuth": []}],
+        "responses": {
+          "204": {"description": "deleted"},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    }
+  }
+}
