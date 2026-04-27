@@ -1,0 +1,90 @@
+<section class="configured-tab" data-testid="configured-tab">
+  @if (error(); as err) {
+    <div class="error" role="alert" data-testid="configured-error">{{ err }}</div>
+  }
+
+  @if (loading()) {
+    <div class="loading" data-testid="configured-loading">Loading indexers…</div>
+  } @else if (list().length === 0) {
+    <div class="empty" data-testid="configured-empty">
+      <p>No indexers configured.</p>
+      <p class="hint">Use the <strong>Browse Catalog</strong> tab to add one.</p>
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="idx-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Display Name</th>
+            <th>Type</th>
+            <th>Linked Credential</th>
+            <th>Status</th>
+            <th>Enabled</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of list(); track row.id) {
+            <tr class="idx-row" [attr.data-testid]="'row-' + row.id">
+              <td><code>{{ row.id }}</code></td>
+              <td>{{ row.display_name }}</td>
+              <td>
+                <span class="type-badge" [attr.data-type]="row.type">{{ row.type }}</span>
+              </td>
+              <td>
+                @if (row.linked_credential_name) {
+                  <code>{{ row.linked_credential_name }}</code>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+              <td>
+                @if (statusFor(row); as st) {
+                  <span
+                    class="status-badge"
+                    [attr.data-status]="st"
+                    [attr.data-testid]="'status-' + row.id"
+                  >{{ st }}</span>
+                  @if (detailFor(row); as detail) {
+                    <span class="detail" [attr.data-testid]="'detail-' + row.id">{{ detail }}</span>
+                  }
+                  @if (row.last_test_at) {
+                    <span class="last-test">{{ row.last_test_at }}</span>
+                  }
+                } @else {
+                  <span class="muted" [attr.data-testid]="'status-' + row.id">untested</span>
+                }
+              </td>
+              <td>
+                <label class="toggle">
+                  <input
+                    type="checkbox"
+                    [checked]="row.enabled_for_search"
+                    (change)="onToggle(row, $event)"
+                    [attr.data-testid]="'toggle-' + row.id"
+                  />
+                  <span class="slider"></span>
+                </label>
+              </td>
+              <td class="actions">
+                <button
+                  type="button"
+                  class="btn ghost small"
+                  (click)="onTest(row)"
+                  [attr.data-testid]="'test-' + row.id"
+                >Test</button>
+                <button
+                  type="button"
+                  class="btn danger small"
+                  (click)="onDelete(row)"
+                  [attr.data-testid]="'delete-' + row.id"
+                >Delete</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

@@ -1,0 +1,102 @@
+* { box-sizing: border-box; }
+
+.history-tab { color: var(--color-text-primary); }
+
+.toolbar {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.error {
+  background: color-mix(in srgb, var(--color-accent) 15%, var(--color-bg-secondary));
+  border: 1px solid var(--color-accent);
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.loading,
+.empty {
+  background: var(--color-bg-secondary);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  padding: 28px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  .hint { font-size: 13px; margin-top: 8px; }
+}
+
+.table-wrap {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.hist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  thead {
+    background: var(--color-bg-tertiary);
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      border-bottom: 1px solid var(--color-border);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+  }
+  tbody tr.hist-row {
+    cursor: pointer;
+    border-bottom: 1px solid var(--color-border);
+    &:last-child { border-bottom: 0; }
+    &:hover { background: color-mix(in srgb, var(--color-bg-tertiary) 50%, transparent); }
+    &.expanded { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+  }
+  tr.hist-detail-row td {
+    background: var(--color-bg-primary);
+    padding: 12px 14px;
+  }
+  td { padding: 10px 14px; vertical-align: middle; }
+  code {
+    background: var(--color-bg-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .has-errors { color: var(--color-accent); font-weight: 600; }
+}
+
+.run-detail {
+  margin: 0;
+  font-size: 12px;
+  background: var(--color-bg-secondary);
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.btn {
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  font: inherit;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  &.primary {
+    background: var(--color-accent);
+    color: #fff;
+    border-color: var(--color-accent);
+  }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}

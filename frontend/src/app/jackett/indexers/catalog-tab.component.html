@@ -1,0 +1,104 @@
+<section class="catalog-tab" data-testid="catalog-tab">
+  <div class="toolbar">
+    <input
+      type="search"
+      [ngModel]="searchTerm()"
+      (ngModelChange)="onSearchInput($event)"
+      (keydown.enter)="onSearchSubmit()"
+      placeholder="Search catalog…"
+      data-testid="catalog-search"
+    />
+    <button
+      type="button"
+      class="btn ghost"
+      (click)="onSearchSubmit()"
+      data-testid="catalog-search-submit"
+    >Search</button>
+    <button
+      type="button"
+      class="btn ghost"
+      (click)="refresh()"
+      data-testid="catalog-refresh"
+    >Refresh from Jackett</button>
+  </div>
+
+  @if (refreshMessage(); as msg) {
+    <div class="info" data-testid="catalog-refresh-msg">{{ msg }}</div>
+  }
+  @if (error(); as err) {
+    <div class="error" role="alert" data-testid="catalog-error">{{ err }}</div>
+  }
+
+  @if (loading()) {
+    <div class="loading">Loading catalog…</div>
+  } @else if (items().length === 0) {
+    <div class="empty" data-testid="catalog-empty">
+      <p>No indexers in catalog.</p>
+      <p class="hint">Click <strong>Refresh from Jackett</strong> to populate.</p>
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="cat-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Display Name</th>
+            <th>Type</th>
+            <th>Required Fields</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (it of items(); track it.id) {
+            <tr [attr.data-testid]="'cat-row-' + it.id">
+              <td><code>{{ it.id }}</code></td>
+              <td>{{ it.display_name }}</td>
+              <td><span class="type-badge" [attr.data-type]="it.type">{{ it.type }}</span></td>
+              <td>
+                @for (f of it.required_fields; track f) {
+                  <code class="field">{{ f }}</code>
+                }
+              </td>
+              <td class="actions">
+                <button
+                  type="button"
+                  class="btn primary small"
+                  (click)="openAdd(it)"
+                  [attr.data-testid]="'cat-add-' + it.id"
+                >Add</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="pager" data-testid="catalog-pager">
+      <button
+        type="button"
+        class="btn ghost small"
+        (click)="prevPage()"
+        [disabled]="page() <= 1"
+        data-testid="catalog-prev"
+      >Prev</button>
+      <span class="page-indicator" data-testid="catalog-page-indicator">
+        Page {{ page() }} / {{ totalPages() }} (total {{ total() }})
+      </span>
+      <button
+        type="button"
+        class="btn ghost small"
+        (click)="nextPage()"
+        [disabled]="page() >= totalPages()"
+        data-testid="catalog-next"
+      >Next</button>
+    </nav>
+  }
+
+  @if (dialogItem(); as it) {
+    <app-indexer-add-dialog
+      [item]="it"
+      (saved)="onSaved()"
+      (cancel)="closeDialog()"
+    ></app-indexer-add-dialog>
+  }
+</section>

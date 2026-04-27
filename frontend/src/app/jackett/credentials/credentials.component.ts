@@ -23,6 +23,15 @@ import {
 } from './credentials.service';
 import { CredentialEditDialogComponent } from './credential-edit-dialog.component';
 
+/**
+ * Task 32 — informational banner driven by the most recent
+ * AutoconfigResult.served_by_native_plugin list. The credentials those
+ * names point to are wired into the qBittorrent native plugin (Boba's
+ * own scrapers) instead of Jackett. Showing this avoids the operator
+ * thinking "my credentials aren't being used" when they actually are
+ * — just by a different code path.
+ */
+
 interface DialogState {
   open: boolean;
   /** null → "Add" mode; otherwise "Edit" mode pinned to that row. */
@@ -43,9 +52,25 @@ export class CredentialsComponent implements OnInit {
   loading = signal<boolean>(true);
   error = signal<string | null>(null);
   dialogState = signal<DialogState>({ open: false, existing: null });
+  /** Task 32 — names that the autoconfig run flagged as served by a native qBittorrent plugin. */
+  servedByNativePlugin = signal<string[]>([]);
 
   ngOnInit(): void {
     this.loadList();
+    this.loadLatestRun();
+  }
+
+  private loadLatestRun(): void {
+    this.service.getLatestRun().subscribe({
+      next: (detail) => {
+        this.servedByNativePlugin.set(detail?.served_by_native_plugin ?? []);
+      },
+      error: () => {
+        // Banner is informational; suppress errors to avoid masking the
+        // primary credentials error surface.
+        this.servedByNativePlugin.set([]);
+      },
+    });
   }
 
   loadList(): void {

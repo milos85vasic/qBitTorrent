@@ -1,0 +1,54 @@
+<section class="indexers-page" data-testid="indexers-page">
+  <header class="page-header">
+    <div>
+      <h2>Indexers</h2>
+      <p class="subtitle">Manage Jackett indexers, browse the catalog, and review autoconfig history.</p>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button
+      type="button"
+      class="tab"
+      [class.active]="activeTab() === 'configured'"
+      (click)="setTab('configured')"
+      role="tab"
+      [attr.aria-selected]="activeTab() === 'configured'"
+      data-testid="tab-configured"
+    >Configured</button>
+    <button
+      type="button"
+      class="tab"
+      [class.active]="activeTab() === 'catalog'"
+      (click)="setTab('catalog')"
+      role="tab"
+      [attr.aria-selected]="activeTab() === 'catalog'"
+      data-testid="tab-catalog"
+    >Browse Catalog</button>
+    <button
+      type="button"
+      class="tab"
+      [class.active]="activeTab() === 'history'"
+      (click)="setTab('history')"
+      role="tab"
+      [attr.aria-selected]="activeTab() === 'history'"
+      data-testid="tab-history"
+    >History</button>
+  </nav>
+
+  <div class="tab-body">
+    @if (activeTab() === 'configured') {
+      <app-jackett-configured-tab
+        [refreshSignal]="configuredRefresh()"
+        data-testid="panel-configured"
+      ></app-jackett-configured-tab>
+    } @else if (activeTab() === 'catalog') {
+      <app-jackett-catalog-tab
+        (added)="onIndexerAdded()"
+        data-testid="panel-catalog"
+      ></app-jackett-catalog-tab>
+    } @else if (activeTab() === 'history') {
+      <app-jackett-history-tab data-testid="panel-history"></app-jackett-history-tab>
+    }
+  </div>
+</section>

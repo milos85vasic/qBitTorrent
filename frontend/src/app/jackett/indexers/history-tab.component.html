@@ -1,0 +1,61 @@
+<section class="history-tab" data-testid="history-tab">
+  <div class="toolbar">
+    <button
+      type="button"
+      class="btn primary"
+      (click)="onTrigger()"
+      [disabled]="triggering()"
+      data-testid="trigger-run"
+    >{{ triggering() ? 'Running…' : 'Run autoconfig now' }}</button>
+  </div>
+
+  @if (error(); as err) {
+    <div class="error" role="alert" data-testid="history-error">{{ err }}</div>
+  }
+
+  @if (loading()) {
+    <div class="loading">Loading history…</div>
+  } @else if (runs().length === 0) {
+    <div class="empty" data-testid="history-empty">
+      <p>No autoconfig runs recorded.</p>
+      <p class="hint">Click <strong>Run autoconfig now</strong> to trigger one.</p>
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="hist-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Ran At</th>
+            <th>Discovered</th>
+            <th>Configured Now</th>
+            <th>Errors</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of runs(); track row.id) {
+            <tr
+              class="hist-row"
+              (click)="toggleExpand(row)"
+              [attr.data-testid]="'run-row-' + row.id"
+              [class.expanded]="expandedId() === row.id"
+            >
+              <td><code>#{{ row.id }}</code></td>
+              <td>{{ row.ran_at }}</td>
+              <td>{{ row.discovered_count }}</td>
+              <td>{{ row.configured_now_count }}</td>
+              <td [class.has-errors]="row.error_count > 0">{{ row.error_count }}</td>
+            </tr>
+            @if (expandedId() === row.id) {
+              <tr [attr.data-testid]="'run-detail-' + row.id" class="hist-detail-row">
+                <td colspan="5">
+                  <pre class="run-detail">{{ detailJson(row.id) }}</pre>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

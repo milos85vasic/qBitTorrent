@@ -12,8 +12,8 @@
 // only ever sent on POST bodies — they are NEVER returned by the API
 // (CredentialDTO only echoes `has_*` booleans + timestamps).
 import { Injectable, InjectionToken, Optional, Inject, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { Observable, of, switchMap } from 'rxjs';
 
 /**
  * DI token for the boba-jackett base URL. Tests override with
@@ -54,6 +54,28 @@ function adminBasicAuthHeader(): HttpHeaders {
   return new HttpHeaders({ Authorization: `Basic ${btoa('admin:admin')}` });
 }
 
+/** Mirrors the OpenAPI `RunSummaryDTO`. */
+export interface RunSummaryLite {
+  id: number;
+  ran_at: string;
+  discovered_count: number;
+  configured_now_count: number;
+  error_count: number;
+}
+
+/** Mirrors the OpenAPI `AutoconfigResult` (Task 32 — `served_by_native_plugin` shipped in 002d3bb). */
+export interface RunDetailLite {
+  ran_at: string;
+  discovered: string[];
+  matched_indexers: Record<string, string>;
+  configured_now: string[];
+  already_present: string[];
+  skipped_no_match: string[];
+  skipped_ambiguous: Array<{ env_name?: string; candidates?: string[] }>;
+  served_by_native_plugin: string[];
+  errors: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class CredentialsService {
   private http = inject(HttpClient);
@@ -84,5 +106,25 @@ export class CredentialsService {
       `${this.baseUrl}/api/v1/jackett/credentials/${encoded}`,
       { headers: adminBasicAuthHeader() },
     );
+  }
+
+  /**
+   * Two-step fetch for the latest autoconfig run. Returns null when no
+   * runs have been recorded yet. Used by Task 32 to surface the
+   * `served_by_native_plugin` informational banner.
+   */
+  getLatestRun(): Observable<RunDetailLite | null> {
+    const params = new HttpParams().set('limit', '1');
+    return this.http
+      .get<RunSummaryLite[]>(`${this.baseUrl}/api/v1/jackett/autoconfig/runs`, { params })
+      .pipe(
+        switchMap((rows) => {
+          if (!rows || rows.length === 0) return of(null);
+          const id = rows[0].id;
+          return this.http.get<RunDetailLite>(
+            `${this.baseUrl}/api/v1/jackett/autoconfig/runs/${id}`,
+          );
+        }),
+      );
   }
 }

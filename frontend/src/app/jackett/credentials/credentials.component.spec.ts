@@ -32,9 +32,12 @@ interface ServiceStub {
   list: ReturnType<typeof vi.fn>;
   upsert: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
+  getLatestRun?: ReturnType<typeof vi.fn>;
 }
 
 function setupWith(stub: ServiceStub) {
+  // Default getLatestRun → no banner.
+  if (!stub.getLatestRun) stub.getLatestRun = vi.fn(() => of(null));
   TestBed.configureTestingModule({
     imports: [CredentialsComponent],
     providers: [{ provide: CredentialsService, useValue: stub }],
@@ -167,6 +170,73 @@ describe('CredentialsComponent', () => {
     const errorEl = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="error-message"]');
     expect(errorEl).not.toBeNull();
     expect(errorEl?.textContent).toContain('boom: backend offline');
+  });
+
+  it('TestNativePluginBanner: renders one info banner per name in served_by_native_plugin', async () => {
+    // CONST-XII narrative: a stub component that ignored the
+    // getLatestRun observable would FAIL because the banner DOM
+    // element keyed by data-testid="native-plugin-banner-NNMCLUB" /
+    // "...-RUTRACKER" would simply not exist.
+    const stub: ServiceStub = {
+      list: vi.fn(() => of([])),
+      upsert: vi.fn(),
+      delete: vi.fn(),
+      getLatestRun: vi.fn(() =>
+        of({
+          ran_at: '2026-04-27T20:00:00Z',
+          discovered: [],
+          matched_indexers: {},
+          configured_now: [],
+          already_present: [],
+          skipped_no_match: [],
+          skipped_ambiguous: [],
+          served_by_native_plugin: ['NNMCLUB', 'RUTRACKER'],
+          errors: [],
+        }),
+      ),
+    };
+    const fixture = setupWith(stub);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const banners = el.querySelectorAll('[data-testid^="native-plugin-banner-"]');
+    expect(banners.length).toBe(2);
+    expect(el.querySelector('[data-testid="native-plugin-banner-NNMCLUB"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="native-plugin-banner-RUTRACKER"]')).not.toBeNull();
+    const bannerText = el.querySelector('[data-testid="native-plugin-banner-NNMCLUB"]')?.textContent ?? '';
+    expect(bannerText).toContain('NNMCLUB');
+    expect(bannerText.toLowerCase()).toContain('native');
+    expect(bannerText.toLowerCase()).toContain('qbittorrent');
+  });
+
+  it('TestNoBannerWhenEmpty: renders zero banners when served_by_native_plugin is empty', async () => {
+    const stub: ServiceStub = {
+      list: vi.fn(() => of([])),
+      upsert: vi.fn(),
+      delete: vi.fn(),
+      getLatestRun: vi.fn(() =>
+        of({
+          ran_at: '2026-04-27T20:00:00Z',
+          discovered: [],
+          matched_indexers: {},
+          configured_now: [],
+          already_present: [],
+          skipped_no_match: [],
+          skipped_ambiguous: [],
+          served_by_native_plugin: [],
+          errors: [],
+        }),
+      ),
+    };
+    const fixture = setupWith(stub);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const banners = (fixture.nativeElement as HTMLElement)
+      .querySelectorAll('[data-testid^="native-plugin-banner-"]');
+    expect(banners.length).toBe(0);
   });
 
   it('opens the edit dialog when "Add credential" is clicked', async () => {

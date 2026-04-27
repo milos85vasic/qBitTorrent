@@ -157,6 +157,64 @@ describe('CredentialsService', () => {
     tr.flush(null, { status: 204, statusText: 'No Content' });
   });
 
+  it('TestGetLatestRun: chains GET /autoconfig/runs?limit=1 then GET /autoconfig/runs/{id}', () => {
+    // CONST-XII narrative: a stub getLatestRun that hardcoded a return
+    // value would FAIL `http.expectOne` for the limit=1 list call AND
+    // for the subsequent detail call. The composed two-step chain
+    // proves we drive the real wire calls.
+    let received: { served_by_native_plugin?: string[] } | null | undefined;
+    svc.getLatestRun().subscribe((r) => (received = r));
+
+    const listReq = http.expectOne(
+      (req) =>
+        req.url === `${TEST_BASE}/api/v1/jackett/autoconfig/runs` &&
+        req.params.get('limit') === '1',
+    );
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush([
+      {
+        id: 42,
+        ran_at: '2026-04-27T20:00:00Z',
+        discovered_count: 1,
+        configured_now_count: 1,
+        error_count: 0,
+      },
+    ]);
+
+    const detailReq = http.expectOne(
+      `${TEST_BASE}/api/v1/jackett/autoconfig/runs/42`,
+    );
+    expect(detailReq.request.method).toBe('GET');
+    detailReq.flush({
+      ran_at: '2026-04-27T20:00:00Z',
+      discovered: [],
+      matched_indexers: {},
+      configured_now: [],
+      already_present: [],
+      skipped_no_match: [],
+      skipped_ambiguous: [],
+      served_by_native_plugin: ['NNMCLUB'],
+      errors: [],
+    });
+
+    expect(received).not.toBeNull();
+    expect(received?.served_by_native_plugin).toEqual(['NNMCLUB']);
+  });
+
+  it('TestGetLatestRun: returns null when no runs exist (skips detail call)', () => {
+    let received: unknown;
+    svc.getLatestRun().subscribe((r) => (received = r));
+    const listReq = http.expectOne(
+      (req) =>
+        req.url === `${TEST_BASE}/api/v1/jackett/autoconfig/runs` &&
+        req.params.get('limit') === '1',
+    );
+    listReq.flush([]);
+    // No detail call should be issued — afterEach's http.verify() will
+    // fail if a stub naively chained anyway.
+    expect(received).toBeNull();
+  });
+
   it('falls back to the default base URL when BOBA_JACKETT_BASE_URL is not provided', () => {
     // Override-free TestBed — service uses its built-in default.
     TestBed.resetTestingModule();

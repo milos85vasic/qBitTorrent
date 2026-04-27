@@ -1,0 +1,49 @@
+* { box-sizing: border-box; }
+
+.indexers-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  color: var(--color-text-primary);
+}
+
+.page-header {
+  margin-bottom: 16px;
+  h2 {
+    margin: 0 0 4px;
+    color: var(--color-accent);
+    text-shadow: var(--shadow-text-md);
+    font-size: 22px;
+  }
+  .subtitle {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+  }
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 16px;
+  .tab {
+    padding: 8px 16px;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    &:hover { color: var(--color-text-primary); }
+    &.active {
+      color: var(--color-accent);
+      border-bottom-color: var(--color-accent);
+    }
+  }
+}
+
+.tab-body {
+  min-height: 200px;
+}
