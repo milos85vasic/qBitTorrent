@@ -212,6 +212,12 @@ frontend/                # Angular 21 dashboard
 ## Critical Constraints
 
 - **TDD mandatory**: RED -> watch fail -> GREEN -> verify -> commit
+- **Anti-Bluff Verification (CONST-XII)** — Tests and challenges MUST prove the feature works for the END USER. A green run is a contract with the user. Specifically:
+  - Assert on user-observable outcomes (DB rows, file content, response body fields, container state) — NOT just status codes / "no error".
+  - Each new test must fail against a no-op stub of the feature it tests. If it doesn't, it's a bluff and must be strengthened or deleted.
+  - Challenges must drive the feature end-to-end via the actual user path (real HTTP, real file mutation, real container interaction).
+  - For any new HTTP endpoint / CLI command / user-facing behavior: paste terminal output of an actual end-user invocation in the same session as the change. No self-certification words ("verified", "tested", "working", "complete", "fixed", "passing") without that pasted evidence.
+  - See `CONSTITUTION.md` § XII for the full rule. Apply universally — every submodule and sub-project inherits.
 - **Never commit `.env`** -- tracker credentials live there
 - **WebUI credentials `admin`/`admin` are hardcoded** -- do not change
 - **IPTorrents freeleech only** -- automated tests must never download non-freeleech. Tagged `IPTorrents [free]`
@@ -538,6 +544,17 @@ or override these.
     `digital.vasic.concurrency/pkg/safe` (or the project's equivalent
     primitives). Bare `sync.Mutex + map/slice` combinations are
     prohibited for new code.
+14. **Anti-Bluff Verification (CONST-XII).** Tests and challenges MUST
+    prove the feature works for the end user. Passing them MUST mean the
+    end user can actually use the product. Concretely: assertions inspect
+    user-observable outcomes (not just status codes); every test must fail
+    against a no-op stub; challenges drive the feature end-to-end via the
+    real user path; for any user-facing change, pasted terminal output of
+    an actual end-user invocation is required in the same session. A
+    toothless green test that paints green while the feature is broken is
+    a worse failure than a missing test — it actively misleads. See
+    `CONSTITUTION.md` § XII for the full text. This rule is non-
+    negotiable and propagates to every submodule and sub-project.
 
 ### Definition of Done (universal)
 

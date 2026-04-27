@@ -25,6 +25,7 @@
 | IX | Test-Driven Development | Blocking |
 | X | Hermetic Test Discipline | Blocking |
 | XI | Minimal Source Commentary | Blocking |
+| XII | Anti-Bluff Verification | Blocking |
 
 ---
 
@@ -119,6 +120,30 @@ This is the primary defence against "green tests, broken product".
 - Type hints on public methods are encouraged.
 - Test files, plugins, scripts, and docs are exempt.
 
+## XII. Anti-Bluff Verification
+
+**Tests and Challenges MUST prove the feature works for the end user — passing them MUST mean the end user can actually use it.**
+
+This project has been burned: tests went green, challenges printed `OK`, but the feature was broken when an end user tried it. That outcome is forbidden. A green run is a contract with the user that the product works.
+
+**Anti-bluff requirements (cumulative — every test/challenge MUST satisfy ALL):**
+
+1. **Assert on user-observable outcomes, not on intermediate signals.** A test that asserts only on HTTP status codes, return values, or "no error" is insufficient if the feature has a state change, a side effect, or a value the user reads. The assertion MUST inspect the actual outcome (DB row content, file content, response body fields, on-screen text, container state, posted-to-server payload).
+
+2. **Tests MUST fail against a stub implementation.** Before merging, the implementer (or a reviewer subagent) MUST mentally substitute a no-op stub for the feature under test and confirm the test would fail. If a stub passes the test, the test asserts nothing meaningful — strengthen or delete it.
+
+3. **Challenges MUST exercise the real path the user takes.** A challenge that boots the service then immediately exits without invoking the feature is a bluff. The challenge MUST drive the feature end-to-end — actual HTTP request, actual file mutation, actual container interaction — and assert on the user-visible result.
+
+4. **Mocks/stubs forbidden outside unit tests** (already enforced by Mandatory Development Standards items 1, 7, 11 — restated here for emphasis). Integration / E2E / security / challenge / benchmark tests run against the real running system. Skip loudly if real services aren't available; never silently mock around them and call it green.
+
+5. **"Smoke before ship."** For any feature that ships a new HTTP endpoint, CLI command, or user-facing behavior: produce pasted terminal output of an actual end-user invocation (curl, click, container run) in the same session as the change. This output is the `## Demo` block already required by the universal Definition of Done — restated here as a hard pass criterion for anti-bluff.
+
+6. **Periodic anti-bluff audit.** When a code-review subagent reviews tests, it MUST sample at least 3 tests and verify each one would fail against a stub. If 3-of-3 are toothless, the PR is rejected and the test suite is hardened first.
+
+**Violations:** A test that paints green while the feature is broken is the worst kind of code-review failure. Treat it more seriously than a missing test — the missing test only fails to catch a bug, while a toothless green test ACTIVELY MISLEADS reviewers and end users into believing the feature works.
+
+**This principle is universal.** Every project, submodule, and sibling repository inherits it through `CONSTITUTION.md`, `CLAUDE.md`, and `AGENTS.md`. No project may opt out.
+
 ---
 
 ## Critical Operational Constraints
@@ -180,7 +205,7 @@ Before modifying code, verify:
 
 ---
 
-**Version**: 1.2.0 | **Ratified**: 2026-04-13 | **Last Amended**: 2026-04-24
+**Version**: 1.3.0 | **Ratified**: 2026-04-13 | **Last Amended**: 2026-04-27
 
 ---
 
