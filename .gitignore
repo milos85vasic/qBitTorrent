@@ -27,6 +27,15 @@ config/qBittorrent/*
 !qBitTorrent-go/internal/db/repos/credentials_test.go
 !qBitTorrent-go/internal/jackettapi/credentials.go
 !qBitTorrent-go/internal/jackettapi/credentials_test.go
+# Angular frontend credentials management UI (source, no secrets).
+!frontend/src/app/jackett/credentials/
+!frontend/src/app/jackett/credentials/credential-edit-dialog.component.ts
+!frontend/src/app/jackett/credentials/credentials.component.html
+!frontend/src/app/jackett/credentials/credentials.component.scss
+!frontend/src/app/jackett/credentials/credentials.component.spec.ts
+!frontend/src/app/jackett/credentials/credentials.component.ts
+!frontend/src/app/jackett/credentials/credentials.service.spec.ts
+!frontend/src/app/jackett/credentials/credentials.service.ts
 *secrets*
 *_password*
 *.key

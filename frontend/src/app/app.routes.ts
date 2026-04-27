@@ -3,5 +3,10 @@ import { DashboardComponent } from './components/dashboard/dashboard.component';
 
 export const routes: Routes = [
   { path: '', component: DashboardComponent },
-  { path: '**', redirectTo: '' }
+  {
+    path: 'jackett',
+    loadChildren: () =>
+      import('./jackett/jackett.routes').then((m) => m.JACKETT_ROUTES),
+  },
+  { path: '**', redirectTo: '' },
 ];
