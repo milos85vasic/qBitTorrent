@@ -609,5 +609,30 @@ Both MUST be wired into the project's CI / `run_all_challenges.sh`.
 
 **Full background:** `docs/HOST_POWER_MANAGEMENT.md` and `CONSTITUTION.md` (CONST-033).
 
+### CONST-033 Operational Note — Triage before assuming we caused a perceived suspend
+
+Same triage as in `CLAUDE.md` — when the user reports
+"computer froze / suspended / logged me out", run this BEFORE proposing
+any fix:
+
+1. `uptime` — discontinuous = real suspend; continuous ≥ alleged downtime = no suspend.
+2. `journalctl -k --since "24 hours ago" | grep -iE "will suspend|systemd-suspend"` — zero = no systemd suspend.
+3. `journalctl -k --since "24 hours ago" | grep -iE "oom-kill|killed process"` — decode `oom_memcg`: `libpod-…` = container OOM (containment); `user@1000.service` = user-session OOM (looks like logout).
+4. Both CONST-033 challenges must remain PASS.
+5. Document findings in `docs/incidents/<date>-*.md`.
+
+Common false positives (NOT CONST-033 violations): GNOME screen lock,
+GUI compositor stall under memory pressure, foreign container OOM at its
+own cgroup cap.
+
+**Container hygiene corollary** (mandatory for every new compose service):
+`mem_limit`, `pids_limit`, `oom_score_adj: 500`.
+
+**Podman/Docker cannot suspend the host.** Rootless podman has no
+power-management permission; cgroup OOM is containment, not host impact.
+
+See `CONSTITUTION.md` § "CONST-033 Operational Note" and
+`docs/incidents/2026-04-27-perceived-host-suspension-investigation.md`.
+
 <!-- END host-power-management addendum (CONST-033) -->
 

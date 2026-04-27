@@ -341,5 +341,42 @@ bash challenges/scripts/host_no_auto_suspend_challenge.sh   # host hardened
 
 Both must PASS.
 
+### CONST-033 Operational Note — Triage before assuming we caused a perceived suspend
+
+When the user reports "computer froze / suspended / logged me out", do NOT
+assume our code is to blame. Many phenomena LOOK like host power events
+but are not. Triage in this order BEFORE any "fix":
+
+1. `uptime` — actual suspend leaves a discontinuous uptime; if uptime ≥ the
+   alleged downtime, no suspend occurred.
+2. `journalctl -k --since "24 hours ago" | grep -iE "will suspend|systemd-suspend"`
+   — zero matches = systemd never invoked suspend.
+3. `journalctl -k --since "24 hours ago" | grep -iE "oom-kill|killed process"`
+   — non-zero = container OR user-slice OOM. Decode the `oom_memcg` cgroup
+   path: `libpod-...` = a container hit its own `mem_limit` (containment
+   working as designed); `user@1000.service` slice = user session OOM-kill
+   (perceived as logout).
+4. Both CONST-033 challenges must continue to PASS.
+5. Document findings in `docs/incidents/<date>-*.md` regardless of outcome.
+
+**Common false positives** (not CONST-033 violations):
+- GNOME / X11 screen lock or display blank
+- Brief GUI compositor stall during memory pressure (`Frame has assigned
+  frame counter but no frame drawn time` in gnome-shell logs)
+- Foreign container hitting its 1 GB cgroup OOM cap
+
+**Container hygiene corollary** (mandatory for every new compose service):
+`mem_limit`, `pids_limit`, and `oom_score_adj: 500` so the container dies
+before the user session under host pressure. Verified on the new
+`boba-jackett` service.
+
+**Podman/Docker themselves cannot suspend the host.** Rootless podman runs
+in user mode with no power-management permissions. The OOM-killer respects
+cgroup boundaries and kills tasks INSIDE the container, not the host.
+
+See `CONSTITUTION.md` § "CONST-033 Operational Note" and
+`docs/incidents/2026-04-27-perceived-host-suspension-investigation.md` for
+the full triage and the precedent that established this note.
+
 <!-- END host-power-management addendum (CONST-033) -->
 

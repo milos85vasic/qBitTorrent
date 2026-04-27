@@ -366,5 +366,54 @@ identifying the non-host context.
 **See also:** `docs/HOST_POWER_MANAGEMENT.md` for full background and
 runbook.
 
+### CONST-033 Operational Note — Distinguishing Host Suspension from Adjacent Phenomena
+
+When the user reports "the computer suspended / hibernated / logged me
+out / froze", **triple-check before assuming our code caused it**. CONST-033
+covers systemd power-management calls — it does NOT cover everything that
+LOOKS like a power event. Document each of these distinctions before
+proposing any "fix":
+
+| Symptom | Real cause | CONST-033 territory? |
+|---|---|---|
+| Display blanked / screen lock kicked in | gnome-session / screensaver — independent of systemd power targets | NO |
+| Brief GUI freeze during heavy I/O or memory pressure | compositor stall (gnome-shell logs `Frame has assigned … but no frame drawn time`) | NO — investigate memory pressure / cgroup OOM |
+| Container OOM-killed | cgroup `oom_memcg` reached its `memory.max` — kernel kills tasks INSIDE the container slice | NO — this is containment working as designed |
+| User session terminated (`user@1000.service` killed) | systemd-oomd (if enabled) or kernel OOM-killer hit the user slice | NO direct CONST-033 issue, but tighten container resource limits to keep host pressure low |
+| Actual host suspend / hibernate / poweroff | systemd power target fired — would show as a `will suspend` broadcast in the journal AND a discontinuous `uptime` | YES — this is what CONST-033 forbids |
+
+**Triage procedure when a "perceived suspend" is reported:**
+
+1. `uptime` — actual suspend leaves a discontinuous uptime; if uptime is >
+   the alleged downtime, there was no suspend.
+2. `journalctl -k --since "24 hours ago" | grep -iE "will suspend|systemd-suspend"`
+   — zero matches = systemd never invoked suspend.
+3. `journalctl -k --since "24 hours ago" | grep -iE "oom-kill|killed process"`
+   — non-zero matches = OOM event happened; check `oom_memcg` to identify
+   which cgroup hit the limit (container vs user slice vs system).
+4. `bash challenges/scripts/host_no_auto_suspend_challenge.sh` — confirms
+   the host's CONST-033 hardening is still intact.
+5. `bash challenges/scripts/no_suspend_calls_challenge.sh` — confirms no
+   forbidden source-tree calls were added.
+6. Document findings in `docs/incidents/<date>-*.md` regardless of outcome.
+   Even a "no, it wasn't us" report has value as a precedent for future
+   triage.
+
+**Container hygiene corollary:** every long-running container in
+`docker-compose.yml` MUST carry `mem_limit`, `pids_limit`, and
+`oom_score_adj: 500` (kill container before user session under pressure).
+Verified for all current services. Non-negotiable for any new service
+added in the future.
+
+**Podman/Docker themselves CANNOT directly suspend the host.** Rootless
+podman runs in user mode with no power-management permissions; the docker
+daemon (when present) has no upstream code path that invokes power
+transitions. If a future incident appears to involve container runtime
+state, the actual mechanism is almost always cgroup OOM containment doing
+its job — investigate the OOM event, not the runtime.
+
+**See also:** `docs/incidents/2026-04-27-perceived-host-suspension-investigation.md`
+for the precedent triage that established this operational note.
+
 <!-- END host-power-management addendum (CONST-033) -->
 
