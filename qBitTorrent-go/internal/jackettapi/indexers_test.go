@@ -500,6 +500,13 @@ func TestTestIndexerOK(t *testing.T) {
 	if got.LastTestAt == nil {
 		t.Fatalf("LastTestAt should be set")
 	}
+	// Anti-bluff (CONST-XII): Jackett's /config endpoint MUST have been
+	// hit exactly once. Without this assertion a handler stub that hardcoded
+	// status="ok" and called RecordTest without ever calling Jackett would
+	// pass — that's exactly the kind of bluff this counter pins down.
+	if got := atomic.LoadInt32(&h.getCount); got != 1 {
+		t.Fatalf("expected 1 GET to Jackett /config, got %d", got)
+	}
 }
 
 func TestTestIndexerAuthFailed(t *testing.T) {
@@ -566,6 +573,26 @@ func TestTestIndexerEmptyPath400(t *testing.T) {
 	h.deps.HandleTestIndexer(rec, req)
 	if rec.Code != 400 {
 		t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestConfigureIndexerEmptyPath400(t *testing.T) {
+	h := newIndexersHarness(t)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/v1/jackett/indexers/", strings.NewReader(`{"credential_name":"X"}`))
+	h.deps.HandleConfigureIndexer(rec, req)
+	if rec.Code != 400 {
+		t.Fatalf("want 400, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPatchIndexerEmptyPath400(t *testing.T) {
+	h := newIndexersHarness(t)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("PATCH", "/api/v1/jackett/indexers/", strings.NewReader(`{"enabled_for_search":true}`))
+	h.deps.HandlePatchIndexer(rec, req)
+	if rec.Code != 400 {
+		t.Fatalf("want 400, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 
