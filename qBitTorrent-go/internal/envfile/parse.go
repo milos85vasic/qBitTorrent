@@ -24,6 +24,7 @@ import (
 //   - If the trimmed value begins and ends with matching `"` or `'`,
 //     the surrounding quotes are stripped (no escape processing inside).
 //   - For duplicate keys, the LAST occurrence wins (matches shell behavior).
+//   - Each line must fit within bufio.Scanner's default 64KB token limit; longer lines cause a scanner error.
 func Parse(r io.Reader) (map[string]string, error) {
 	out := map[string]string{}
 	sc := bufio.NewScanner(r)
@@ -38,6 +39,9 @@ func Parse(r io.Reader) (map[string]string, error) {
 			continue
 		}
 		k := strings.TrimSpace(t[:eq])
+		if k == "" {
+			continue
+		}
 		v := strings.TrimSpace(t[eq+1:])
 		// strip matching surrounding quotes
 		if len(v) >= 2 {
