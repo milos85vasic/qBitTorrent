@@ -10,7 +10,7 @@ const APP_URL = process.env.BOBA_FRONTEND_URL ?? 'http://localhost:4200';
 const BACKEND_URL = process.env.BOBA_BACKEND ?? 'http://localhost:7189';
 
 export default defineConfig({
-  testDir: '.',
+  testDir: './e2e',
   testMatch: /.*\.spec\.ts$/,
   fullyParallel: false, // backend state is shared (autoconfig runs, etc.)
   workers: 1,
@@ -19,10 +19,11 @@ export default defineConfig({
   timeout: 30_000,
   use: {
     baseURL: APP_URL,
-    extraHTTPHeaders: {
-      // Surface backend in the env so spec files can construct API URLs.
-      'X-Boba-Backend': BACKEND_URL,
-    },
+    // NOTE: do NOT inject extraHTTPHeaders here — they pollute every
+    // browser XHR and trigger CORS preflights for headers the backend
+    // doesn't whitelist. Specs read backend URL from process.env directly.
+    // (Caught by the very first live Playwright run via CONST-XII —
+    // X-Boba-Backend triggered CORS preflight rejection.)
     trace: 'on-first-retry',
   },
   projects: [

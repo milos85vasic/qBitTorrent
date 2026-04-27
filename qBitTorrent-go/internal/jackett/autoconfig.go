@@ -182,6 +182,23 @@ func Autoconfigure(deps AutoconfigDeps, envOverrides map[string]string) Autoconf
 	}
 	result.DiscoveredCredentials = discovered
 
+	// Pre-populate ServedByNativePlugin from `discovered` BEFORE any
+	// early-exit path. If the operator has e.g. NNMCLUB credentials, the
+	// dashboard banner must render even when Jackett is unreachable —
+	// otherwise the user thinks "Boba is broken" when really NNMCLUB is
+	// served by the native plugin and the unrelated Jackett-down state
+	// is just orthogonal noise. The success path further down REMOVES
+	// names that did get matched + configured at Jackett (since in that
+	// case Jackett DOES handle them and the banner would mislead).
+	// Caught by challenges/scripts/nnmclub_native_plugin_clarification_challenge.sh
+	// which runs against an unreachable Jackett and asserts NNMCLUB
+	// still appears in served_by_native_plugin.
+	{
+		preNative := classifyServedByNativePlugin(discovered)
+		sort.Strings(preNative)
+		result.ServedByNativePlugin = preNative
+	}
+
 	if len(bundles) == 0 {
 		recordRun(deps.Runs, &result, started, 0)
 		return result

@@ -175,5 +175,8 @@ func NewMux(d *Deps) http.Handler {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	})
 
-	return WithAuth(mux)
+	// CORS wraps OUTSIDE auth so OPTIONS preflights short-circuit before
+	// auth ever runs. Allowed origins default to the dashboard dev/prod
+	// hosts; pass a custom list at NewMux time if you front it differently.
+	return WithCORS(nil, WithAuth(mux))
 }

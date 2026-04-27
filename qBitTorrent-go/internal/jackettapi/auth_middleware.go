@@ -44,7 +44,14 @@ var expectedAuth = "Basic " + base64.StdEncoding.EncodeToString([]byte(adminUser
 // attacks on the credential check.
 func WithAuth(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		// OPTIONS is the CORS preflight method — by W3C spec it must
+		// NOT carry credentials. Forwarding without auth lets the CORS
+		// middleware (wrapped outside us) emit the proper preflight
+		// response. If we required auth here, every browser-initiated
+		// POST/PATCH/DELETE would fail at preflight before the actual
+		// request ever reached the handler. (Caught by Playwright walk-
+		// through Task 47 §11.10.)
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
 			inner.ServeHTTP(w, r)
 			return
 		}

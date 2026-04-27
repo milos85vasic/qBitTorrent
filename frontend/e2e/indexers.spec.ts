@@ -25,8 +25,6 @@ async function gotoIndexers(page: Page): Promise<void> {
 }
 
 test.describe('indexers page (Task 47 §11.10)', () => {
-  test.skip(true, 'SKIP-OK: task-47-§11.10 — Playwright not installed in this dispatch');
-
   test('1. Golden path — three tabs visible', async ({ page }) => {
     await gotoIndexers(page);
     await expect(page.getByTestId('tab-configured')).toBeVisible();
