@@ -15,9 +15,12 @@ const FuzzyThreshold = 0.85
 // AmbiguousMatch records an env name that tied between multiple catalog
 // candidates above FuzzyThreshold. The autoconfig run reports these for
 // operator review (they require an explicit override to disambiguate).
+//
+// JSON tags exist so AutoconfigResult (and downstream API responses in
+// Task 19) serialize this struct with stable, snake_case field names.
 type AmbiguousMatch struct {
-	EnvName    string
-	Candidates []string
+	EnvName    string   `json:"env_name"`
+	Candidates []string `json:"candidates"`
 }
 
 // ratio returns a similarity score in [0, 1] using the classic edit-distance

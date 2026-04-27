@@ -1,0 +1,384 @@
+package jackett
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/milos85vasic/qBitTorrent-go/internal/db/repos"
+)
+
+// AutoconfigResult mirrors the Python AutoconfigResult shape so the merge
+// service / dashboard can consume the same JSON payload regardless of which
+// backend (Python or Go) ran the autoconfig pass.
+//
+// JSON tags use snake_case for parity with the Python pydantic model. The
+// `discovered` key matches the Python `Field(alias="discovered")` on
+// `discovered_credentials` — keep this exact tag so existing dashboard
+// consumers don't break.
+type AutoconfigResult struct {
+	RanAt                 time.Time         `json:"ran_at"`
+	DiscoveredCredentials []string          `json:"discovered"`
+	MatchedIndexers       map[string]string `json:"matched_indexers"`
+	ConfiguredNow         []string          `json:"configured_now"`
+	AlreadyPresent        []string          `json:"already_present"`
+	SkippedNoMatch        []string          `json:"skipped_no_match"`
+	SkippedAmbiguous      []AmbiguousMatch  `json:"skipped_ambiguous"`
+	Errors                []string          `json:"errors"`
+}
+
+// AutoconfigDeps holds the DB repositories and the Jackett client the
+// orchestrator wires together. The runtime constructs it once at boot
+// and reuses across triggers.
+type AutoconfigDeps struct {
+	Creds     *repos.Credentials
+	Overrides *repos.Overrides
+	Indexers  *repos.Indexers
+	Runs      *repos.Runs
+	Client    *Client
+}
+
+// ParseIndexerMapCSV parses "NAME:id,NAME2:id2" CSV into an override map.
+// Keys are uppercased; values left as-is. Empty / malformed pairs skipped.
+// Returns an empty (non-nil) map when input is empty so callers can merge
+// without nil checks. Mirrors Python _parse_indexer_map.
+func ParseIndexerMapCSV(raw string) map[string]string {
+	out := map[string]string{}
+	if raw == "" {
+		return out
+	}
+	for _, pair := range strings.Split(raw, ",") {
+		pair = strings.TrimSpace(pair)
+		if pair == "" || !strings.Contains(pair, ":") {
+			continue
+		}
+		idx := strings.IndexByte(pair, ':')
+		k := strings.TrimSpace(strings.ToUpper(pair[:idx]))
+		v := strings.TrimSpace(pair[idx+1:])
+		if k != "" && v != "" {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// fillFields walks a Jackett indexer config template, populates known
+// credential keys ("username", "password", "cookie"/"cookies"/"cookieheader")
+// from the bundle, returns the populated template AND a count of fields filled.
+//
+// Returns count==0 when none of the template's id keys match a credential
+// the bundle actually has — caller treats that as
+// no_compatible_credential_fields_for_indexer (e.g. iptorrents needs cookie
+// but the bundle is userpass-only).
+func fillFields(template []map[string]any, cred *repos.Credential) ([]map[string]any, int) {
+	fieldMap := map[string]string{
+		"username":     cred.Username,
+		"password":     cred.Password,
+		"cookie":       cred.Cookies,
+		"cookies":      cred.Cookies,
+		"cookieheader": cred.Cookies,
+	}
+	populated := make([]map[string]any, 0, len(template))
+	filled := 0
+	for _, f := range template {
+		// Shallow-copy: Jackett field values are scalars, no nested maps
+		// we need to deep-copy. Caller still gets independent maps.
+		nf := make(map[string]any, len(f))
+		for k, v := range f {
+			nf[k] = v
+		}
+		if id, ok := nf["id"].(string); ok {
+			if val, present := fieldMap[id]; present && val != "" {
+				nf["value"] = val
+				filled++
+			}
+		}
+		populated = append(populated, nf)
+	}
+	return populated, filled
+}
+
+// Autoconfigure runs one full autoconfig pass:
+//
+//  1. snapshot credentials + overrides from DB
+//  2. merge envOverrides (e.g. JACKETT_INDEXER_MAP CSV) into the override map
+//     — DB wins on key collision (DB is canonical, env is a legacy migration
+//     helper)
+//  3. WarmUp + GetCatalog
+//  4. MatchIndexers
+//  5. for each match: GetIndexerTemplate → fillFields → PostIndexerConfig
+//     → Indexers.Upsert + Credentials.MarkUsed
+//  6. Runs.Insert with a summary
+//  7. return AutoconfigResult
+//
+// Never panics; all errors land in result.Errors. The orchestrator is
+// idempotent: matched indexers already configured at Jackett are recorded
+// in AlreadyPresent without a re-POST.
+//
+// envOverrides is the parsed JACKETT_INDEXER_MAP. Pass nil or empty to skip
+// env merge entirely.
+func Autoconfigure(deps AutoconfigDeps, envOverrides map[string]string) AutoconfigResult {
+	started := time.Now().UTC()
+	result := AutoconfigResult{
+		RanAt:           started,
+		MatchedIndexers: map[string]string{},
+	}
+
+	// Step 1: load credentials metadata, then decrypt only the rows that
+	// actually carry a usable secret. We sort the kept names alphabetically
+	// for deterministic discovered/matched output.
+	bundles, discovered, listErr := loadBundles(deps.Creds)
+	if listErr != nil {
+		result.Errors = append(result.Errors, fmt.Sprintf("credentials_list_failed: %v", listErr))
+		recordRun(deps.Runs, &result, started, 0)
+		return result
+	}
+	result.DiscoveredCredentials = discovered
+
+	if len(bundles) == 0 {
+		recordRun(deps.Runs, &result, started, 0)
+		return result
+	}
+
+	if deps.Client == nil || deps.Client.apiKey == "" {
+		result.Errors = append(result.Errors, "jackett_auth_missing_key")
+		recordRun(deps.Runs, &result, started, len(bundles))
+		return result
+	}
+
+	// Step 2: merge env-derived overrides with DB overrides; DB wins on key
+	// collision so operator UI edits override stale env values.
+	override := map[string]string{}
+	for k, v := range envOverrides {
+		override[k] = v
+	}
+	if dbMap, err := deps.Overrides.AsMap(); err == nil {
+		for k, v := range dbMap {
+			override[k] = v
+		}
+	} else {
+		result.Errors = append(result.Errors, fmt.Sprintf("overrides_load_failed: %v", err))
+	}
+
+	// Step 3: warm session, fetch catalog. WarmUp failure is tolerated per
+	// Python — a real auth problem will surface on the catalog GET.
+	_ = deps.Client.WarmUp()
+	catalog, err := deps.Client.GetCatalog()
+	if err != nil {
+		// Map known sentinel errors verbatim (jackett_auth_failed,
+		// jackett_catalog_http_NNN). Anything else gets routed to
+		// jackett_unreachable for parity with Python.
+		msg := err.Error()
+		if strings.HasPrefix(msg, "jackett_") {
+			result.Errors = append(result.Errors, msg)
+		} else {
+			result.Errors = append(result.Errors, "jackett_unreachable")
+		}
+		recordRun(deps.Runs, &result, started, len(bundles))
+		return result
+	}
+
+	already := map[string]bool{}
+	for _, e := range catalog {
+		if e.Configured {
+			already[e.ID] = true
+		}
+	}
+
+	// Step 4: match. envNames must be the sorted bundle names so matched
+	// iteration order downstream stays deterministic.
+	matched, ambiguous, unmatched := MatchIndexers(discovered, catalog, override)
+	result.MatchedIndexers = matched
+	result.SkippedAmbiguous = ambiguous
+	result.SkippedNoMatch = unmatched
+
+	// Step 5: configure. Iterate matched in env-name order for determinism
+	// (map range is unordered).
+	envNames := make([]string, 0, len(matched))
+	for k := range matched {
+		envNames = append(envNames, k)
+	}
+	sort.Strings(envNames)
+
+	for _, envName := range envNames {
+		indexerID := matched[envName]
+		// Mirror catalog state (display_name, type) into our DB regardless
+		// of whether we re-POST or not — the indexers table is meant as a
+		// snapshot of "what's wired up at Jackett".
+		entry := findCatalog(catalog, indexerID)
+
+		if already[indexerID] {
+			result.AlreadyPresent = append(result.AlreadyPresent, indexerID)
+			upsertIndexerRow(deps.Indexers, entry, indexerID, envName, started)
+			// Don't MarkUsed — we didn't actually consume credentials this run.
+			continue
+		}
+
+		if errMsg := configureOne(deps, envName, indexerID, bundles[envName]); errMsg != "" {
+			result.Errors = append(result.Errors, fmt.Sprintf("indexer_config_failed:%s:%s", indexerID, errMsg))
+			continue
+		}
+		result.ConfiguredNow = append(result.ConfiguredNow, indexerID)
+		upsertIndexerRow(deps.Indexers, entry, indexerID, envName, started)
+		// Best-effort — log but do not surface. The Task 14 redactor will
+		// scrub if a leak ever sneaks in.
+		if mErr := deps.Creds.MarkUsed(envName); mErr != nil {
+			log.Printf("autoconfig: MarkUsed(%s) failed: %v", envName, mErr)
+		}
+	}
+
+	recordRun(deps.Runs, &result, started, len(bundles))
+	return result
+}
+
+// configureOne handles the per-indexer happy-path: GET template, fill
+// fields, POST. Returns "" on success, an error string (without the
+// "indexer_config_failed:<id>:" prefix — caller adds it) on failure.
+//
+// Mirrors Python _configure_one: one retry on a 5xx after a 2-second
+// sleep, then surface the failure.
+//
+// TODO(boba-jackett): preserve template envelope shape on POST. The Python
+// helper sends bare-list when the GET returned bare-list and {"config": ...}
+// when GET returned an envelope. The current Client.PostIndexerConfig
+// always sends bare-list; real Jackett accepts both for most indexers but
+// some versions are strict. Revisit if a regression shows up in CT.
+func configureOne(deps AutoconfigDeps, envName, indexerID string, cred *repos.Credential) string {
+	tmpl, err := deps.Client.GetIndexerTemplate(indexerID)
+	if err != nil {
+		return err.Error()
+	}
+	populated, filled := fillFields(tmpl, cred)
+	if filled == 0 {
+		return "no_compatible_credential_fields_for_indexer"
+	}
+	if err := deps.Client.PostIndexerConfig(indexerID, populated); err != nil {
+		// Retry once on 5xx with a 2-second backoff. The error string from
+		// PostIndexerConfig is "config POST HTTP <code>" — we sniff the
+		// numeric code by prefix.
+		if isServerError(err.Error()) {
+			time.Sleep(2 * time.Second)
+			if err2 := deps.Client.PostIndexerConfig(indexerID, populated); err2 == nil {
+				return ""
+			} else {
+				return err2.Error()
+			}
+		}
+		return err.Error()
+	}
+	return ""
+}
+
+// isServerError returns true when the PostIndexerConfig error string maps
+// to a 5xx HTTP status.
+func isServerError(msg string) bool {
+	const prefix = "config POST HTTP "
+	if !strings.HasPrefix(msg, prefix) {
+		return false
+	}
+	rest := strings.TrimPrefix(msg, prefix)
+	return strings.HasPrefix(rest, "5")
+}
+
+// loadBundles returns a name→Credential map of bundles that carry usable
+// secrets, plus the sorted list of names. Rows with no userpass pair AND
+// no cookies are skipped (they couldn't satisfy any indexer template).
+func loadBundles(c *repos.Credentials) (map[string]*repos.Credential, []string, error) {
+	rows, err := c.List()
+	if err != nil {
+		return nil, nil, err
+	}
+	keep := []string{}
+	for _, r := range rows {
+		if !((r.HasUsername && r.HasPassword) || r.HasCookies) {
+			continue
+		}
+		keep = append(keep, r.Name)
+	}
+	sort.Strings(keep)
+	bundles := make(map[string]*repos.Credential, len(keep))
+	for _, name := range keep {
+		full, err := c.Get(name)
+		if err != nil {
+			// Skip (don't fail the whole run) — a single corrupt row
+			// shouldn't poison the batch. The error surfaces nowhere
+			// because we already counted it in `keep`; remove from final
+			// discovered list.
+			continue
+		}
+		bundles[name] = full
+	}
+	// Rebuild sorted list to match what survived decrypt.
+	final := make([]string, 0, len(bundles))
+	for k := range bundles {
+		final = append(final, k)
+	}
+	sort.Strings(final)
+	return bundles, final, nil
+}
+
+// findCatalog returns the catalog entry matching id, or a zero-value entry
+// with the id pre-filled (so DB upsert still has a primary key to write).
+func findCatalog(catalog []CatalogEntry, id string) CatalogEntry {
+	for _, e := range catalog {
+		if e.ID == id {
+			return e
+		}
+	}
+	return CatalogEntry{ID: id}
+}
+
+// upsertIndexerRow mirrors the catalog state into the indexers table. Best
+// effort — failure is logged but does not poison the run result.
+func upsertIndexerRow(r *repos.Indexers, entry CatalogEntry, id, envName string, syncAt time.Time) {
+	linked := envName
+	row := &repos.Indexer{
+		ID:                   id,
+		DisplayName:          entry.Name,
+		Type:                 entry.Type,
+		ConfiguredAtJackett:  true,
+		LinkedCredentialName: &linked,
+		EnabledForSearch:     true,
+		LastJackettSyncAt:    &syncAt,
+	}
+	if row.DisplayName == "" {
+		row.DisplayName = id
+	}
+	if row.Type == "" {
+		row.Type = "private"
+	}
+	if err := r.Upsert(row); err != nil {
+		log.Printf("autoconfig: indexers.Upsert(%s) failed: %v", id, err)
+	}
+}
+
+// recordRun marshals the result into the autoconfig_runs table. Insert
+// failures append a "run_record_failed" entry to result.Errors AFTER the
+// JSON snapshot is taken so the caller still sees a complete result; the
+// row simply doesn't persist. discovered is passed in (not derived from
+// result) because some early-return paths (e.g. credentials_list_failed)
+// haven't populated result.DiscoveredCredentials yet.
+func recordRun(runs *repos.Runs, result *AutoconfigResult, started time.Time, discovered int) {
+	summary, err := json.Marshal(result)
+	if err != nil {
+		// Should never happen — all fields are JSON-friendly.
+		summary = []byte("{}")
+	}
+	errsJSON, err := json.Marshal(result.Errors)
+	if err != nil || len(result.Errors) == 0 {
+		errsJSON = []byte("[]")
+	}
+	run := &repos.Run{
+		RanAt:              started,
+		DiscoveredCount:    discovered,
+		ConfiguredNowCount: len(result.ConfiguredNow),
+		ErrorsJSON:         string(errsJSON),
+		ResultSummaryJSON:  string(summary),
+	}
+	if _, insErr := runs.Insert(run); insErr != nil {
+		result.Errors = append(result.Errors, fmt.Sprintf("run_record_failed: %v", insErr))
+	}
+}
