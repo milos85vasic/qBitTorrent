@@ -46,6 +46,33 @@ async def lifespan(app: FastAPI):
     app.state.scheduler.set_search_callback(lambda q, c: app.state.search_orchestrator.search(query=q, category=c))
     await app.state.scheduler.start()
 
+    # Jackett auto-configuration — best-effort, never blocks boot.
+    from merge_service.jackett_autoconfig import autoconfigure_jackett
+
+    jackett_url = os.getenv("JACKETT_URL", "http://localhost:9117")
+    jackett_key = os.getenv("JACKETT_API_KEY", "")
+    if jackett_key and jackett_key != "YOUR_API_KEY_HERE":
+        try:
+            app.state.jackett_autoconfig_last = await autoconfigure_jackett(
+                jackett_url=jackett_url,
+                api_key=jackett_key,
+                env=os.environ,
+            )
+            r = app.state.jackett_autoconfig_last
+            logger.info(
+                "Jackett autoconfig: discovered=%d configured_now=%d already=%d errors=%d",
+                len(r.discovered_credentials),
+                len(r.configured_now),
+                len(r.already_present),
+                len(r.errors),
+            )
+        except Exception:
+            logger.exception("Jackett autoconfig failed unexpectedly")
+            app.state.jackett_autoconfig_last = None
+    else:
+        logger.info("Jackett autoconfig: skipped (no API key)")
+        app.state.jackett_autoconfig_last = None
+
     logger.info("Merge Service API started")
 
     yield
@@ -192,6 +219,7 @@ async def stats():
 
 from .auth import router as auth_router  # noqa: E402
 from .hooks import router as hooks_router  # noqa: E402
+from .jackett import router as jackett_router  # noqa: E402
 from .routes import router as api_router  # noqa: E402
 from .scheduler import router as scheduler_router  # noqa: E402
 
@@ -199,6 +227,7 @@ app.include_router(api_router, prefix="/api/v1")
 app.include_router(hooks_router, prefix="/api/v1/hooks")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(scheduler_router, prefix="/api/v1/schedules")
+app.include_router(jackett_router, prefix="/api/v1")
 
 
 def _serve_index_html():
