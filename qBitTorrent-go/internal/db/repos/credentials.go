@@ -153,9 +153,18 @@ func (c *Credentials) Delete(name string) error {
 	return err
 }
 
-// MarkUsed updates last_used_at on the named row. Used after autoconfig
-// successfully applies the credential to a Jackett indexer.
+// MarkUsed updates last_used_at on the named row. Returns ErrNotFound if no row matches.
 func (c *Credentials) MarkUsed(name string) error {
-	_, err := c.conn.Exec("UPDATE credentials SET last_used_at=CURRENT_TIMESTAMP WHERE name=?", name)
-	return err
+	res, err := c.conn.Exec("UPDATE credentials SET last_used_at=? WHERE name=?", time.Now().UTC(), name)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

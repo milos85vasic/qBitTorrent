@@ -78,4 +78,71 @@ func TestUpsertOverwritesUpdatedAt(t *testing.T) {
 	}
 }
 
+func TestUpsertPatchSemanticsPreservesNilFields(t *testing.T) {
+	r := freshConn(t)
+	if err := r.Upsert("X", "userpass", strPtr("u"), strPtr("p"), nil); err != nil {
+		t.Fatalf("Upsert initial: %v", err)
+	}
+	if err := r.Upsert("X", "userpass", nil, strPtr("p2"), nil); err != nil {
+		t.Fatalf("Upsert patch: %v", err)
+	}
+	got, err := r.Get("X")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.Username != "u" {
+		t.Fatalf("nil-pointer username should preserve prior value, got %q", got.Username)
+	}
+	if got.Password != "p2" {
+		t.Fatalf("non-nil password should update, got %q", got.Password)
+	}
+	if got.HasCookies {
+		t.Fatalf("cookies never set, should be false")
+	}
+}
+
+func TestUpsertCanToggleKind(t *testing.T) {
+	r := freshConn(t)
+	if err := r.Upsert("X", "userpass", strPtr("u"), strPtr("p"), nil); err != nil {
+		t.Fatalf("Upsert userpass: %v", err)
+	}
+	if err := r.Upsert("X", "cookie", nil, nil, strPtr("c")); err != nil {
+		t.Fatalf("Upsert cookie: %v", err)
+	}
+	got, err := r.Get("X")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.Kind != "cookie" {
+		t.Fatalf("kind not toggled, got %q", got.Kind)
+	}
+	if got.Cookies != "c" {
+		t.Fatalf("cookies not stored, got %q", got.Cookies)
+	}
+}
+
+func TestMarkUsedAdvancesTimestamp(t *testing.T) {
+	r := freshConn(t)
+	r.Upsert("X", "userpass", strPtr("u"), strPtr("p"), nil)
+	before, _ := r.Get("X")
+	if before.LastUsedAt != nil {
+		t.Fatalf("LastUsedAt should be nil before MarkUsed, got %v", before.LastUsedAt)
+	}
+	time.Sleep(20 * time.Millisecond)
+	if err := r.MarkUsed("X"); err != nil {
+		t.Fatalf("MarkUsed: %v", err)
+	}
+	after, _ := r.Get("X")
+	if after.LastUsedAt == nil {
+		t.Fatalf("LastUsedAt should be set after MarkUsed")
+	}
+}
+
+func TestMarkUsedReturnsNotFoundOnMissingRow(t *testing.T) {
+	r := freshConn(t)
+	if err := r.MarkUsed("DOES_NOT_EXIST"); err != ErrNotFound {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
 func strPtr(s string) *string { return &s }
