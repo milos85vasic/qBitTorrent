@@ -406,7 +406,11 @@ Key variables:
 - `OMDB_API_KEY`, `TMDB_API_KEY`, `TVDB_API_KEY` -- metadata enrichment
 - `ANILIST_CLIENT_ID` -- anime metadata
 - `JACKETT_API_KEY` -- public tracker uplift (auto-discovered from Jackett container config; manual override optional)
+- `JACKETT_INDEXER_MAP` -- CSV `NAME:indexer_id` overrides for the autoconfig fuzzy matcher
+- `JACKETT_AUTOCONFIG_EXCLUDE` -- CSV prefix denylist for env scan; default `QBITTORRENT,JACKETT,WEBUI,PROXY,MERGE,BRIDGE`
 - `SNYK_TOKEN`, `SONAR_TOKEN` -- scanner tokens (opt-in)
+
+**Jackett auto-configuration** (since 2026-04-27): the merge service discovers `<NAME>_USERNAME/_PASSWORD/_COOKIES` env triples at startup and idempotently configures matching Jackett indexers. Last-run summary at `GET /api/v1/jackett/autoconfig/last` (redacted, 404 when not run). Best-effort, never blocks boot. See `docs/JACKETT_INTEGRATION.md` § "Auto-Configuration".
 
 ## Plugin System
 

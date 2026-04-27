@@ -166,7 +166,9 @@ Installed to `config/qBittorrent/nova3/engines/` inside container.
 
 Priority: shell env → `./.env` → `~/.qbit.env` → container env.
 
-Key: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD` (falls back to `IPTORRENTS_USERNAME/PASSWORD` if unset), `NNMCLUB_COOKIES`, `IPTORRENTS_USERNAME/PASSWORD`, `QBITTORRENT_DATA_DIR` (`/mnt/DATA`), `PUID/PGID` (`1000`), `MERGE_SERVICE_PORT` (`7187`), `PROXY_PORT` (`7186`), `BRIDGE_PORT` (`7188`).
+Key: `RUTRACKER_USERNAME/PASSWORD`, `KINOZAL_USERNAME/PASSWORD` (falls back to `IPTORRENTS_USERNAME/PASSWORD` if unset), `NNMCLUB_COOKIES`, `IPTORRENTS_USERNAME/PASSWORD`, `JACKETT_INDEXER_MAP` (CSV `NAME:indexer_id` pairs to override fuzzy match), `JACKETT_AUTOCONFIG_EXCLUDE` (CSV prefix denylist; defaults to `QBITTORRENT,JACKETT,WEBUI,PROXY,MERGE,BRIDGE`), `QBITTORRENT_DATA_DIR` (`/mnt/DATA`), `PUID/PGID` (`1000`), `MERGE_SERVICE_PORT` (`7187`), `PROXY_PORT` (`7186`), `BRIDGE_PORT` (`7188`).
+
+**Jackett auto-configuration**: at proxy startup, the merge service discovers `<NAME>_USERNAME/_PASSWORD/_COOKIES` env triples and configures matching Jackett indexers (idempotent, best-effort, never blocks boot). Last-run summary at `GET /api/v1/jackett/autoconfig/last` (redacted). See `docs/JACKETT_INTEGRATION.md` § "Auto-Configuration".
 
 ## Code Conventions
 

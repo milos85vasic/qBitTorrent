@@ -227,3 +227,104 @@ curl "http://localhost:9117/api/v2.0/indexers/all/results/torznab/api?apikey=${A
 | `setup.sh` | Copies `.json` config files during setup |
 | `download-proxy/src/merge_service/search.py` | Jackett tracker registration + dispatch |
 | `scripts/extract-jackett-key.py` | Standalone key extraction utility |
+
+## Auto-Configuration (since 2026-04-27)
+
+At merge-service startup, the proxy automatically configures Jackett
+indexers using credentials it finds in environment variables.
+
+### Discovery
+
+The merge service scans `os.environ` for triples of the form
+`<NAME>_USERNAME` / `<NAME>_PASSWORD` / `<NAME>_COOKIES`. Each tracker
+needs *either* a `(USERNAME, PASSWORD)` pair *or* a `COOKIES` value.
+
+Names matching the **denylist** (default
+`QBITTORRENT,JACKETT,WEBUI,PROXY,MERGE,BRIDGE`, override via
+`JACKETT_AUTOCONFIG_EXCLUDE`) are dropped — these are project-internal
+credentials, not tracker creds.
+
+### Matching
+
+For each surviving credential bundle, the autoconfig:
+1. Checks `JACKETT_INDEXER_MAP` (CSV `NAME:indexer_id` pairs) for an
+   explicit override. Highest precedence.
+2. Falls back to fuzzy matching (Levenshtein `ratio() >= 0.85`,
+   case-insensitive) against Jackett's catalog id and display name.
+3. Skips ambiguous matches (multiple indexers ≥ threshold) with a clear
+   log message and an entry in `skipped_ambiguous`.
+
+### Configuration
+
+For each matched indexer:
+1. Fetches the per-indexer config template via
+   `GET /api/v2.0/indexers/{id}/config`.
+2. Maps env credentials onto the template's `username` / `password` /
+   `cookie` / `cookies` / `cookieheader` fields, preserving every other
+   field verbatim.
+3. POSTs the populated config back. Retries once on 5xx.
+4. Skips with `no_compatible_credential_fields_for_indexer` if no env
+   credential maps to any template field (e.g. IPTorrents requires
+   `cookie`; if you only provide `IPTORRENTS_USERNAME/PASSWORD`, the
+   indexer is reported skipped rather than failing).
+
+The autoconfig is **idempotent**: it consults the catalog's `configured`
+flag and skips already-configured indexers (`already_present`).
+
+### Endpoint
+
+```
+GET /api/v1/jackett/autoconfig/last
+```
+
+Returns the most recent autoconfig run summary (redacted — never
+contains credential values). 404 when autoconfig has not run yet
+(e.g., no `JACKETT_API_KEY`).
+
+Example response:
+
+```json
+{
+  "ran_at": "2026-04-27T11:34:21.835022Z",
+  "discovered": ["IPTORRENTS", "KINOZAL", "NNMCLUB", "RUTRACKER"],
+  "matched_indexers": {
+    "KINOZAL": "kinozal",
+    "IPTORRENTS": "iptorrents",
+    "RUTRACKER": "rutracker"
+  },
+  "configured_now": ["kinozal", "rutracker"],
+  "already_present": [],
+  "skipped_no_match": ["NNMCLUB"],
+  "skipped_ambiguous": [],
+  "errors": [
+    "indexer_config_failed:iptorrents:no_compatible_credential_fields_for_indexer"
+  ]
+}
+```
+
+### Failure modes (best-effort)
+
+The autoconfig is best-effort and **never blocks boot**. Errors land in
+the result's `errors` list and are logged WARNING. Common error codes:
+
+| Code | Meaning |
+|---|---|
+| `jackett_unreachable` | Jackett container not accepting connections |
+| `jackett_auth_failed` | Bad / missing API key (HTTP 401) |
+| `jackett_auth_missing_key` | `JACKETT_API_KEY` env var was empty |
+| `catalog_parse_failed` | Catalog endpoint returned non-JSON |
+| `jackett_total_timeout_60s` | Hit the outer 60-second cap |
+| `indexer_config_failed:<id>:<reason>` | Per-indexer failure (HTTP code or `no_compatible_credential_fields_for_indexer`) |
+
+### Configuration
+
+| Env var | Purpose | Default |
+|---|---|---|
+| `JACKETT_INDEXER_MAP` | CSV `NAME:indexer_id` overrides for fuzzy match | empty |
+| `JACKETT_AUTOCONFIG_EXCLUDE` | CSV prefix denylist | `QBITTORRENT,JACKETT,WEBUI,PROXY,MERGE,BRIDGE` |
+
+### Files
+
+- `download-proxy/src/merge_service/jackett_autoconfig.py` — module
+- `download-proxy/src/api/jackett.py` — read-only endpoint
+- `download-proxy/src/api/__init__.py` — wired into FastAPI lifespan
