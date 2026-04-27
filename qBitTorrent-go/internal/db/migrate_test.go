@@ -64,3 +64,23 @@ func TestMigratePragmas(t *testing.T) {
 		t.Errorf("foreign_keys: want 1, got %d", fk)
 	}
 }
+
+// TestOpenWithExoticPath regression-guards Issue 1: a path containing
+// reserved URL characters (?, &, #) used to truncate the DSN query
+// string and silently degrade journal_mode to "delete".
+func TestOpenWithExoticPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "weird?name#1.db")
+	conn, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer conn.Close()
+	var jm string
+	if err := conn.QueryRow("PRAGMA journal_mode").Scan(&jm); err != nil {
+		t.Fatalf("PRAGMA journal_mode: %v", err)
+	}
+	if jm != "wal" {
+		t.Fatalf("journal_mode degraded to %q on exotic path", jm)
+	}
+}

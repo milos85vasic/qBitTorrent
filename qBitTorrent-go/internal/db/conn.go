@@ -3,14 +3,44 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
 
+// dsnPathEscape percent-encodes characters in the database path that would
+// confuse the modernc.org/sqlite DSN parser. The parser splits on the FIRST
+// '?' to separate path from query (sqlite.go:newConn), so any literal '?'
+// or '#' in the path silently truncates the query string and degrades
+// pragmas (e.g. journal_mode falls back from WAL to delete).
+//
+// Spaces are encoded as %20 (NOT '+', which is form-encoding only).
+// '/' is preserved so absolute paths still resolve correctly.
+func dsnPathEscape(path string) string {
+	// url.PathEscape encodes ?, #, %, and most other reserved chars while
+	// leaving '/' alone — exactly what we want for a sqlite file path.
+	// We then escape '%' literals that PathEscape leaves alone if any
+	// snuck in pre-encoded, but PathEscape already double-encodes them, so
+	// we're fine. Whitespace becomes %20 via PathEscape too.
+	escaped := url.PathEscape(path)
+	// PathEscape doesn't escape '+' — and modernc's DSN parser is fine
+	// with raw '+'. No further work needed.
+	return escaped
+}
+
 func Open(path string) (*sql.DB, error) {
 	// modernc.org/sqlite uses _pragma=name(value) DSN syntax.
-	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=foreign_keys(on)&_pragma=synchronous(NORMAL)", path)
-	conn, err := sql.Open("sqlite", dsn) // driver name "sqlite" (NOT "sqlite3") for modernc
+	// The DSN parser splits on the FIRST '?' (sqlite.go:newConn), so a
+	// path containing '?', '#', or other reserved chars truncates the
+	// query string and silently degrades journal_mode away from WAL.
+	// Percent-encode the path component to defend against this.
+	var dsn strings.Builder
+	dsn.WriteString("file:")
+	dsn.WriteString(dsnPathEscape(path))
+	dsn.WriteString("?_pragma=journal_mode(WAL)&_pragma=foreign_keys(on)&_pragma=synchronous(NORMAL)")
+
+	conn, err := sql.Open("sqlite", dsn.String()) // driver name "sqlite" (NOT "sqlite3") for modernc
 	if err != nil {
 		return nil, fmt.Errorf("sql.Open: %w", err)
 	}

@@ -1,4 +1,4 @@
-CREATE TABLE credentials (
+CREATE TABLE IF NOT EXISTS credentials (
   name              TEXT PRIMARY KEY,
   kind              TEXT NOT NULL CHECK (kind IN ('userpass', 'cookie')),
   username_enc      BLOB,
@@ -9,7 +9,7 @@ CREATE TABLE credentials (
   last_used_at      DATETIME
 );
 
-CREATE TABLE indexers (
+CREATE TABLE IF NOT EXISTS indexers (
   id                       TEXT PRIMARY KEY,
   display_name             TEXT NOT NULL,
   type                     TEXT NOT NULL,
@@ -20,9 +20,9 @@ CREATE TABLE indexers (
   last_test_status         TEXT,
   last_test_at             DATETIME
 );
-CREATE INDEX idx_indexers_linked_cred ON indexers(linked_credential_name);
+CREATE INDEX IF NOT EXISTS idx_indexers_linked_cred ON indexers(linked_credential_name);
 
-CREATE TABLE catalog_cache (
+CREATE TABLE IF NOT EXISTS catalog_cache (
   id                    TEXT PRIMARY KEY,
   display_name          TEXT NOT NULL,
   type                  TEXT NOT NULL,
@@ -31,9 +31,9 @@ CREATE TABLE catalog_cache (
   template_fields_json  TEXT NOT NULL,
   cached_at             DATETIME NOT NULL
 );
-CREATE INDEX idx_catalog_cached_at ON catalog_cache(cached_at);
+CREATE INDEX IF NOT EXISTS idx_catalog_cached_at ON catalog_cache(cached_at);
 
-CREATE TABLE autoconfig_runs (
+CREATE TABLE IF NOT EXISTS autoconfig_runs (
   id                       INTEGER PRIMARY KEY AUTOINCREMENT,
   ran_at                   DATETIME NOT NULL,
   discovered_count         INTEGER NOT NULL,
@@ -41,9 +41,9 @@ CREATE TABLE autoconfig_runs (
   errors_json              TEXT NOT NULL DEFAULT '[]',
   result_summary_json      TEXT NOT NULL
 );
-CREATE INDEX idx_runs_ran_at ON autoconfig_runs(ran_at DESC);
+CREATE INDEX IF NOT EXISTS idx_runs_ran_at ON autoconfig_runs(ran_at DESC);
 
-CREATE TABLE indexer_map_overrides (
+CREATE TABLE IF NOT EXISTS indexer_map_overrides (
   env_name      TEXT PRIMARY KEY,
   indexer_id    TEXT NOT NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

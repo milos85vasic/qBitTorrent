@@ -26,8 +26,15 @@ func Migrate(conn *sql.DB) error {
 	}
 	for rows.Next() {
 		var v int
-		_ = rows.Scan(&v)
+		if err := rows.Scan(&v); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan version: %w", err)
+		}
 		applied[v] = true
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("iter versions: %w", err)
 	}
 	rows.Close()
 
@@ -51,6 +58,16 @@ func Migrate(conn *sql.DB) error {
 			return fmt.Errorf("bad migration name %s: %w", name, err)
 		}
 		migs = append(migs, mig{v, name})
+	}
+	// Reject duplicate migration versions before sort — accidental
+	// filename collisions (e.g. two 002_*.sql) silently masked one
+	// migration otherwise.
+	seen := map[int]bool{}
+	for _, m := range migs {
+		if seen[m.version] {
+			return fmt.Errorf("duplicate migration version %d in %s", m.version, m.name)
+		}
+		seen[m.version] = true
 	}
 	sort.Slice(migs, func(i, j int) bool { return migs[i].version < migs[j].version })
 
