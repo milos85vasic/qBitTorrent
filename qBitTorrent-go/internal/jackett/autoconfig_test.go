@@ -106,7 +106,7 @@ func TestAutoconfigureMissingAPIKey(t *testing.T) {
 
 func TestAutoconfigureNoCompatibleFields(t *testing.T) {
 	// An indexer template that requires a "cookie" field, paired with a
-	// userpass credential. fillFields fills nothing → skip with the
+	// userpass credential. FillFields fills nothing → skip with the
 	// no_compatible_credential_fields_for_indexer error.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {

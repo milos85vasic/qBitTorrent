@@ -65,7 +65,7 @@ func ParseIndexerMapCSV(raw string) map[string]string {
 	return out
 }
 
-// fillFields walks a Jackett indexer config template, populates known
+// FillFields walks a Jackett indexer config template, populates known
 // credential keys ("username", "password", "cookie"/"cookies"/"cookieheader")
 // from the bundle, returns the populated template AND a count of fields filled.
 //
@@ -73,7 +73,10 @@ func ParseIndexerMapCSV(raw string) map[string]string {
 // the bundle actually has — caller treats that as
 // no_compatible_credential_fields_for_indexer (e.g. iptorrents needs cookie
 // but the bundle is userpass-only).
-func fillFields(template []map[string]any, cred *repos.Credential) ([]map[string]any, int) {
+//
+// Exported for use by [internal/jackettapi.HandleConfigureIndexer]; the
+// helper has no internal state, so a public function is the cleanest seam.
+func FillFields(template []map[string]any, cred *repos.Credential) ([]map[string]any, int) {
 	fieldMap := map[string]string{
 		"username":     cred.Username,
 		"password":     cred.Password,
@@ -109,7 +112,7 @@ func fillFields(template []map[string]any, cred *repos.Credential) ([]map[string
 //     helper)
 //  3. WarmUp + GetCatalog
 //  4. MatchIndexers
-//  5. for each match: GetIndexerTemplate → fillFields → PostIndexerConfig
+//  5. for each match: GetIndexerTemplate → FillFields → PostIndexerConfig
 //     → Indexers.Upsert + Credentials.MarkUsed
 //  6. Runs.Insert with a summary
 //  7. return AutoconfigResult
@@ -251,7 +254,7 @@ func configureOne(deps AutoconfigDeps, envName, indexerID string, cred *repos.Cr
 	if err != nil {
 		return err.Error()
 	}
-	populated, filled := fillFields(tmpl, cred)
+	populated, filled := FillFields(tmpl, cred)
 	if filled == 0 {
 		return "no_compatible_credential_fields_for_indexer"
 	}

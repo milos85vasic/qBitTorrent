@@ -169,6 +169,40 @@ func (c *Client) PostIndexerConfig(id string, fields []map[string]any) error {
 	return nil
 }
 
+// TestIndexer probes a configured indexer by hitting its /config endpoint.
+// This is a minimal "is the indexer reachable and authorised" check; it
+// does NOT run a real torznab search query (that's deferred to a follow-up
+// task wiring the search path through this client).
+//
+// Returns:
+//   - nil on HTTP 200 (caller maps this to status="ok").
+//   - error with message "auth_failed" on HTTP 401.
+//   - error with message "unreachable" on transport/network failure.
+//   - error with message "http_<code>" on any other 4xx/5xx response.
+//
+// The handler in [internal/jackettapi.HandleTestIndexer] inspects the error
+// text to map to the spec §8.2 status enum.
+func (c *Client) TestIndexer(id string) error {
+	u := fmt.Sprintf("%s/api/v2.0/indexers/%s/config?apikey=%s", c.base, id, c.apiKey)
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return fmt.Errorf("build test request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("unreachable")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 401 {
+		return fmt.Errorf("auth_failed")
+	}
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("http_%d", resp.StatusCode)
+	}
+	return nil
+}
+
 // DeleteIndexer removes a configured indexer. A 404 is treated as success
 // (already absent) so the caller can drive idempotent reconciliation.
 func (c *Client) DeleteIndexer(id string) error {

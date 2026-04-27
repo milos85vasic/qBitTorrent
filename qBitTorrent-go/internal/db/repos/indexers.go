@@ -2,6 +2,7 @@ package repos
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -46,6 +47,25 @@ func (r *Indexers) Upsert(i *Indexer) error {
 		i.LinkedCredentialName, i.EnabledForSearch, i.LastJackettSyncAt,
 		i.LastTestStatus, i.LastTestAt)
 	return err
+}
+
+// Get returns the indexer row matching id, or [ErrNotFound] when no row
+// exists. Mirrors [Credentials.Get] for symmetry — the API layer reads-back
+// after Upsert / SetEnabled to return the canonical row in the response DTO.
+func (r *Indexers) Get(id string) (*Indexer, error) {
+	row := r.conn.QueryRow(`SELECT id, display_name, type, configured_at_jackett,
+		linked_credential_name, enabled_for_search, last_jackett_sync_at,
+		last_test_status, last_test_at FROM indexers WHERE id=?`, id)
+	i := &Indexer{}
+	if err := row.Scan(&i.ID, &i.DisplayName, &i.Type, &i.ConfiguredAtJackett,
+		&i.LinkedCredentialName, &i.EnabledForSearch, &i.LastJackettSyncAt,
+		&i.LastTestStatus, &i.LastTestAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return i, nil
 }
 
 // List returns all indexers ordered by id.

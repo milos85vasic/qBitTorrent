@@ -2,6 +2,7 @@ package repos
 
 import (
 	"crypto/rand"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -35,6 +36,37 @@ func TestIndexersUpsertAndList(t *testing.T) {
 	}
 	if len(rows) != 1 || rows[0].ID != "rutracker" {
 		t.Fatalf("got %+v", rows)
+	}
+}
+
+func TestIndexersGet(t *testing.T) {
+	r := indexersConn(t)
+	if err := r.Upsert(&Indexer{
+		ID: "rutracker", DisplayName: "RuTracker.org", Type: "private",
+		ConfiguredAtJackett: true, EnabledForSearch: true,
+	}); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	got, err := r.Get("rutracker")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.ID != "rutracker" || got.DisplayName != "RuTracker.org" || got.Type != "private" {
+		t.Fatalf("scalar fields: %+v", got)
+	}
+	if !got.ConfiguredAtJackett || !got.EnabledForSearch {
+		t.Fatalf("flags: %+v", got)
+	}
+	if got.LinkedCredentialName != nil {
+		t.Fatalf("link should be nil (no credential seeded): %+v", got.LinkedCredentialName)
+	}
+}
+
+func TestIndexersGetNotFound(t *testing.T) {
+	r := indexersConn(t)
+	_, err := r.Get("missing")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
 
