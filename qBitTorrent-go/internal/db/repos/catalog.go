@@ -116,7 +116,7 @@ func (c *Catalog) Query(q CatalogQuery) (rows []*CatalogEntry, total int, err er
 	pageArgs := append(args, q.Limit, q.Offset)
 	r, err := c.conn.Query(`SELECT id, display_name, type, language, description,
 		template_fields_json, cached_at FROM catalog_cache`+whereClause+
-		` ORDER BY display_name LIMIT ? OFFSET ?`, pageArgs...)
+		` ORDER BY display_name, id LIMIT ? OFFSET ?`, pageArgs...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query: %w", err)
 	}
@@ -157,6 +157,9 @@ func (c *Catalog) OlderThan(cutoff time.Time) ([]string, error) {
 // ReplaceAll truncates the table and bulk-inserts the given entries in
 // one transaction. Used by full-catalog refresh (Task 18).
 func (c *Catalog) ReplaceAll(entries []*CatalogEntry) error {
+	if len(entries) == 0 {
+		return errors.New("repos: ReplaceAll refusing empty replacement (would wipe catalog_cache)")
+	}
 	tx, err := c.conn.Begin()
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)

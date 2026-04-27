@@ -132,3 +132,40 @@ func TestCatalogReplaceAll(t *testing.T) {
 		t.Fatalf("want [c], got %+v", rows)
 	}
 }
+
+func TestCatalogReplaceAllRejectsEmpty(t *testing.T) {
+	r := catalogConn(t)
+	r.Upsert(makeEntry("a", "A", "public", "en"))
+	if err := r.ReplaceAll(nil); err == nil {
+		t.Fatal("ReplaceAll(nil) should error")
+	}
+	if err := r.ReplaceAll([]*CatalogEntry{}); err == nil {
+		t.Fatal("ReplaceAll([]) should error")
+	}
+	rows, _, _ := r.Query(CatalogQuery{Limit: 100})
+	if len(rows) != 1 {
+		t.Fatalf("rows must survive empty ReplaceAll attempts; got %d", len(rows))
+	}
+}
+
+func TestCatalogQueryDeterministicOrderOnNameTie(t *testing.T) {
+	r := catalogConn(t)
+	// Two entries with IDENTICAL display_name but different ids — pagination
+	// must not silently drop or duplicate either across page boundaries.
+	r.Upsert(makeEntry("aaa", "Same Name", "public", "en"))
+	r.Upsert(makeEntry("bbb", "Same Name", "public", "en"))
+	r.Upsert(makeEntry("ccc", "Same Name", "public", "en"))
+
+	page1, _, _ := r.Query(CatalogQuery{Limit: 2, Offset: 0})
+	page2, _, _ := r.Query(CatalogQuery{Limit: 2, Offset: 2})
+	seen := map[string]bool{}
+	for _, row := range append(page1, page2...) {
+		if seen[row.ID] {
+			t.Fatalf("duplicate id %q across pages", row.ID)
+		}
+		seen[row.ID] = true
+	}
+	if len(seen) != 3 {
+		t.Fatalf("expected 3 unique rows across pages, got %d", len(seen))
+	}
+}
