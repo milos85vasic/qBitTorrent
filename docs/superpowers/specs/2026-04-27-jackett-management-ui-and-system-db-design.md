@@ -173,11 +173,9 @@ All shared mutable state across goroutines uses `digital.vasic.concurrency/pkg/s
 
 Migration `001_init.sql`:
 
-```sql
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-PRAGMA synchronous = NORMAL;
+> **Note:** PRAGMA settings (`journal_mode=WAL`, `foreign_keys=ON`, `synchronous=NORMAL`) live in the connection DSN in `internal/db/conn.go`, not in this migration file. SQLite rejects `PRAGMA synchronous` inside a transaction, and the migrations stepper wraps each migration in a transaction for atomic apply. Setting them per-connection is the only place they actually take effect for `journal_mode` and `foreign_keys` anyway.
 
+```sql
 CREATE TABLE credentials (
   name              TEXT PRIMARY KEY,
   kind              TEXT NOT NULL CHECK (kind IN ('userpass', 'cookie')),
