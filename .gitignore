@@ -166,8 +166,10 @@ artifacts/
 # Go build artifacts
 qBitTorrent-go/qbittorrent-proxy
 qBitTorrent-go/webui-bridge
+qBitTorrent-go/bin/
 shellcheck-v0.11.0/
 config/jackett/
+config/boba.db
 
 # Local Claude Code settings (per-user)
 .claude/
