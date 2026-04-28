@@ -8,8 +8,10 @@ import (
 // defaultAllowedOrigins are the dashboard origins permitted by CORS by
 // default. Add more via WithCORSOrigins if needed in production.
 var defaultAllowedOrigins = []string{
-	"http://localhost:4200", // ng serve dev server
-	"http://localhost:7187", // merge service Angular SPA
+	"http://localhost:4200",   // ng serve dev server
+	"http://127.0.0.1:4200", // ng serve dev server (IPv4)
+	"http://localhost:7187",   // merge service Angular SPA
+	"http://127.0.0.1:7187",   // merge service Angular SPA (IPv4)
 }
 
 // WithCORS wraps an inner handler with permissive-but-allowlisted CORS:

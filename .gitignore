@@ -170,6 +170,8 @@ qBitTorrent-go/bin/
 shellcheck-v0.11.0/
 config/jackett/
 config/boba.db
+config/boba.db-shm
+config/boba.db-wal
 
 # Local Claude Code settings (per-user)
 .claude/
