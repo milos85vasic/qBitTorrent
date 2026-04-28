@@ -134,6 +134,7 @@ services:
       - PUBLIC_TRACKER_DEADLINE_SECONDS=15
       - ENABLE_DEAD_TRACKERS=${ENABLE_DEAD_TRACKERS:-0}
       - JACKETT_API_KEY=${JACKETT_API_KEY:-}
+      - ALLOWED_ORIGINS=*
     volumes:
       - ./config:/config
       - ./config/jackett:/jackett-config:ro

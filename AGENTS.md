@@ -215,10 +215,13 @@ frontend/                # Angular 21 dashboard
 
 - **TDD mandatory**: RED -> watch fail -> GREEN -> verify -> commit
 - **Anti-Bluff Verification (CONST-XII)** — Tests and challenges MUST prove the feature works for the END USER. A green run is a contract with the user. Specifically:
-  - Assert on user-observable outcomes (DB rows, file content, response body fields, container state) — NOT just status codes / "no error".
+  - Assert on user-observable outcomes (DB rows, file content, response body fields, container state, DOM text, rendered HTML attributes, browser console errors) — NOT just status codes / "no error".
   - Each new test must fail against a no-op stub of the feature it tests. If it doesn't, it's a bluff and must be strengthened or deleted.
   - Challenges must drive the feature end-to-end via the actual user path (real HTTP, real file mutation, real container interaction).
   - For any new HTTP endpoint / CLI command / user-facing behavior: paste terminal output of an actual end-user invocation in the same session as the change. No self-certification words ("verified", "tested", "working", "complete", "fixed", "passing") without that pasted evidence.
+  - Flaky tests are bluffs; they must be hardened or deleted.
+  - Regression tests MUST fail against the pre-fix code.
+  - No hardcoded `localhost` / `127.0.0.1` for client-facing URLs. Any URL, API base, CORS origin, or service address returned to a browser MUST derive from the request's `Host` header, `window.location`, or an explicit `PUBLIC_HOST` env var.
   - See `CONSTITUTION.md` § XII for the full rule. Apply universally — every submodule and sub-project inherits.
 - **Never commit `.env`** -- tracker credentials live there
 - **WebUI credentials `admin`/`admin` are hardcoded** -- do not change
@@ -557,7 +560,14 @@ or override these.
     real user path; for any user-facing change, pasted terminal output of
     an actual end-user invocation is required in the same session. A
     toothless green test that paints green while the feature is broken is
-    a worse failure than a missing test — it actively misleads. See
+    a worse failure than a missing test — it actively misleads.
+    Additional requirements: frontend tests MUST assert on DOM state /
+    rendered output / browser console errors; error-path tests MUST assert
+    on user-visible errors (not merely internal exception handling); flaky
+    tests are bluffs and must be hardened or deleted; regression tests MUST
+    fail against pre-fix code; no hardcoded `localhost` / `127.0.0.1` for
+    client-facing URLs — they MUST derive from `Host` header,
+    `window.location`, or an explicit `PUBLIC_HOST` env var. See
     `CONSTITUTION.md` § XII for the full text. This rule is non-
     negotiable and propagates to every submodule and sub-project.
 
@@ -602,15 +612,17 @@ reboot, or any other power-state transition.** This rule applies to:
 
 The host runs mission-critical parallel CLI agents and container
 workloads. Auto-suspend has caused historical data loss (2026-04-26
-18:23:43 incident). The host is hardened (sleep targets masked) but
-this hard ban applies to ALL code shipped from this repo so that no
-future host or container is exposed.
+18:23:43 incident). Accidental poweroff has also caused data loss
+(2026-04-28 18:37:55 incident). The host is hardened (sleep targets
+masked, power key ignored) but this hard ban applies to ALL code
+shipped from this repo so that no future host or container is exposed.
 
 **Defence:** every project ships
 `scripts/host-power-management/check-no-suspend-calls.sh` (static
-scanner) and
-`challenges/scripts/no_suspend_calls_challenge.sh` (challenge wrapper).
-Both MUST be wired into the project's CI / `run_all_challenges.sh`.
+scanner), `challenges/scripts/no_suspend_calls_challenge.sh` (challenge
+wrapper), and `challenges/scripts/host_no_auto_poweroff_challenge.sh`
+(host state verification). All MUST be wired into the project's CI /
+`run_all_challenges.sh`.
 
 **Full background:** `docs/HOST_POWER_MANAGEMENT.md` and `CONSTITUTION.md` (CONST-033).
 
@@ -621,7 +633,7 @@ Same triage as in `CLAUDE.md` — when the user reports
 any fix:
 
 1. `uptime` — discontinuous = real suspend; continuous ≥ alleged downtime = no suspend.
-2. `journalctl -k --since "24 hours ago" | grep -iE "will suspend|systemd-suspend"` — zero = no systemd suspend.
+2. `journalctl -k --since "24 hours ago" | grep -iE "will suspend|systemd-suspend"` — zero = no systemd suspend. Also check `will power off` for CONST-034.
 3. `journalctl -k --since "24 hours ago" | grep -iE "oom-kill|killed process"` — decode `oom_memcg`: `libpod-…` = container OOM (containment); `user@1000.service` = user-session OOM (looks like logout).
 4. Both CONST-033 challenges must remain PASS.
 5. Document findings in `docs/incidents/<date>-*.md`.

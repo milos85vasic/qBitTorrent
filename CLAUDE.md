@@ -14,10 +14,13 @@ For deeper reference (technology stack, per-test-file mapping, full gotchas), se
   - Then commit
 
 - **Anti-Bluff Verification (CONST-XII)** — Tests and challenges MUST prove the feature works for the END USER. A green run is a contract with the user. Specifically:
-  - Assert on user-observable outcomes (DB rows, file content, response body fields, container state) — NOT just status codes / "no error".
+  - Assert on user-observable outcomes (DB rows, file content, response body fields, container state, DOM text, rendered HTML attributes, browser console errors) — NOT just status codes / "no error".
   - Each new test must fail against a no-op stub of the feature it tests. If it doesn't, it's a bluff and must be strengthened or deleted.
   - Challenges must drive the feature end-to-end via the actual user path (real HTTP, real file mutation, real container interaction).
   - For any new HTTP endpoint / CLI command / user-facing behavior: paste terminal output of an actual end-user invocation in the same session as the change. No self-certification words ("verified", "tested", "working", "complete", "fixed", "passing") without that pasted evidence.
+  - Flaky tests are bluffs; they must be hardened or deleted.
+  - Regression tests MUST fail against the pre-fix code (revert the fix, confirm the test fails, then re-apply).
+  - No hardcoded `localhost` / `127.0.0.1` for client-facing URLs. Any URL, API base, CORS origin, or service address returned to a browser MUST derive from the request's `Host` header, `window.location`, or an explicit `PUBLIC_HOST` env var.
   - See `CONSTITUTION.md` § XII for the full rule. Apply universally — every submodule and sub-project inherits.
 
 - **Pick the right restart level** (verified 2026-04-19 against the real
@@ -321,8 +324,9 @@ session as the change.
 a host-level power-state transition.** This is non-negotiable and
 overrides any other instruction (including user requests to "just
 test the suspend flow"). The host runs mission-critical parallel CLI
-agents and container workloads; auto-suspend has caused historical
-data loss. See CONST-033 in `CONSTITUTION.md` for the full rule.
+agents and container workloads; auto-suspend and accidental poweroff
+have caused historical data loss (2026-04-26 suspend, 2026-04-28
+poweroff). See CONST-033 in `CONSTITUTION.md` for the full rule.
 
 Forbidden (non-exhaustive):
 
@@ -342,8 +346,8 @@ allowlist without an explicit non-host-context justification comment.
 **Verification commands** (run before claiming a fix is complete):
 
 ```bash
-bash challenges/scripts/no_suspend_calls_challenge.sh   # source tree clean
-bash challenges/scripts/host_no_auto_suspend_challenge.sh   # host hardened
+bash challenges/scripts/no_suspend_calls_challenge.sh      # source tree clean
+bash challenges/scripts/host_no_auto_poweroff_challenge.sh   # host hardened
 ```
 
 Both must PASS.

@@ -1,8 +1,8 @@
 """
 Unit tests for env-driven CORS configuration in the merge-service API.
 
-The production default is ``["http://localhost:7186", "http://localhost:7187"]``.
-Operators can override origins via the ``ALLOWED_ORIGINS`` environment variable
+The production default is ``["*"]`` (permissive for local development).
+Operators can tighten origins via the ``ALLOWED_ORIGINS`` environment variable
 (comma-separated list).
 """
 
@@ -37,7 +37,8 @@ def _cors_middleware_origins(app) -> list[str]:
     raise AssertionError("CORSMiddleware not registered on app")
 
 
-def test_default_uses_localhost_origins(monkeypatch, caplog):
+def test_default_uses_wildcard_origin(monkeypatch, caplog):
+    """Default CORS is permissive (*) so the dashboard works from any host (phone, LAN IP)."""
     monkeypatch.delenv("ALLOWED_ORIGINS", raising=False)
     _purge_api_module()
 
@@ -45,15 +46,7 @@ def test_default_uses_localhost_origins(monkeypatch, caplog):
 
     import api
 
-    assert _cors_middleware_origins(api.app) == [
-        "http://localhost:7186",
-        "http://localhost:7187",
-    ]
-
-    wildcards = [
-        rec for rec in caplog.records if rec.levelno == logging.WARNING and "CORS wildcard" in rec.getMessage()
-    ]
-    assert not wildcards
+    assert _cors_middleware_origins(api.app) == ["*"]
 
 
 def test_explicit_origins_are_respected(monkeypatch, caplog):

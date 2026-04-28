@@ -35,7 +35,7 @@ func main() {
 	scheduleStore := api.NewScheduleStore("/config/merge-service/scheduling.json")
 	themeStore := api.NewThemeStore("/config/merge-service/theme.json")
 
-	if cfg.ServerPort == 7187 {
+	if os.Getenv("GIN_MODE") == "debug" || os.Getenv("GIN_MODE") == "test" {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
@@ -47,7 +47,11 @@ func main() {
 
 	r.GET("/health", api.HealthHandler)
 
-	r.GET("/api/v1/bridge/health", api.BridgeHealthHandler(fmt.Sprintf("http://localhost:%d", cfg.BridgePort)))
+	bridgeHost := cfg.QBittorrentHost
+	if h := os.Getenv("BRIDGE_HOST"); h != "" {
+		bridgeHost = h
+	}
+	r.GET("/api/v1/bridge/health", api.BridgeHealthHandler(fmt.Sprintf("http://%s:%d", bridgeHost, cfg.BridgePort)))
 
 	r.GET("/api/v1/config", api.ConfigHandler(map[string]interface{}{
 		"qbittorrent_url":          fmt.Sprintf("http://%s:%d", cfg.QBittorrentHost, cfg.ProxyPort),

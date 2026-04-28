@@ -36,12 +36,20 @@ def _restore_env():
 
 
 @pytest.mark.security
-class TestCORSNoWildcard:
-    def test_no_wildcard_in_acao_header(self):
+class TestCORSWildcardDefault:
+    """Default CORS is wildcard (*) for local-dev convenience (dashboard from phone/LAN)."""
+
+    def test_default_allows_any_origin(self):
+        client = _make_client(None)
+        resp = client.get("/health", headers={"Origin": "http://192.168.1.100:7187"})
+        acao = resp.headers.get("access-control-allow-origin")
+        assert acao == "*"
+
+    def test_default_allows_localhost(self):
         client = _make_client(None)
         resp = client.get("/health", headers={"Origin": "http://localhost:7187"})
         acao = resp.headers.get("access-control-allow-origin")
-        assert acao != "*"
+        assert acao == "*"
 
 
 @pytest.mark.security
@@ -63,18 +71,3 @@ class TestCORSAllowsConfiguredOrigins:
         resp = client.get("/health", headers={"Origin": "http://evil.example.com"})
         acao = resp.headers.get("access-control-allow-origin")
         assert acao is None
-
-
-@pytest.mark.security
-class TestCORSDefaultOrigins:
-    def test_default_allows_7186(self):
-        client = _make_client(None)
-        resp = client.get("/health", headers={"Origin": "http://localhost:7186"})
-        acao = resp.headers.get("access-control-allow-origin")
-        assert acao == "http://localhost:7186"
-
-    def test_default_allows_7187(self):
-        client = _make_client(None)
-        resp = client.get("/health", headers={"Origin": "http://localhost:7187"})
-        acao = resp.headers.get("access-control-allow-origin")
-        assert acao == "http://localhost:7187"

@@ -140,6 +140,16 @@ This project has been burned: tests went green, challenges printed `OK`, but the
 
 6. **Periodic anti-bluff audit.** When a code-review subagent reviews tests, it MUST sample at least 3 tests and verify each one would fail against a stub. If 3-of-3 are toothless, the PR is rejected and the test suite is hardened first.
 
+7. **Frontend changes MUST assert on DOM / rendered output / browser console.** A test that only checks that an Angular service method was called, or that a component compiled, is a bluff. The assertion MUST inspect the actual DOM text, the rendered HTML attribute, the route change, or the network-tab payload that the end user sees.
+
+8. **Error-path tests MUST assert on the user-visible error.** A test that only checks that an exception was caught internally is a bluff. The assertion MUST inspect the HTTP error response body, the CLI stderr, the UI toast text, or the browser console error — whatever the end user actually experiences.
+
+9. **Flaky tests are bluffs; they must be hardened or deleted.** A test that passes 80 % of the time is a de facto bluff — it trains reviewers to ignore red runs and erodes trust in the entire suite. If a test cannot be made deterministic within 3 attempts, delete it and replace it with a reliable challenge script.
+
+10. **Regression tests MUST fail against the pre-fix code.** A test added for a bug fix is a bluff if it would have passed before the fix was applied. Before merging, the implementer MUST revert the fix (or check out the parent commit), run the new test, and confirm it fails. If it passes, the test does not reproduce the bug — strengthen or delete it.
+
+11. **No hardcoded `localhost` / `127.0.0.1` for client-facing URLs.** Any URL, API base, CORS origin, or service address that is returned to a browser or rendered in a UI MUST derive from the request's `Host` header, `window.location`, or an explicit `PUBLIC_HOST` / `EXTERNAL_URL` environment variable. Hardcoding `localhost` or `127.0.0.1` breaks access from mobile phones, other LAN devices, and reverse-proxy deployments. This rule applies to frontend services, backend config endpoints, CORS allow-lists, and injected JavaScript. Environment-variable overrides alone are insufficient — the default MUST work for the most common access pattern (same-host browser access via hostname or IP).
+
 **Violations:** A test that paints green while the feature is broken is the worst kind of code-review failure. Treat it more seriously than a missing test — the missing test only fails to catch a bug, while a toothless green test ACTIVELY MISLEADS reviewers and end users into believing the feature works.
 
 **This principle is universal.** Every project, submodule, and sibling repository inherits it through `CONSTITUTION.md`, `CLAUDE.md`, and `AGENTS.md`. No project may opt out.
@@ -336,24 +346,29 @@ includes — but is not limited to:
 **Why:** The host runs mission-critical parallel CLI-agent and
 container workloads. On 2026-04-26 18:23:43 the host was auto-
 suspended by the GDM greeter's idle policy mid-session, killing
-HelixAgent and 41 dependent services. Recurring memory-pressure
-SIGKILLs of `user@1000.service` (perceived as "logged out") have the
-same outcome. Auto-suspend, hibernate, and any power-state transition
-are unsafe for this host.
+HelixAgent and 41 dependent services. On 2026-04-28 18:37:55 the host
+was powered off by systemd-logind while long-running build, test, and
+container orchestration work was in progress, again destroying all
+state. Recurring memory-pressure SIGKILLs of `user@1000.service`
+(perceived as "logged out") have the same outcome. Auto-suspend,
+hibernate, poweroff, and any host-level power-state transition are
+unsafe for this host.
 
 **Defence in depth (mandatory artifacts in every project):**
-1. `scripts/host-power-management/install-host-suspend-guard.sh` —
+1. `scripts/host-power-management/install-host-power-guard.sh` —
    privileged installer, manual prereq, run once per host with sudo.
    Masks `sleep.target`, `suspend.target`, `hibernate.target`,
    `hybrid-sleep.target`; writes `AllowSuspend=no` drop-in; sets
-   logind `IdleAction=ignore` and `HandleLidSwitch=ignore`.
+   logind `IdleAction=ignore`, `HandleLidSwitch=ignore`, AND
+   `HandlePowerKey=ignore` (prevents accidental button press from
+   killing long-running work).
 2. `scripts/host-power-management/user_session_no_suspend_bootstrap.sh` —
    per-user, no-sudo defensive layer. Idempotent. Safe to source from
    `start.sh` / `setup.sh` / `bootstrap.sh`.
 3. `scripts/host-power-management/check-no-suspend-calls.sh` —
    static scanner. Exits non-zero on any forbidden invocation.
-4. `challenges/scripts/host_no_auto_suspend_challenge.sh` — asserts
-   the running host's state matches layer-1 masking.
+4. `challenges/scripts/host_no_auto_poweroff_challenge.sh` — asserts
+   the running host cannot suspend, hibernate, OR power off.
 5. `challenges/scripts/no_suspend_calls_challenge.sh` — wraps the
    scanner as a challenge that runs in CI / `run_all_challenges.sh`.
 

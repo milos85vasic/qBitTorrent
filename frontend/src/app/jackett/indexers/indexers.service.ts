@@ -28,7 +28,10 @@ export const BOBA_JACKETT_BASE_URL = new InjectionToken<string>(
   'BOBA_JACKETT_BASE_URL_INDEXERS',
 );
 
-const DEFAULT_BASE_URL = 'http://localhost:7189';
+const DEFAULT_BASE_URL =
+  typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}:7189`
+    : 'http://localhost:7189';
 
 export type IndexerTestStatus =
   | 'ok'

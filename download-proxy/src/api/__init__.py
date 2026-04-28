@@ -91,7 +91,7 @@ app = FastAPI(
 )
 
 
-_DEFAULT_ORIGINS = ["http://localhost:7186", "http://localhost:7187"]
+_DEFAULT_ORIGINS = ["*"]
 
 
 def _parse_allowed_origins(raw: str | None) -> list[str]:
