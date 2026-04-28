@@ -103,6 +103,43 @@ func TestWithCORS_CustomOriginsList(t *testing.T) {
 	}
 }
 
+func TestWithCORS_WildcardAllowsAnyOrigin(t *testing.T) {
+	var reached bool
+	h := WithCORS([]string{"*"}, markerPostHandler(&reached))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/x", nil)
+	req.Header.Set("Origin", "http://192.168.1.42:7187")
+	h.ServeHTTP(rec, req)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://192.168.1.42:7187" {
+		t.Fatalf("wildcard: want ACAO echoed back, got %q", got)
+	}
+	if !reached {
+		t.Fatal("inner handler NOT reached")
+	}
+}
+
+func TestWithCORS_EnvVarOverridesDefaults(t *testing.T) {
+	t.Setenv("ALLOWED_ORIGINS", "http://phone.local:7187")
+	var reached bool
+	h := WithCORS(nil, markerPostHandler(&reached))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/x", nil)
+	req.Header.Set("Origin", "http://phone.local:7187")
+	h.ServeHTTP(rec, req)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://phone.local:7187" {
+		t.Fatalf("env var origin: want ACAO=http://phone.local:7187, got %q", got)
+	}
+	// Default origin should no longer be allowed
+	rec2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("GET", "/x", nil)
+	req2.Header.Set("Origin", "http://localhost:7187")
+	h.ServeHTTP(rec2, req2)
+	if rec2.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatalf("default origin should NOT be allowed when env var overrides; got %q",
+			rec2.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
 func TestAuthMiddleware_OPTIONSPassesWithoutAuth(t *testing.T) {
 	// Anti-bluff regression for the auth middleware fix: OPTIONS
 	// (browser CORS preflight) must pass through without auth.
